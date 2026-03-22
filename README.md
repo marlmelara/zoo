@@ -1,16 +1,164 @@
-# React + Vite
+# Frontend Architecture
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+The frontend is organized into **public pages**, **admin dashboard pages**, and a shared **API layer** that communicates with Supabase.
 
-Currently, two official plugins are available:
+This separation allows multiple team members to work on different parts of the application without interfering with each other.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+---
 
-## React Compiler
+# Project Structure
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+```
+src
+│
+├── api
+│   ├── animals.js
+│   ├── dashboard.js
+│   ├── donations.js
+│   ├── events.js
+│   ├── inventory.js
+│   ├── public.js
+│   ├── staff.js
+│   └── tickets.js
+│
+├── pages
+│   ├── public
+│   │   ├── Home
+│   │   │   └── Home.jsx
+│   │   ├── Tickets
+│   │   │   └── Tickets.jsx
+│   │   ├── Shop
+│   │   │   └── Shop.jsx
+│   │   └── Donations
+│   │       └── Donations.jsx
+│   │
+│   └── dashboards
+│       └── Admin
+│           ├── Dashboard.jsx
+│           └── tabs
+│               ├── Animals.jsx
+│               ├── Staff.jsx
+│               ├── AdminTickets.jsx
+│               ├── Events.jsx
+│               └── Inventory.jsx
+│
+├── components
+│   ├── Layout.jsx
+│   └── ErrorBoundary.jsx
+│
+├── contexts
+│   └── AuthContext.jsx
+│
+├── lib
+│   └── supabase.js
+│
+├── utils
+│   └── apiHandler.js
+```
 
-## Expanding the ESLint configuration
+---
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+# Public vs Admin Routes
+
+The application separates the **public website** from the **internal admin dashboard**.
+
+## Public Routes
+
+These routes are accessible to visitors.
+
+```
+/               → Zoo homepage
+/tickets        → Public ticket purchase
+/shop           → Gift shop
+/donations      → Donation page
+/login          → Employee login
+```
+
+Public pages are located in:
+
+```
+src/pages/public
+```
+
+---
+
+## Admin Dashboard Routes
+
+These routes require authentication and are used by zoo employees.
+
+```
+/dashboard
+/dashboard/admin
+/dashboard/animals
+/dashboard/staff
+/dashboard/tickets
+/dashboard/events
+/dashboard/inventory
+```
+
+Admin pages are located in:
+
+```
+src/pages/dashboards/Admin
+```
+
+---
+
+# API Layer (Supabase)
+
+All database communication is handled through the API helper functions located in:
+
+```
+src/api
+```
+
+Examples include:
+
+- `animals.js`
+- `events.js`
+- `inventory.js`
+- `tickets.js`
+- `staff.js`
+- `dashboard.js`
+
+Example usage inside a component:
+
+```javascript
+import { getAdminEvents } from '../../api/events';
+
+const events = await getAdminEvents();
+```
+
+Using a centralized API layer keeps components clean and avoids writing raw Supabase queries inside UI code.
+
+---
+
+# Notes for Team Members
+
+- Build UI pages inside `src/pages`
+- Call database functions from `src/api`
+- Avoid writing Supabase queries directly inside components
+- Admin pages should use the `/dashboard/...` routes
+- Public pages should remain outside the dashboard structure
+
+---
+
+# Running the Project
+
+Install dependencies:
+
+```
+npm install
+```
+
+Start the development server:
+
+```
+npm run dev
+```
+
+The app will run locally at:
+
+```
+http://localhost:5173
+```

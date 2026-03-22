@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { Lock } from 'lucide-react';
 
@@ -14,9 +14,12 @@ export default function Login() {
         e.preventDefault();
         try {
             setLoading(true);
+
             const { error } = await signIn({ email, password });
             if (error) throw error;
-            navigate('/');
+
+            navigate('/dashboard');   // FIXED
+
         } catch (error) {
             alert(error.message);
         } finally {

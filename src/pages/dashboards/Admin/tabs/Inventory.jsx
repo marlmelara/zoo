@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { supabase } from '../lib/supabase';
+import { supabase } from '../../../../lib/supabase';
 import { ShoppingBag, Coffee, AlertTriangle, Package, ShoppingCart, Plus, Minus, Trash2 } from 'lucide-react';
 
 export default function Inventory() {

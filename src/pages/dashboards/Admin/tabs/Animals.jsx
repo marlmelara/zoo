@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
-import { supabase } from '../lib/supabase';
+import { supabase } from '../../../../lib/supabase';
 import { Activity, Plus, X } from 'lucide-react';
 
 export default function Animals() {

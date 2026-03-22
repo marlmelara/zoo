@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { supabase } from '../lib/supabase';
+import { supabase } from '../../../lib/supabase';
 import { LayoutDashboard, Users, Ticket, ShoppingBag, DollarSign, TrendingUp } from 'lucide-react';
 
 export default function AdminDashboard() {

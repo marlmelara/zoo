@@ -6,7 +6,6 @@ import { getUpcomingEvents, getHomeStats } from '../../../api/public';
 // Import React Icons
 import { FaClock, FaTicketAlt, FaMap, FaMapMarkerAlt, FaPhone, FaEnvelope } from 'react-icons/fa';
 
-
 // Import Swiper styles
 import 'swiper/css';
 import 'swiper/css/pagination';
@@ -251,16 +250,6 @@ useEffect(() => {
                 </div>
               </div>
 
-              {/* Quick Links */}
-              <div className="footer-section">
-                <h3 className="footer-title">Quick Links</h3>
-                <ul className="footer-links">
-                  <li><a href="/about">About Us</a></li>
-                  <li><a href="/contact">Contact</a></li>
-                  <li><a href="/schedule">Calendar</a></li>
-                  <li><a href="/privacy">Privacy Policy</a></li>
-                </ul>
-              </div>
             </div>
 
             {/* Copyright Bar */}

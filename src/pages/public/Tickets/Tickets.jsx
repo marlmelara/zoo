@@ -1,65 +1,361 @@
-import React from 'react';
-import { getPublicTicketTypes } from '../../../api/tickets';
-
-const ticketOptions = [
-  {
-    title: 'General Admission',
-    description: 'Standard zoo entry for one guest.',
-    price: '$24.99',
-  },
-  {
-    title: 'Child Admission',
-    description: 'Discounted admission for children.',
-    price: '$17.99',
-  },
-  {
-    title: 'Membership',
-    description: 'Unlimited visits plus member-exclusive benefits.',
-    price: '$89.99 / year',
-  },
-  {
-    title: 'VIP Experience',
-    description: 'Premium access with special event and exhibit perks.',
-    price: '$149.99',
-  },
-];
+import React, { useState } from 'react';
+import { FaCalendarAlt, FaUser, FaChild, FaMinus, FaPlus } from 'react-icons/fa';
+import { FaPersonCane } from "react-icons/fa6";
 
 export default function Tickets() {
-  return (
-    <div style={{ color: 'white' }}>
-      <section style={{ marginBottom: '40px' }}>
-        <h1 style={{ fontSize: '42px', marginBottom: '12px' }}>Tickets & Membership</h1>
-        <p style={{ color: 'var(--color-text-muted)', maxWidth: '700px' }}>
-          Plan your visit with admission options, family-friendly pricing, and membership packages.
-        </p>
-      </section>
+  const [selectedDate, setSelectedDate] = useState(null);
+  const [selectedTime, setSelectedTime] = useState(null);
+  const [quantities, setQuantities] = useState({
+    adult: 0,
+    youth: 0,
+    senior: 0
+  });
 
-      <section
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-          gap: '20px',
-        }}
-      >
-        {ticketOptions.map((ticket) => (
-          <div
-            key={ticket.title}
-            className="glass-panel"
-            style={{ padding: '24px', borderRadius: '16px' }}
-          >
-            <h2 style={{ marginTop: 0, marginBottom: '10px' }}>{ticket.title}</h2>
-            <p style={{ color: 'var(--color-text-muted)', minHeight: '48px' }}>
-              {ticket.description}
+  // Generate calendar for March 2026
+  const [currentYear, setCurrentYear] = useState(2026);
+  const [currentMonthIndex, setCurrentMonthIndex] = useState(2); // 2 = March
+
+  const timeSlots = [
+    '9:00 AM', '10:00 AM', '11:00 AM', '12:00 PM',
+    '1:00 PM', '2:00 PM', '3:00 PM', '4:00 PM'
+  ];
+
+  const handleQuantityChange = (type, change) => {
+    setQuantities(prev => ({
+      ...prev,
+      [type]: Math.max(0, prev[type] + change)
+    }));
+  };
+
+  const getTotalTickets = () => {
+    return quantities.adult + quantities.youth + quantities.senior;
+  };
+
+  const getTotalPrice = () => {
+    const prices = {
+      adult: 24.99,
+      youth: 17.99,
+      senior: 19.99
+    };
+    return (quantities.adult * prices.adult) + 
+           (quantities.youth * prices.youth) + 
+           (quantities.senior * prices.senior);
+  };
+
+  const formatDate = (date) => {
+    if (!date) return '';
+    return date.toLocaleDateString('en-US', { 
+      weekday: 'long', 
+      month: 'long', 
+      day: 'numeric', 
+      year: 'numeric' 
+    });
+  };
+
+  // Calendar generation
+  const generateCalendarDays = () => {
+    const firstDay = new Date(currentYear, currentMonthIndex, 1);
+    const lastDay = new Date(currentYear, currentMonthIndex + 1, 0);
+    const daysInMonth = lastDay.getDate();
+    const startingDayOfWeek = firstDay.getDay();
+    
+    const days = [];
+    
+    for (let i = 0; i < startingDayOfWeek; i++) {
+      days.push(null);
+    }
+    
+    for (let i = 1; i <= daysInMonth; i++) {
+      const date = new Date(currentYear, currentMonthIndex, i);
+      const isToday = date.toDateString() === new Date().toDateString();
+      const isSelected = selectedDate && selectedDate.toDateString() === date.toDateString();
+      const isPast = date < new Date() && date.toDateString() !== new Date().toDateString();
+      
+      days.push({
+        day: i,
+        date: date,
+        isToday,
+        isSelected,
+        isPast
+      });
+    }
+    
+    return days;
+  };
+
+  const handleDateSelect = (day) => {
+    if (day && !day.isPast) {
+      setSelectedDate(day.date);
+      setSelectedTime(null);
+    }
+  };
+
+  const handleTimeSelect = (time) => {
+    setSelectedTime(time);
+  };
+
+  const handleCheckout = () => {
+    if (!selectedDate) {
+      alert('Please select a date');
+      return;
+    }
+    if (!selectedTime) {
+      alert('Please select a time');
+      return;
+    }
+    if (getTotalTickets() === 0) {
+      alert('Please select at least one ticket');
+      return;
+    }
+    
+    console.log('Checkout:', {
+      date: selectedDate,
+      time: selectedTime,
+      quantities,
+      total: getTotalPrice()
+    });
+    alert('Proceeding to checkout...');
+  };
+
+  const calendarDays = generateCalendarDays();
+  const weekDays = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+
+  return (
+    <div className="tickets-page">
+      <div className="tickets-container">
+        {/* Left Column - Ticket Options */}
+        <div className="tickets-left">
+          {/* Page Header */}
+          <div className="page-header">
+            <h1 className="page-title">Tickets & Membership</h1>
+            <p className="page-description">
+              Plan your visit with admission options, family-friendly pricing, and membership package.
             </p>
-            <p style={{ fontSize: '24px', fontWeight: '700', color: 'var(--color-primary)' }}>
-              {ticket.price}
-            </p>
-            <button className="glass-button" style={{ marginTop: '12px' }}>
-              Select
-            </button>
           </div>
-        ))}
-      </section>
+
+          {/* Member Banner */}
+          <div className="member-banner glass-panel">
+            <p>Coog Zoo Members log in now to reserve free admission and check out other great benefits!</p>
+            <button className="glass-button">Log In</button>
+          </div>
+
+          {/* Ticket Pricing Table */}
+          <div className="glass-panel tickets-table">
+            <div className="table-header">
+              <div className="header-cell ticket-type">Ticket Type</div>
+              <div className="header-cell price">Price</div>
+              <div className="header-cell quantity">Quantity</div>
+            </div>
+            
+            <div className="table-row">
+              <div className="table-cell ticket-type">
+                <FaUser className="ticket-icon" />
+                <div className="ticket-info">
+                  <span className="ticket-name">Adult</span>
+                  <span className="ticket-age">(Ages 12-64)</span>
+                </div>
+              </div>
+              <div className="table-cell price">$24.99</div>
+              <div className="table-cell quantity">
+                <div className="quantity-controls">
+                  <button 
+                    className="quantity-btn"
+                    onClick={() => handleQuantityChange('adult', -1)}
+                    disabled={quantities.adult === 0}
+                  >
+                    <FaMinus />
+                  </button>
+                  <span className="quantity-number">{quantities.adult}</span>
+                  <button 
+                    className="quantity-btn"
+                    onClick={() => handleQuantityChange('adult', 1)}
+                  >
+                    <FaPlus />
+                  </button>
+                </div>
+              </div>
+            </div>
+            
+            <div className="table-row">
+              <div className="table-cell ticket-type">
+                <FaChild className="ticket-icon" />
+                <div className="ticket-info">
+                  <span className="ticket-name">Youth</span>
+                  <span className="ticket-age">(Ages 3-11)</span>
+                </div>
+              </div>
+              <div className="table-cell price">$17.99</div>
+              <div className="table-cell quantity">
+                <div className="quantity-controls">
+                  <button 
+                    className="quantity-btn"
+                    onClick={() => handleQuantityChange('youth', -1)}
+                    disabled={quantities.youth === 0}
+                  >
+                    <FaMinus />
+                  </button>
+                  <span className="quantity-number">{quantities.youth}</span>
+                  <button 
+                    className="quantity-btn"
+                    onClick={() => handleQuantityChange('youth', 1)}
+                  >
+                    <FaPlus />
+                  </button>
+                </div>
+              </div>
+            </div>
+            
+            <div className="table-row">
+              <div className="table-cell ticket-type">
+                <FaPersonCane className="ticket-icon" />
+                <div className="ticket-info">
+                  <span className="ticket-name">Senior</span>
+                  <span className="ticket-age">(Ages 65+)</span>
+                </div>
+              </div>
+              <div className="table-cell price">$19.99</div>
+              <div className="table-cell quantity">
+                <div className="quantity-controls">
+                  <button 
+                    className="quantity-btn"
+                    onClick={() => handleQuantityChange('senior', -1)}
+                    disabled={quantities.senior === 0}
+                  >
+                    <FaMinus />
+                  </button>
+                  <span className="quantity-number">{quantities.senior}</span>
+                  <button 
+                    className="quantity-btn"
+                    onClick={() => handleQuantityChange('senior', 1)}
+                  >
+                    <FaPlus />
+                  </button>
+                </div>
+              </div>
+            </div>
+            
+            <div className="table-footer">
+              <div className="infant-note">
+                Children 2 and under always get free admission - no ticket required!
+              </div>
+            </div>
+          </div>
+
+          {/* Membership Option */}
+          <div className="glass-panel membership-card">
+            <div className="membership-header">
+              <h2 className="membership-title">Annual Membership</h2>
+              <div className="membership-badge">Best Value</div>
+            </div>
+            <p className="membership-description">
+              Unlimited visits plus member-exclusive benefits, free parking, and access to special events.
+            </p>
+            <div className="membership-pricing">
+              <span className="membership-price">$89.99</span>
+              <span className="membership-period">/ year</span>
+            </div>
+            <button className="glass-button membership-button">Become a Member</button>
+          </div>
+        </div>
+
+        {/* Right Column - Calendar and Time Selection */}
+        <div className="tickets-right">
+          <div className="glass-panel calendar-card">
+            <h3 className="calendar-title">
+              <FaCalendarAlt className="calendar-icon" />
+              Select Date & Time
+            </h3>
+            
+            <div className="calendar-header">
+              <button 
+                className="month-nav"
+                onClick={() => {
+                  if (currentMonthIndex > 0) {
+                    setCurrentMonthIndex(currentMonthIndex - 1);
+                  }
+                }}
+                disabled={currentMonthIndex === 0}
+              >
+                ←
+              </button>
+              <span className="current-month">
+                {new Date(currentYear, currentMonthIndex).toLocaleString('default', { month: 'long', year: 'numeric' })}
+              </span>
+              <button 
+                className="month-nav"
+                onClick={() => {
+                  if (currentMonthIndex < 11) {
+                    setCurrentMonthIndex(currentMonthIndex + 1);
+                  }
+                }}
+                disabled={currentMonthIndex === 11}
+              >
+                →
+              </button>
+            </div>
+
+            <div className="calendar-grid">
+              {weekDays.map(day => (
+                <div key={day} className="calendar-weekday">{day}</div>
+              ))}
+              {calendarDays.map((day, index) => (
+                <div
+                  key={index}
+                  className={`calendar-day ${day ? 'has-date' : 'empty'} 
+                    ${day?.isSelected ? 'selected' : ''} 
+                    ${day?.isToday ? 'today' : ''}
+                    ${day?.isPast ? 'past' : ''}`}
+                  onClick={() => handleDateSelect(day)}
+                >
+                  {day && <span className="day-number">{day.day}</span>}
+                </div>
+              ))}
+            </div>
+
+            {selectedDate && (
+              <div className="time-slots">
+                <h4 className="time-slots-title">Select Time</h4>
+                <div className="time-slots-grid">
+                  {timeSlots.map(time => (
+                    <button
+                      key={time}
+                      className={`time-slot ${selectedTime === time ? 'selected' : ''}`}
+                      onClick={() => handleTimeSelect(time)}
+                    >
+                      {time}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {selectedDate && selectedTime && (
+              <div className="selected-summary">
+                <p className="selected-date">
+                  <strong>Selected:</strong> {formatDate(selectedDate)} at {selectedTime}
+                </p>
+              </div>
+            )}
+
+            <div className="checkout-section">
+              <div className="total-tickets">
+                <span>Total Tickets:</span>
+                <span className="total-number">{getTotalTickets()}</span>
+              </div>
+              <div className="total-price">
+                <span>Total Price:</span>
+                <span className="price-amount">${getTotalPrice().toFixed(2)}</span>
+              </div>
+              <button 
+                className="checkout-button"
+                onClick={handleCheckout}
+              >
+                Proceed to Checkout
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

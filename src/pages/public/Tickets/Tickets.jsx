@@ -1,8 +1,12 @@
 import React, { useState } from 'react';
-import { FaCalendarAlt, FaUser, FaChild, FaMinus, FaPlus } from 'react-icons/fa';
+import { useNavigate } from 'react-router-dom';  
+import { FaCalendarAlt, FaUser, FaChild, FaMapMarkerAlt, FaPhone, FaEnvelope, FaMinus, FaPlus } from 'react-icons/fa';
 import { FaPersonCane } from "react-icons/fa6";
+import './tickets.css';
 
 export default function Tickets() {
+  const navigate = useNavigate();  
+
   const [selectedDate, setSelectedDate] = useState(null);
   const [selectedTime, setSelectedTime] = useState(null);
   const [quantities, setQuantities] = useState({
@@ -108,13 +112,18 @@ export default function Tickets() {
       return;
     }
     
-    console.log('Checkout:', {
+    // Prepare the ticket data to pass to checkout
+    const ticketData = {
       date: selectedDate,
       time: selectedTime,
-      quantities,
-      total: getTotalPrice()
-    });
-    alert('Proceeding to checkout...');
+      quantities: quantities,
+      totalTickets: getTotalTickets(),
+      totalPrice: getTotalPrice(),
+      // Add any other relevant information
+    };
+    
+    // Navigate to checkout page with the ticket data
+    navigate('/checkout', { state: { ticketData } });
   };
 
   const calendarDays = generateCalendarDays();
@@ -356,6 +365,51 @@ export default function Tickets() {
           </div>
         </div>
       </div>
-    </div>
+
+      {/* Footer */}
+      <footer className="footer">
+        <div className="footer-container">
+          <div className="footer-main">
+            <div className="footer-section footer-brand">
+                <div className="footer-logo">
+                    <div className="logo-placeholder">
+                      🦁 Coog Zoo
+                    </div>
+                </div>
+                <p className="footer-description">
+                  Discover amazing wildlife, attend exciting events, and support animal conservation at Coog Zoo.
+                </p>
+                </div>
+                {/* Contact Information */}
+                <div className="footer-section">
+                    <h3 className="footer-title">Contact Us</h3>
+                      <div className="footer-contact-info">
+                        <div className="contact-item">
+                          <FaMapMarkerAlt className="contact-icon" />
+                          <div>
+                            <p>4302 University Dr</p>
+                            <p>Houston, TX 77004</p>
+                          </div>
+                        </div>
+                        <div className="contact-item">
+                          <FaPhone className="contact-icon" />
+                          <a href="tel:5555555555">555-555-5555</a>
+                        </div>
+                        <div className="contact-item">
+                          <FaEnvelope className="contact-icon" />
+                          <a href="mailto:info@coogzoo.org">info@coogzoo.org</a>
+                        </div>
+                      </div>
+                  </div>
+          </div>
+        {/* Copyright Bar */}
+          <div className="footer-bottom">
+              <div className="footer-bottom-content">
+                <p>&copy; {new Date().getFullYear()} Coog Zoo. All rights reserved.</p>
+              </div>
+          </div>
+      </div>
+    </footer>
+  </div>
   );
 }

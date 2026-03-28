@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Swiper, SwiperSlide } from 'swiper/react';
 import { Autoplay, Pagination, Navigation, EffectFade } from 'swiper/modules';
 import { getUpcomingEvents, getHomeStats } from '../../../api/public';
+import "./home.css"; 
 
 // Import React Icons
 import { FaClock, FaTicketAlt, FaMap, FaMapMarkerAlt, FaPhone, FaEnvelope } from 'react-icons/fa';

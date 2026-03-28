@@ -1,0 +1,406 @@
+/* Tickets Page Styles */
+.tickets-page {
+  min-height: 100vh;
+  padding: 2rem 0;
+}
+
+.tickets-container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0 2rem;
+  display: grid;
+  grid-template-columns: 1fr 450px;
+  gap: 2rem;
+}
+
+/* Left Column */
+.tickets-left {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+/* Page Header */
+.page-header {
+  margin-bottom: 0;
+}
+
+.page-title {
+  font-size: 2.5rem;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+  color: white;
+  background-clip: text;
+}
+
+.page-description {
+  font-size: 1rem;
+  color: var(--color-text-muted);
+  margin: 0;
+}
+
+/* Member Banner */
+.member-banner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+  padding: 1rem 1.5rem;
+}
+
+.member-banner p {
+  margin: 0;
+  font-size: 0.95rem;
+  flex: 1;
+}
+
+/* Tickets Table */
+.tickets-table {
+  padding: 0;
+  overflow: hidden;
+}
+
+.table-header {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1.5fr;
+  background: rgba(16, 185, 129, 0.2);
+  border-bottom: 2px solid var(--color-primary);
+  padding: 1rem;
+  font-weight: 600;
+}
+
+.header-cell {
+  color: var(--color-text);
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.table-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1.5fr;
+  padding: 1rem;
+  border-bottom: 1px solid var(--glass-border);
+  transition: background-color 0.3s ease;
+}
+
+.table-row:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.table-cell {
+  display: flex;
+  align-items: center;
+  color: var(--color-text);
+}
+
+.ticket-type {
+  gap: 0.75rem;
+}
+
+.ticket-icon {
+  color: var(--color-primary);
+  font-size: 1.1rem;
+}
+
+.ticket-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.ticket-name {
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.ticket-age {
+  font-size: 0.7rem;
+  color: var(--color-text-muted);
+}
+
+.price {
+  font-weight: 600;
+  color: var(--color-primary);
+  font-size: 1rem;
+}
+
+.quantity-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.quantity-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--glass-border);
+  color: var(--color-text);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+}
+
+.quantity-btn:hover:not(:disabled) {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+.quantity-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.quantity-number {
+  font-size: 1rem;
+  font-weight: 600;
+  min-width: 25px;
+  text-align: center;
+}
+
+.table-footer {
+  padding: 1rem;
+  background: rgba(16, 185, 129, 0.05);
+  border-top: 1px solid var(--glass-border);
+}
+
+.infant-note {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  padding-top: 0.5rem;
+}
+
+/* Membership Card */
+.membership-card {
+  padding: 1.5rem;
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(139, 92, 246, 0.1));
+  position: relative;
+  overflow: hidden;
+}
+
+.membership-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--color-primary), var(--color-secondary));
+}
+
+.membership-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.membership-title {
+  font-size: 1.3rem;
+  font-weight: 700;
+  margin: 0;
+  color: white;
+  background-clip: text;
+}
+
+.membership-badge {
+  background: var(--color-primary);
+  padding: 0.2rem 0.6rem;
+  border-radius: 20px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: white;
+}
+
+.membership-description {
+  color: var(--color-text-muted);
+  line-height: 1.5;
+  margin-bottom: 1rem;
+  font-size: 0.9rem;
+}
+
+.membership-pricing {
+  margin-bottom: 1rem;
+}
+
+.membership-price {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--color-primary);
+}
+
+.membership-period {
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+}
+
+.membership-button {
+  width: 100%;
+  margin-bottom: 1rem;
+}
+
+/* Calendar Card */
+.calendar-card {
+  padding: 1.5rem;
+  position: sticky;
+  top: 2rem;
+}
+
+.calendar-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin-bottom: 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--color-text);
+}
+
+.calendar-icon {
+  color: var(--color-primary);
+}
+
+.calendar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.month-nav {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--glass-border);
+  padding: 0.4rem 0.8rem;
+  border-radius: 6px;
+  color: var(--color-text);
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.month-nav:hover:not(:disabled) {
+  background: rgba(16, 185, 129, 0.2);
+}
+
+.month-nav:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.current-month {
+  font-weight: 500;
+  font-size: 0.9rem;
+}
+
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 0.3rem;
+  margin-bottom: 1rem;
+}
+
+.calendar-weekday {
+  text-align: center;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  padding: 0.4rem;
+}
+
+.calendar-day {
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid transparent;
+}
+
+.calendar-day.has-date:hover:not(.past) {
+  background: var(--color-primary);
+}
+
+.calendar-day.selected {
+  background: var(--color-primary);
+}
+
+.calendar-day.today {
+  border-color: var(--color-primary);
+}
+
+.calendar-day.past {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.calendar-day.empty {
+  cursor: default;
+  background: transparent;
+}
+
+.day-number {
+  font-size: 0.75rem;
+  color: var(--color-text);
+}
+
+.calendar-day.selected .day-number {
+  color: white;
+}
+
+/* Time Slots */
+.time-slots {
+  margin-top: 1rem;
+}
+
+.time-slots-title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+  color: var(--color-text);
+}
+
+.time-slots-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.5rem;
+}
+
+.time-slot {
+  padding: 0.5rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--glass-border);
+  border-radius: 6px;
+  color: var(--color-text);
+  cursor: pointer;
+  font-size: 0.75rem;
+  transition: all 0.3s ease;
+}
+
+.time-slot:hover {
+  background: rgba(16, 185, 129, 0.2);
+}
+
+.time-slot.selected {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+.selected-summary {
+  margin-top: 1rem;
+  padding: 0.6rem;
+  background: rgba(16, 185, 129, 0.1);
+  border-radius: 6px;
+  font-size: 0.8rem;
+}
+
+.selected-date {
+  margin: 0;
+  color: var(--color-text);
+}

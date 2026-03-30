@@ -34,14 +34,23 @@ export default function FoodShop() {
           <div
             key={item.item_id}
             className="glass-panel"
-            style={{ padding: '16px', borderRadius: '32px', aspectRatio: '1 / 1' }}
+            style={{ padding: '16px', borderRadius: '32px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}
           >
+            {item.image_url && (
+              <div style={{ width: '100%', borderRadius: '20px', overflow: 'hidden', marginBottom: '12px' }}>
+                <img
+                  src={item.image_url}
+                  alt={item.item_name}
+                  style={{ width: '100%', height: '200px', objectFit: 'cover', display: 'block' }}
+                />
+              </div>
+            )}
             <h2 style={{ marginTop: 0 }}>{item.item_name}</h2>
             <p style={{ color: 'var(--color-text-muted)' }}>{item.description}</p>
             <p style={{ color: 'var(--color-primary)', fontWeight: 700 }}>
               ${(item.price_cents / 100).toFixed(2)}
             </p>
-            <button className="glass-button" style={{ marginTop: '16px' }}>
+            <button className="glass-button" style={{ marginTop: 'auto', paddingTop: '16px' }}>
               Add to Cart
             </button>
           </div>

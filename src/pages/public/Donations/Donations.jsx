@@ -2,9 +2,9 @@ import React, { useState } from 'react';
 import { createDonation } from '../../../api/donations';
 
 const TABS = [
-  { key: 'general', title: 'General Donations', image: 'src/images/donation-general.jpg' },
-  { key: 'animal', title: 'Animal Wellbeing', image: 'src/images/donation-animal.jpg' },
-  { key: 'conservation', title: 'Conservation Fund', image: 'src/images/donation-conservation.jpg' },
+  { key: 'general', title: 'General Donations', image: '/images/donation-general.jpg' },
+  { key: 'animal', title: 'Animal Wellbeing', image: '/images/donation-animal.jpg' },
+  { key: 'conservation', title: 'Conservation Fund', image: '/images/donation-conservation.jpg' },
 ];
 
 export default function Donations() {

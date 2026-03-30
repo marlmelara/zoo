@@ -32,25 +32,25 @@ useEffect(() => {
 
   const slides = [
     {
-      image: 'src/images/elephant2.jpg',
+      image: '/images/elephant2.jpg',
       title: 'Stop by the Zoo!',
       subtitle: 'Experience over x species from around the world',
       buttons: [{ text: '🎟️ Buy Tickets', link: '/tickets', variant: 'primary' }]
     },
     {
-      image: 'src/images/giraffe.jpg',
+      image: '/images/giraffe.jpg',
       title: 'Daily Animal Encounters',
       subtitle: 'Get up close with our friendly animals',
       buttons: [{ text: '⏰ View Schedule', link: '/schedule', variant: 'secondary' }]
     },
     {
-      image: 'src/images/lion.jpg',
+      image: '/images/lion.jpg',
       title: 'New Lion Exhibit',
       subtitle: 'Now open! Visit our majestic lions',
       buttons: [{ text: '🦁 Learn More', link: '/exhibits/lions', variant: 'primary' }]
     },
     {
-      image: 'src/images/penguin.jpg',
+      image: '/images/penguin.jpg',
       title: 'Lunch with the Zoo Keepers!',
       subtitle: 'Learn more about how you can support the zoo!',
       buttons: [{ text: '🍽️ RVSP for the lunch!', link: '/RSVP', variant: 'secondary' }]

@@ -2,16 +2,21 @@ import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../../contexts/AuthContext';
 import { supabase } from '../../../lib/supabase';
 import { getSuppliesByDepartment, createSupplyRequest, getMySupplyRequests } from '../../../api/supplies';
+import { logActivity } from '../../../api/activityLog';
 import {
     Cat, Activity, Package, Calendar, AlertTriangle, Plus, X,
     ClipboardList, Clock, CheckCircle, XCircle, Send
 } from 'lucide-react';
 
-const TABS = ['My Animals', 'Medical Records', 'Supplies', 'My Events'];
+const TABS = ['My Animals', 'Medical Records', 'My Events', 'Supplies'];
 
 export default function VetDashboard() {
-    const { employeeId, deptId } = useAuth();
+    const { user, employeeId, deptId } = useAuth();
     const [activeTab, setActiveTab] = useState('My Animals');
+
+    // Resolved IDs
+    const [resolvedEmpId, setResolvedEmpId] = useState(employeeId);
+    const [resolvedDeptId, setResolvedDeptId] = useState(deptId);
 
     // Animals state
     const [animals, setAnimals] = useState([]);
@@ -36,33 +41,78 @@ export default function VetDashboard() {
     const [eventsLoading, setEventsLoading] = useState(true);
 
     useEffect(() => {
-        fetchMyAnimals();
-        fetchMyEvents();
-        if (deptId) {
-            fetchSupplies();
-            fetchMyRequests();
-        }
-    }, [employeeId, deptId]);
+        async function loadDashboard() {
+            if (!user?.id) return;
 
-    async function fetchMyAnimals() {
+            let empId = employeeId;
+            let depId = deptId;
+
+            if (!empId || !depId) {
+                try {
+                    const { data, error } = await supabase
+                        .from('employees')
+                        .select('employee_id, dept_id')
+                        .eq('user_id', user.id)
+                        .single();
+                    if (!error && data) {
+                        empId = data.employee_id;
+                        depId = data.dept_id;
+                        setResolvedEmpId(empId);
+                        setResolvedDeptId(depId);
+                    }
+                } catch (err) {
+                    console.error('Error resolving employee:', err);
+                }
+            } else {
+                setResolvedEmpId(empId);
+                setResolvedDeptId(depId);
+            }
+
+            fetchMyAnimals(empId);
+            fetchMyEvents(empId);
+            if (depId) {
+                fetchSupplies(depId);
+                fetchMyRequests(empId);
+            } else {
+                setSuppliesLoading(false);
+            }
+        }
+        loadDashboard();
+    }, [user?.id, employeeId, deptId]);
+
+    async function fetchMyAnimals(empId) {
+        const id = empId || resolvedEmpId || employeeId;
+        if (!id) { setAnimalsLoading(false); return; }
         try {
-            // Vet's animals are linked via health_records.vet_id
+            // Vet's animals via vet_animal_assignments junction table
+            const { data: assignments, error: vaError } = await supabase
+                .from('vet_animal_assignments')
+                .select('animal_id')
+                .eq('vet_id', id);
+
+            if (vaError || !assignments?.length) {
+                setAnimals([]);
+                setAnimalsLoading(false);
+                return;
+            }
+
+            const animalIds = assignments.map(a => a.animal_id).filter(Boolean);
+            if (animalIds.length === 0) {
+                setAnimals([]);
+                setAnimalsLoading(false);
+                return;
+            }
+
             const { data, error } = await supabase
                 .from('animals')
-                .select('*, animal_zones(zone_name), health_records!inner(record_id, vet_id)')
-                .eq('health_records.vet_id', employeeId);
+                .select('*, animal_zones(zone_name), health_records(record_id)')
+                .in('animal_id', animalIds);
 
             if (error) throw error;
             setAnimals(data || []);
         } catch (err) {
             console.error('Error fetching vet animals:', err);
-            // Fallback: get all animals if filter fails
-            try {
-                const { data } = await supabase.from('animals').select('*, animal_zones(zone_name), health_records(record_id, vet_id)');
-                setAnimals((data || []).filter(a => a.health_records?.vet_id === employeeId));
-            } catch (e) {
-                setAnimals([]);
-            }
+            setAnimals([]);
         } finally {
             setAnimalsLoading(false);
         }
@@ -104,9 +154,11 @@ export default function VetDashboard() {
         }
     }
 
-    async function fetchSupplies() {
+    async function fetchSupplies(depId) {
+        const id = depId || resolvedDeptId || deptId;
+        if (!id) { setSuppliesLoading(false); return; }
         try {
-            const data = await getSuppliesByDepartment(deptId);
+            const data = await getSuppliesByDepartment(id);
             setSupplies(data);
         } catch (err) {
             console.error('Error fetching supplies:', err);
@@ -115,10 +167,11 @@ export default function VetDashboard() {
         }
     }
 
-    async function fetchMyRequests() {
-        if (!employeeId) return;
+    async function fetchMyRequests(empId) {
+        const id = empId || resolvedEmpId || employeeId;
+        if (!id) return;
         try {
-            const data = await getMySupplyRequests(employeeId);
+            const data = await getMySupplyRequests(id);
             setMyRequests(data);
         } catch (err) {
             console.error('Error fetching my requests:', err);
@@ -128,32 +181,42 @@ export default function VetDashboard() {
     async function handleRequestSubmit(e) {
         e.preventDefault();
         const supply = supplies.find(s => s.supply_id === parseInt(requestForm.supply_id));
-        if (!supply) return;
+        const empId = resolvedEmpId || employeeId;
+        if (!supply || !empId) return;
         try {
-            await createSupplyRequest({
-                requested_by: employeeId,
+            const newRequest = await createSupplyRequest({
+                requested_by: empId,
                 supply_type: 'operational',
                 item_id: supply.supply_id,
                 item_name: supply.item_name,
                 requested_quantity: parseInt(requestForm.quantity),
                 reason: requestForm.reason
             });
+            await logActivity({
+                action_type: 'supply_request_created',
+                description: `Requested ${requestForm.quantity}x ${supply.item_name}`,
+                performed_by: empId,
+                target_type: 'supply_request',
+                target_id: newRequest.request_id,
+                metadata: { item_name: supply.item_name, quantity: parseInt(requestForm.quantity), reason: requestForm.reason }
+            });
             setShowRequestForm(false);
             setRequestForm({ supply_id: '', quantity: '', reason: '' });
-            fetchMyRequests();
+            fetchMyRequests(empId);
         } catch (err) {
             console.error('Error creating supply request:', err);
             alert('Failed to submit request: ' + err.message);
         }
     }
 
-    async function fetchMyEvents() {
-        if (!employeeId) return;
+    async function fetchMyEvents(empId) {
+        const id = empId || resolvedEmpId || employeeId;
+        if (!id) { setEventsLoading(false); return; }
         try {
             const { data, error } = await supabase
                 .from('event_assignments')
                 .select('*, events(*)')
-                .eq('employee_id', employeeId);
+                .eq('employee_id', id);
 
             if (error) throw error;
             setEvents((data || []).map(a => a.events).filter(Boolean));

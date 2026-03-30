@@ -16,7 +16,7 @@ export async function getSuppliesByDepartment(deptId) {
 export async function getAllOperationalSupplies() {
   const result = await supabase
     .from('operational_supplies')
-    .select('*, departments(dept_name)')
+    .select('*, departments!operational_supplies_department_id_fkey(dept_name)')
     .order('supply_id', { ascending: true });
 
   return handleSupabaseResult(result);

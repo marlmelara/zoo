@@ -12,52 +12,39 @@ export default function Layout() {
 
     // Build nav items based on role
     const getNavItems = () => {
-        const items = [
-            { name: 'Dashboard', path: '/dashboard', icon: <LayoutDashboard size={20} /> },
-        ];
+        const items = [];
 
-        // Role-specific dashboard link
         if (role === 'admin') {
-            items.push({ name: 'Admin Panel', path: '/dashboard/admin', icon: <Shield size={20} /> });
-            items.push({ name: 'Manager Panel', path: '/dashboard/manager', icon: <Briefcase size={20} /> });
-        }
-        if (role === 'manager') {
-            items.push({ name: 'Manager Panel', path: '/dashboard/manager', icon: <Briefcase size={20} /> });
-        }
-        if (role === 'vet') {
-            items.push({ name: 'Vet Portal', path: '/dashboard/vet', icon: <Stethoscope size={20} /> });
-        }
-        if (role === 'caretaker') {
-            items.push({ name: 'Caretaker Portal', path: '/dashboard/caretaker', icon: <Heart size={20} /> });
-        }
-        if (role === 'security' || role === 'retail') {
-            items.push({ name: 'My Portal', path: '/dashboard/employee', icon: <Users size={20} /> });
-        }
-
-        // Shared tabs (admin/manager get all, others get relevant ones)
-        if (role === 'admin' || role === 'manager') {
             items.push(
+                { name: 'Admin Panel', path: '/dashboard/admin', icon: <Shield size={20} /> },
+                { name: 'Manager Panel', path: '/dashboard/manager', icon: <Briefcase size={20} /> },
                 { name: 'Animals', path: '/dashboard/animals', icon: <Cat size={20} /> },
                 { name: 'Staff', path: '/dashboard/staff', icon: <Users size={20} /> },
                 { name: 'Tickets', path: '/dashboard/tickets', icon: <Ticket size={20} /> },
                 { name: 'Events', path: '/dashboard/events', icon: <Calendar size={20} /> },
                 { name: 'Inventory', path: '/dashboard/inventory', icon: <ShoppingBag size={20} /> },
             );
-        } else if (role === 'vet' || role === 'caretaker') {
+        } else if (role === 'manager') {
             items.push(
-                { name: 'Animals', path: '/dashboard/animals', icon: <Cat size={20} /> },
-                { name: 'Events', path: '/dashboard/events', icon: <Calendar size={20} /> },
+                { name: 'Manager Panel', path: '/dashboard/manager', icon: <Briefcase size={20} /> },
+            );
+        } else if (role === 'vet') {
+            items.push(
+                { name: 'My Portal', path: '/dashboard/vet', icon: <Stethoscope size={20} /> },
+            );
+        } else if (role === 'caretaker') {
+            items.push(
+                { name: 'My Portal', path: '/dashboard/caretaker', icon: <Heart size={20} /> },
+            );
+        } else if (role === 'customer') {
+            items.push(
+                { name: 'My Account', path: '/dashboard/customer', icon: <Users size={20} /> },
             );
         } else {
-            // security, retail
+            // security, retail — only their portal
             items.push(
-                { name: 'Events', path: '/dashboard/events', icon: <Calendar size={20} /> },
+                { name: 'My Portal', path: '/dashboard/employee', icon: <Users size={20} /> },
             );
-            if (role === 'retail') {
-                items.push(
-                    { name: 'Inventory', path: '/dashboard/inventory', icon: <ShoppingBag size={20} /> },
-                );
-            }
         }
 
         return items;

@@ -8,16 +8,22 @@ import {
     restockOperationalSupply,
     getAllOperationalSupplies
 } from '../../../api/supplies';
+import { getRecentActivity, getDepartmentActivity, logActivity } from '../../../api/activityLog';
 import {
     LayoutDashboard, Users, ClipboardList, Calendar, Package,
-    CheckCircle, XCircle, Clock, AlertTriangle, Shield
+    CheckCircle, XCircle, Clock, AlertTriangle, Shield, Activity,
+    Cat, UserPlus
 } from 'lucide-react';
 
-const TABS = ['Overview', 'Supply Requests', 'My Staff', 'Events'];
+const TABS = ['Overview', 'Supply Requests', 'My Staff', 'Animal Assignments', 'Events', 'Activity Log'];
 
 export default function ManagerDashboard() {
-    const { employeeId, deptId, role } = useAuth();
+    const { user, employeeId, deptId, role } = useAuth();
     const [activeTab, setActiveTab] = useState('Overview');
+
+    // Resolved IDs — fetched directly from DB to avoid context timing issues
+    const [resolvedEmpId, setResolvedEmpId] = useState(employeeId);
+    const [resolvedDeptId, setResolvedDeptId] = useState(deptId);
 
     // Overview state
     const [overviewStats, setOverviewStats] = useState({ staffCount: 0, pendingRequests: 0, lowStockCount: 0, upcomingEvents: 0 });
@@ -40,23 +46,78 @@ export default function ManagerDashboard() {
     // Supplies overview
     const [allSupplies, setAllSupplies] = useState([]);
 
+    // Activity log state
+    const [activityLog, setActivityLog] = useState([]);
+    const [activityLoading, setActivityLoading] = useState(true);
+
+    // Animal assignments state
+    const [allAnimals, setAllAnimals] = useState([]);
+    const [animalsLoading, setAnimalsLoading] = useState(true);
+    const [vets, setVets] = useState([]);
+    const [caretakers, setCaretakers] = useState([]);
+
+    // Event assignments state
+    const [eventAssignments, setEventAssignments] = useState({});
+
     const isAdmin = role === 'admin';
 
+    // Resolve employee profile directly from DB using auth user ID
     useEffect(() => {
-        fetchOverview();
-        fetchRequests();
-        fetchStaff();
-        fetchEvents();
-        fetchAllSupplies();
-    }, [employeeId, deptId]);
+        async function loadDashboard() {
+            if (!user?.id) return;
 
-    async function fetchOverview() {
+            let empId = employeeId;
+            let depId = deptId;
+
+            // If context IDs aren't ready yet, fetch directly
+            if (!empId || !depId) {
+                try {
+                    const { data, error } = await supabase
+                        .from('employees')
+                        .select('employee_id, dept_id')
+                        .eq('user_id', user.id)
+                        .single();
+
+                    if (!error && data) {
+                        empId = data.employee_id;
+                        depId = data.dept_id;
+                        setResolvedEmpId(empId);
+                        setResolvedDeptId(depId);
+                    }
+                } catch (err) {
+                    console.error('Error resolving employee:', err);
+                }
+            } else {
+                setResolvedEmpId(empId);
+                setResolvedDeptId(depId);
+            }
+
+            // Now fetch everything with resolved IDs
+            fetchOverview(depId);
+            fetchRequests(depId);
+            fetchStaff(depId);
+            fetchEvents();
+            fetchAllSupplies();
+            fetchActivityLog(depId);
+            fetchAnimalsWithAssignments();
+            fetchVetsAndCaretakers();
+        }
+
+        loadDashboard();
+    }, [user?.id, employeeId, deptId]);
+
+    async function fetchOverview(depId) {
+        const id = depId || resolvedDeptId || deptId;
         try {
+            const staffQuery = id
+                ? supabase.from('employees').select('*', { count: 'exact', head: true }).eq('dept_id', id)
+                : supabase.from('employees').select('*', { count: 'exact', head: true });
+
             const promises = [
-                supabase.from('employees').select('*', { count: 'exact', head: true }).eq('dept_id', deptId),
+                staffQuery,
                 supabase.from('supply_requests').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
                 supabase.from('operational_supplies').select('*', { count: 'exact', head: true }).lte('stock_count', 10),
-                supabase.from('events').select('*', { count: 'exact', head: true }).gte('event_date', new Date().toISOString())
+                supabase.from('events').select('*', { count: 'exact', head: true })
             ];
 
             const [staffRes, pendingRes, lowStockRes, eventsRes] = await Promise.all(promises);
@@ -74,10 +135,11 @@ export default function ManagerDashboard() {
         }
     }
 
-    async function fetchRequests() {
+    async function fetchRequests(depId) {
+        const id = depId || resolvedDeptId || deptId;
         try {
             const [pending, all] = await Promise.all([
-                getPendingRequestsForManager(isAdmin ? null : deptId),
+                getPendingRequestsForManager(isAdmin ? null : id),
                 getAllSupplyRequests()
             ]);
             setPendingRequests(pending);
@@ -98,36 +160,61 @@ export default function ManagerDashboard() {
         }
     }
 
-    async function handleReview(requestId, status) {
+    async function fetchActivityLog(depId) {
+        const id = depId || resolvedDeptId || deptId;
         try {
-            await reviewSupplyRequest(requestId, employeeId, status);
+            const data = isAdmin
+                ? await getRecentActivity(30)
+                : await getDepartmentActivity(id, 30);
+            setActivityLog(data);
+        } catch (err) {
+            console.error('Error fetching activity log:', err);
+        } finally {
+            setActivityLoading(false);
+        }
+    }
+
+    async function handleReview(requestId, status) {
+        const empId = resolvedEmpId || employeeId;
+        try {
+            const request = pendingRequests.find(r => r.request_id === requestId);
+            await reviewSupplyRequest(requestId, empId, status);
 
             // If approved, auto-restock the supply
-            if (status === 'approved') {
-                const request = pendingRequests.find(r => r.request_id === requestId);
-                if (request && request.supply_type === 'operational') {
-                    await restockOperationalSupply(request.item_id, request.requested_quantity);
-                }
+            if (status === 'approved' && request && request.supply_type === 'operational') {
+                await restockOperationalSupply(request.item_id, request.requested_quantity);
             }
 
-            fetchRequests();
-            fetchOverview();
+            // Log the activity
+            await logActivity({
+                action_type: status === 'approved' ? 'supply_request_approved' : 'supply_request_denied',
+                description: `${status === 'approved' ? 'Approved' : 'Denied'} request for ${request?.requested_quantity}x ${request?.item_name}`,
+                performed_by: empId,
+                target_type: 'supply_request',
+                target_id: requestId,
+                metadata: { item_name: request?.item_name, quantity: request?.requested_quantity, status }
+            });
+
+            fetchRequests(resolvedDeptId);
+            fetchOverview(resolvedDeptId);
             fetchAllSupplies();
+            fetchActivityLog(resolvedDeptId);
         } catch (err) {
             console.error('Error reviewing request:', err);
             alert('Failed to review request: ' + err.message);
         }
     }
 
-    async function fetchStaff() {
+    async function fetchStaff(depId) {
+        const id = depId || resolvedDeptId || deptId;
         try {
             let query = supabase
                 .from('employees')
                 .select('*, departments!employees_dept_id_fkey(dept_name), vets(license_no, specialty), animal_caretakers(specialization_species)')
                 .order('employee_id', { ascending: true });
 
-            if (!isAdmin && deptId) {
-                query = query.eq('dept_id', deptId);
+            if (!isAdmin && id) {
+                query = query.eq('dept_id', id);
             }
 
             const { data, error } = await query;
@@ -145,15 +232,168 @@ export default function ManagerDashboard() {
             const { data, error } = await supabase
                 .from('events')
                 .select('*')
-                .gte('event_date', new Date().toISOString())
-                .order('event_date', { ascending: true });
+                .order('event_date', { ascending: false });
 
             if (error) throw error;
             setEvents(data || []);
+
+            // Also fetch event assignments for each event
+            if (data?.length) {
+                const { data: assignments, error: aErr } = await supabase
+                    .from('event_assignments')
+                    .select('*, employees!event_assignments_employee_id_fkey(first_name, last_name), animals(name)');
+
+                if (!aErr && assignments) {
+                    const map = {};
+                    assignments.forEach(a => {
+                        if (!map[a.event_id]) map[a.event_id] = [];
+                        map[a.event_id].push(a);
+                    });
+                    setEventAssignments(map);
+                }
+            }
         } catch (err) {
             console.error('Error fetching events:', err);
         } finally {
             setEventsLoading(false);
+        }
+    }
+
+    async function fetchAnimalsWithAssignments() {
+        try {
+            const { data, error } = await supabase
+                .from('animals')
+                .select('*, animal_zones(zone_name)')
+                .order('animal_id', { ascending: true });
+
+            if (error) throw error;
+
+            // Fetch vet and caretaker assignments from junction tables
+            const [vtRes, ctRes] = await Promise.all([
+                supabase.from('vet_animal_assignments').select('*, employees!vet_animal_assignments_vet_id_fkey(first_name, last_name)'),
+                supabase.from('caretaker_animal_assignments').select('*, employees!caretaker_animal_assignments_caretaker_id_fkey(first_name, last_name)')
+            ]);
+
+            const animalsWithAssignments = (data || []).map(animal => ({
+                ...animal,
+                vet_assignments: (vtRes.data || []).filter(a => a.animal_id === animal.animal_id),
+                caretaker_assignments: (ctRes.data || []).filter(a => a.animal_id === animal.animal_id)
+            }));
+
+            setAllAnimals(animalsWithAssignments);
+        } catch (err) {
+            console.error('Error fetching animals:', err);
+        } finally {
+            setAnimalsLoading(false);
+        }
+    }
+
+    async function fetchVetsAndCaretakers() {
+        try {
+            const [vetRes, ctRes] = await Promise.all([
+                supabase.from('vets').select('employee_id, specialty, employees!vets_employee_id_fkey(first_name, last_name)'),
+                supabase.from('animal_caretakers').select('employee_id, specialization_species, assigned_animal_id, employees!animal_caretakers_employee_id_fkey(first_name, last_name)')
+            ]);
+            setVets(vetRes.data || []);
+            setCaretakers(ctRes.data || []);
+        } catch (err) {
+            console.error('Error fetching vets/caretakers:', err);
+        }
+    }
+
+    async function handleAssignVet(animalId, vetEmployeeId) {
+        try {
+            const { error } = await supabase.from('vet_animal_assignments').upsert(
+                { vet_id: vetEmployeeId, animal_id: animalId },
+                { onConflict: 'vet_id,animal_id' }
+            );
+            if (error) throw error;
+            await logActivity({
+                action_type: 'animal_vet_assigned',
+                description: `Assigned vet to animal #${animalId}`,
+                performed_by: resolvedEmpId || employeeId,
+                target_type: 'animal',
+                target_id: animalId
+            });
+            fetchAnimalsWithAssignments();
+        } catch (err) {
+            console.error('Error assigning vet:', err);
+            alert('Failed to assign vet: ' + err.message);
+        }
+    }
+
+    async function handleRemoveVetAssignment(vetId, animalId) {
+        try {
+            await supabase.from('vet_animal_assignments')
+                .delete()
+                .eq('vet_id', vetId)
+                .eq('animal_id', animalId);
+            fetchAnimalsWithAssignments();
+        } catch (err) {
+            console.error('Error removing vet:', err);
+        }
+    }
+
+    async function handleAssignCaretaker(animalId, caretakerEmployeeId) {
+        try {
+            const { error } = await supabase.from('caretaker_animal_assignments').upsert(
+                { caretaker_id: caretakerEmployeeId, animal_id: animalId },
+                { onConflict: 'caretaker_id,animal_id' }
+            );
+            if (error) throw error;
+            await logActivity({
+                action_type: 'animal_caretaker_assigned',
+                description: `Assigned caretaker to animal #${animalId}`,
+                performed_by: resolvedEmpId || employeeId,
+                target_type: 'animal',
+                target_id: animalId
+            });
+            fetchAnimalsWithAssignments();
+        } catch (err) {
+            console.error('Error assigning caretaker:', err);
+            alert('Failed to assign caretaker: ' + err.message);
+        }
+    }
+
+    async function handleRemoveCaretakerAssignment(caretakerId, animalId) {
+        try {
+            await supabase.from('caretaker_animal_assignments')
+                .delete()
+                .eq('caretaker_id', caretakerId)
+                .eq('animal_id', animalId);
+            fetchAnimalsWithAssignments();
+        } catch (err) {
+            console.error('Error removing caretaker:', err);
+        }
+    }
+
+    async function handleAssignEmployeeToEvent(eventId, empIdToAssign) {
+        try {
+            const { error } = await supabase.from('event_assignments').insert({
+                event_id: eventId,
+                employee_id: empIdToAssign
+            });
+            if (error) throw error;
+            await logActivity({
+                action_type: 'event_employee_assigned',
+                description: `Assigned employee #${empIdToAssign} to event #${eventId}`,
+                performed_by: resolvedEmpId || employeeId,
+                target_type: 'event',
+                target_id: eventId
+            });
+            fetchEvents();
+        } catch (err) {
+            console.error('Error assigning employee to event:', err);
+            alert('Failed to assign: ' + err.message);
+        }
+    }
+
+    async function handleRemoveEventAssignment(assignmentId) {
+        try {
+            await supabase.from('event_assignments').delete().eq('assignment_id', assignmentId);
+            fetchEvents();
+        } catch (err) {
+            console.error('Error removing assignment:', err);
         }
     }
 
@@ -439,39 +679,281 @@ export default function ManagerDashboard() {
                 </div>
             )}
 
+            {/* ═══════════ ACTIVITY LOG TAB ═══════════ */}
+            {activeTab === 'Activity Log' && (
+                <div>
+                    <h2 style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <Activity size={24} /> Recent Activity
+                    </h2>
+                    {activityLoading ? <p>Loading activity...</p> : activityLog.length === 0 ? (
+                        <div className="glass-panel" style={{ padding: '40px', textAlign: 'center', color: 'var(--color-text-muted)' }}>
+                            <Activity size={48} style={{ marginBottom: '15px', opacity: 0.3 }} />
+                            <p>No activity recorded yet.</p>
+                        </div>
+                    ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                            {activityLog.map(log => (
+                                <div key={log.log_id} style={{
+                                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                                    background: 'rgba(255,255,255,0.05)', padding: '14px 18px', borderRadius: '10px',
+                                    borderLeft: `3px solid ${
+                                        log.action_type.includes('approved') ? '#10b981' :
+                                        log.action_type.includes('denied') ? '#ef4444' :
+                                        log.action_type.includes('created') ? '#3b82f6' :
+                                        '#f59e0b'
+                                    }`
+                                }}>
+                                    <div>
+                                        <span style={{ fontWeight: 600 }}>{log.description}</span>
+                                        <div style={{ fontSize: '12px', color: 'var(--color-text-muted)', marginTop: '4px' }}>
+                                            {log.performer
+                                                ? `${log.performer.first_name} ${log.performer.last_name} (${log.performer.role})`
+                                                : 'System'}
+                                            <span style={{
+                                                marginLeft: '10px', padding: '2px 6px', borderRadius: '6px',
+                                                background: 'rgba(255,255,255,0.08)', fontSize: '11px'
+                                            }}>
+                                                {log.action_type.replace(/_/g, ' ')}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div style={{ textAlign: 'right', fontSize: '12px', color: 'var(--color-text-muted)', whiteSpace: 'nowrap' }}>
+                                        <div>{new Date(log.created_at).toLocaleDateString()}</div>
+                                        <div>{new Date(log.created_at).toLocaleTimeString()}</div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* ═══════════ ANIMAL ASSIGNMENTS TAB ═══════════ */}
+            {activeTab === 'Animal Assignments' && (
+                <div>
+                    <h2 style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <Cat size={24} /> Animal Assignments
+                    </h2>
+                    <p style={{ color: 'var(--color-text-muted)', marginBottom: '20px' }}>
+                        Assign vets and caretakers to animals.
+                    </p>
+
+                    {animalsLoading ? <p>Loading animals...</p> : allAnimals.length === 0 ? (
+                        <div className="glass-panel" style={{ padding: '40px', textAlign: 'center', color: 'var(--color-text-muted)' }}>
+                            <Cat size={48} style={{ marginBottom: '15px', opacity: 0.3 }} />
+                            <p>No animals found.</p>
+                        </div>
+                    ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                            {allAnimals.map(animal => {
+                                const assignedVets = animal.vet_assignments || [];
+                                const assignedVetIds = assignedVets.map(a => a.vet_id);
+                                const assignedCts = animal.caretaker_assignments || [];
+                                const assignedCtIds = assignedCts.map(a => a.caretaker_id);
+
+                                return (
+                                    <div key={animal.animal_id} className="glass-panel" style={{ padding: '20px' }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', flexWrap: 'wrap', gap: '15px' }}>
+                                            <div style={{ minWidth: '200px' }}>
+                                                <h3 style={{ margin: '0 0 5px' }}>{animal.name}</h3>
+                                                <p style={{ color: 'var(--color-secondary)', fontSize: '14px', margin: '0 0 3px' }}>
+                                                    {animal.species_common_name}
+                                                </p>
+                                                {animal.species_binomial && (
+                                                    <p style={{ fontSize: '12px', color: 'var(--color-text-muted)', fontStyle: 'italic', margin: 0 }}>
+                                                        {animal.species_binomial}
+                                                    </p>
+                                                )}
+                                                <p style={{ fontSize: '13px', color: 'var(--color-text-muted)', margin: '5px 0 0' }}>
+                                                    Zone: {animal.animal_zones?.zone_name || 'Unassigned'} | Age: {animal.age}
+                                                </p>
+                                            </div>
+
+                                            <div style={{ display: 'flex', gap: '15px', flexWrap: 'wrap' }}>
+                                                {/* Vet Assignments (multiple) */}
+                                                <div style={{ background: 'rgba(255,255,255,0.05)', padding: '12px', borderRadius: '10px', minWidth: '220px' }}>
+                                                    <p style={{ fontSize: '12px', color: 'var(--color-text-muted)', margin: '0 0 8px' }}>Assigned Vets</p>
+                                                    {assignedVets.length > 0 && (
+                                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '8px' }}>
+                                                            {assignedVets.map(a => (
+                                                                <div key={a.vet_id} style={{
+                                                                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                                                                    background: 'rgba(255,255,255,0.08)', padding: '4px 8px', borderRadius: '6px', fontSize: '13px'
+                                                                }}>
+                                                                    <span>{a.employees?.first_name} {a.employees?.last_name}</span>
+                                                                    <button
+                                                                        onClick={() => handleRemoveVetAssignment(a.vet_id, animal.animal_id)}
+                                                                        style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '0 2px', fontSize: '16px', lineHeight: 1 }}
+                                                                        title="Remove"
+                                                                    >
+                                                                        &times;
+                                                                    </button>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                    <select
+                                                        className="glass-input"
+                                                        style={{ width: '100%', fontSize: '13px' }}
+                                                        value=""
+                                                        onChange={e => {
+                                                            const vetId = parseInt(e.target.value);
+                                                            if (vetId) handleAssignVet(animal.animal_id, vetId);
+                                                        }}
+                                                    >
+                                                        <option value="">+ Add vet...</option>
+                                                        {vets
+                                                            .filter(v => !assignedVetIds.includes(v.employee_id))
+                                                            .map(v => (
+                                                                <option key={v.employee_id} value={v.employee_id}>
+                                                                    {v.employees?.first_name} {v.employees?.last_name} — {v.specialty}
+                                                                </option>
+                                                            ))}
+                                                    </select>
+                                                </div>
+
+                                                {/* Caretaker Assignments (multiple) */}
+                                                <div style={{ background: 'rgba(255,255,255,0.05)', padding: '12px', borderRadius: '10px', minWidth: '220px' }}>
+                                                    <p style={{ fontSize: '12px', color: 'var(--color-text-muted)', margin: '0 0 8px' }}>Assigned Caretakers</p>
+                                                    {assignedCts.length > 0 && (
+                                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '8px' }}>
+                                                            {assignedCts.map(a => (
+                                                                <div key={a.caretaker_id} style={{
+                                                                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                                                                    background: 'rgba(255,255,255,0.08)', padding: '4px 8px', borderRadius: '6px', fontSize: '13px'
+                                                                }}>
+                                                                    <span>{a.employees?.first_name} {a.employees?.last_name}</span>
+                                                                    <button
+                                                                        onClick={() => handleRemoveCaretakerAssignment(a.caretaker_id, animal.animal_id)}
+                                                                        style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '0 2px', fontSize: '16px', lineHeight: 1 }}
+                                                                        title="Remove"
+                                                                    >
+                                                                        &times;
+                                                                    </button>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                    <select
+                                                        className="glass-input"
+                                                        style={{ width: '100%', fontSize: '13px' }}
+                                                        value=""
+                                                        onChange={e => {
+                                                            const ctId = parseInt(e.target.value);
+                                                            if (ctId) handleAssignCaretaker(animal.animal_id, ctId);
+                                                        }}
+                                                    >
+                                                        <option value="">+ Add caretaker...</option>
+                                                        {caretakers
+                                                            .filter(c => !assignedCtIds.includes(c.employee_id))
+                                                            .map(c => (
+                                                                <option key={c.employee_id} value={c.employee_id}>
+                                                                    {c.employees?.first_name} {c.employees?.last_name} — {c.specialization_species}
+                                                                </option>
+                                                            ))}
+                                                    </select>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
+            )}
+
             {/* ═══════════ EVENTS TAB ═══════════ */}
             {activeTab === 'Events' && (
                 <div>
-                    <h2>Upcoming Events</h2>
+                    <h2>Events</h2>
                     {eventsLoading ? <p>Loading events...</p> : events.length === 0 ? (
                         <div className="glass-panel" style={{ padding: '40px', textAlign: 'center', color: 'var(--color-text-muted)' }}>
                             <Calendar size={48} style={{ marginBottom: '15px', opacity: 0.3 }} />
-                            <p>No upcoming events.</p>
+                            <p>No events found.</p>
                         </div>
                     ) : (
-                        <div className="grid-cards">
-                            {events.map(event => (
-                                <div key={event.event_id} className="glass-panel" style={{ padding: '20px' }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '15px' }}>
-                                        <Calendar color="var(--color-secondary)" />
-                                        <h3 style={{ margin: 0 }}>{event.title}</h3>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                            {events.map(event => {
+                                const assigned = eventAssignments[event.event_id] || [];
+                                return (
+                                    <div key={event.event_id} className="glass-panel" style={{ padding: '20px' }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '10px' }}>
+                                            <div>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '5px' }}>
+                                                    <Calendar color="var(--color-secondary)" size={20} />
+                                                    <h3 style={{ margin: 0 }}>{event.title}</h3>
+                                                </div>
+                                                <p style={{ fontSize: '14px', color: 'var(--color-text-muted)', margin: '5px 0' }}>{event.description}</p>
+                                                <p style={{ color: 'var(--color-secondary)', fontWeight: 600, fontSize: '14px' }}>
+                                                    {new Date(event.event_date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                                                </p>
+                                            </div>
+                                            <div style={{ textAlign: 'right', fontSize: '13px', color: 'var(--color-text-muted)' }}>
+                                                {event.actual_attendance || 0} / {event.max_capacity} capacity
+                                            </div>
+                                        </div>
+
+                                        {/* Assigned employees */}
+                                        <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '12px', marginTop: '10px' }}>
+                                            <p style={{ fontSize: '12px', color: 'var(--color-text-muted)', margin: '0 0 8px' }}>Assigned Staff:</p>
+                                            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '10px' }}>
+                                                {assigned.length === 0 ? (
+                                                    <span style={{ fontSize: '13px', color: 'var(--color-text-muted)', fontStyle: 'italic' }}>No staff assigned</span>
+                                                ) : assigned.map(a => (
+                                                    <div key={a.assignment_id} style={{
+                                                        display: 'flex', alignItems: 'center', gap: '6px',
+                                                        background: 'rgba(255,255,255,0.08)', padding: '5px 10px', borderRadius: '8px', fontSize: '13px'
+                                                    }}>
+                                                        <Users size={14} />
+                                                        <span>{a.employees?.first_name} {a.employees?.last_name}</span>
+                                                        <button
+                                                            onClick={() => handleRemoveEventAssignment(a.assignment_id)}
+                                                            style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '0 2px', fontSize: '16px', lineHeight: 1 }}
+                                                            title="Remove"
+                                                        >
+                                                            &times;
+                                                        </button>
+                                                    </div>
+                                                ))}
+                                            </div>
+
+                                            {/* Assign new employee */}
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                <select
+                                                    className="glass-input"
+                                                    style={{ flex: 1, fontSize: '13px' }}
+                                                    id={`event-assign-${event.event_id}`}
+                                                    defaultValue=""
+                                                >
+                                                    <option value="" disabled>Select employee to assign...</option>
+                                                    {staff
+                                                        .filter(s => !assigned.some(a => a.employee_id === s.employee_id))
+                                                        .map(s => (
+                                                            <option key={s.employee_id} value={s.employee_id}>
+                                                                {s.first_name} {s.last_name} ({s.role})
+                                                            </option>
+                                                        ))
+                                                    }
+                                                </select>
+                                                <button
+                                                    className="glass-button"
+                                                    style={{ background: 'var(--color-secondary)', padding: '8px 16px', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '5px' }}
+                                                    onClick={() => {
+                                                        const sel = document.getElementById(`event-assign-${event.event_id}`);
+                                                        if (sel.value) {
+                                                            handleAssignEmployeeToEvent(event.event_id, parseInt(sel.value));
+                                                            sel.value = '';
+                                                        }
+                                                    }}
+                                                >
+                                                    <UserPlus size={14} /> Assign
+                                                </button>
+                                            </div>
+                                        </div>
                                     </div>
-                                    <p style={{ fontSize: '14px', color: 'var(--color-text-muted)', marginBottom: '10px' }}>{event.description}</p>
-                                    <p style={{ color: 'var(--color-secondary)', fontWeight: 600 }}>
-                                        {new Date(event.event_date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
-                                    </p>
-                                    <div style={{ marginTop: '10px', height: '6px', width: '100%', background: 'rgba(255,255,255,0.1)', borderRadius: '3px' }}>
-                                        <div style={{
-                                            height: '100%',
-                                            width: `${event.max_capacity ? (event.actual_attendance / event.max_capacity) * 100 : 0}%`,
-                                            background: 'var(--color-secondary)', borderRadius: '3px'
-                                        }} />
-                                    </div>
-                                    <p style={{ fontSize: '12px', color: 'var(--color-text-muted)', marginTop: '5px' }}>
-                                        {event.actual_attendance || 0} / {event.max_capacity} capacity
-                                    </p>
-                                </div>
-                            ))}
+                                );
+                            })}
                         </div>
                     )}
                 </div>

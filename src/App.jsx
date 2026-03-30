@@ -28,6 +28,7 @@ import ManagerDashboard from './pages/dashboards/Manager/ManagerDashboard';
 import VetDashboard from './pages/dashboards/Vet/VetDashboard';
 import CaretakerDashboard from './pages/dashboards/Caretaker/CaretakerDashboard';
 import GenEmployeeDashboard from './pages/dashboards/GenEmployee/GenEmployeeDashboard';
+import CustomerDashboard from './pages/dashboards/Customer/CustomerDashboard';
 
 const loadingScreenStyle = {
   height: '100vh',
@@ -46,6 +47,17 @@ const PrivateRoute = () => {
   }
 
   return user ? <Outlet /> : <Navigate to="/login" replace />;
+};
+
+// Role guard: only allows specified roles, redirects others to /dashboard
+const RoleRoute = ({ allowed }) => {
+  const { role, loading } = useAuth();
+
+  if (loading) {
+    return <div style={loadingScreenStyle}>Loading...</div>;
+  }
+
+  return allowed.includes(role) ? <Outlet /> : <Navigate to="/dashboard" replace />;
 };
 
 function App() {
@@ -67,17 +79,33 @@ function App() {
           {/* Protected Routes */}
           <Route element={<PrivateRoute />}>
             <Route element={<Layout />}>
+              {/* Dashboard redirector — sends everyone to their role-specific page */}
               <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/dashboard/admin" element={<AdminDashboard />} />
-              <Route path="/dashboard/manager" element={<ManagerDashboard />} />
+
+              {/* Admin-only routes */}
+              <Route element={<RoleRoute allowed={['admin']} />}>
+                <Route path="/dashboard/admin" element={<AdminDashboard />} />
+                <Route path="/dashboard/staff" element={<Staff />} />
+                <Route path="/dashboard/tickets" element={<AdminTickets />} />
+                <Route path="/dashboard/animals" element={<Animals />} />
+              </Route>
+
+              {/* Admin + Manager routes */}
+              <Route element={<RoleRoute allowed={['admin', 'manager']} />}>
+                <Route path="/dashboard/manager" element={<ManagerDashboard />} />
+              </Route>
+
+              {/* Admin-only: Inventory & Events pages */}
+              <Route element={<RoleRoute allowed={['admin']} />}>
+                <Route path="/dashboard/inventory" element={<Inventory />} />
+                <Route path="/dashboard/events" element={<Events />} />
+              </Route>
+
+              {/* Role-specific portals */}
               <Route path="/dashboard/vet" element={<VetDashboard />} />
               <Route path="/dashboard/caretaker" element={<CaretakerDashboard />} />
               <Route path="/dashboard/employee" element={<GenEmployeeDashboard />} />
-              <Route path="/dashboard/animals" element={<Animals />} />
-              <Route path="/dashboard/staff" element={<Staff />} />
-              <Route path="/dashboard/tickets" element={<AdminTickets />} />
-              <Route path="/dashboard/events" element={<Events />} />
-              <Route path="/dashboard/inventory" element={<Inventory />} />
+              <Route path="/dashboard/customer" element={<CustomerDashboard />} />
             </Route>
           </Route>
 

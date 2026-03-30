@@ -2,20 +2,23 @@ import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../../contexts/AuthContext';
 import { supabase } from '../../../lib/supabase';
 import { getSuppliesByDepartment, createSupplyRequest, getMySupplyRequests } from '../../../api/supplies';
+import { logActivity } from '../../../api/activityLog';
 import {
-    Clock, Package, Calendar, AlertTriangle,
+    Clock, Package, AlertTriangle, Calendar,
     ClipboardList, CheckCircle, XCircle, Send, User
 } from 'lucide-react';
 
-const TABS = ['My Schedule', 'Supplies', 'My Events'];
+const TABS = ['My Schedule', 'My Events', 'Supplies'];
 
 export default function GenEmployeeDashboard() {
-    const { employeeId, deptId, role } = useAuth();
+    const { user, employeeId, deptId, role } = useAuth();
     const [activeTab, setActiveTab] = useState('My Schedule');
 
-    // Profile state
+    // Profile state — holds the full employee record + resolved IDs
     const [profile, setProfile] = useState(null);
     const [profileLoading, setProfileLoading] = useState(true);
+    const [resolvedEmpId, setResolvedEmpId] = useState(employeeId);
+    const [resolvedDeptId, setResolvedDeptId] = useState(deptId);
 
     // Supplies state
     const [supplies, setSupplies] = useState([]);
@@ -28,83 +31,85 @@ export default function GenEmployeeDashboard() {
     const [events, setEvents] = useState([]);
     const [eventsLoading, setEventsLoading] = useState(true);
 
+    // Fetch profile directly using auth user ID — avoids context timing issues
     useEffect(() => {
-        fetchProfile();
-        fetchMyEvents();
-        if (deptId) {
-            fetchSupplies();
-            fetchMyRequests();
+        async function loadAll() {
+            if (!user?.id) {
+                setProfileLoading(false);
+                setSuppliesLoading(false);
+                return;
+            }
+
+            try {
+                // Get employee record by auth user_id
+                const { data, error } = await supabase
+                    .from('employees')
+                    .select('*, departments!employees_dept_id_fkey(dept_name)')
+                    .eq('user_id', user.id)
+                    .single();
+
+                if (error) throw error;
+                setProfile(data);
+                setResolvedEmpId(data.employee_id);
+                setResolvedDeptId(data.dept_id);
+
+                // Now fetch supplies and requests with the resolved IDs
+                if (data.dept_id) {
+                    const supplyData = await getSuppliesByDepartment(data.dept_id);
+                    setSupplies(supplyData);
+                }
+                if (data.employee_id) {
+                    const reqData = await getMySupplyRequests(data.employee_id);
+                    setMyRequests(reqData);
+                    fetchMyEvents(data.employee_id);
+                }
+            } catch (err) {
+                console.error('Error loading dashboard data:', err);
+            } finally {
+                setProfileLoading(false);
+                setSuppliesLoading(false);
+            }
         }
+
+        loadAll();
+    }, [user?.id]);
+
+    // Keep resolved IDs in sync if context updates later
+    useEffect(() => {
+        if (employeeId) setResolvedEmpId(employeeId);
+        if (deptId) setResolvedDeptId(deptId);
     }, [employeeId, deptId]);
 
-    async function fetchProfile() {
-        if (!employeeId) { setProfileLoading(false); return; }
-        try {
-            const { data, error } = await supabase
-                .from('employees')
-                .select('*, departments!employees_dept_id_fkey(dept_name)')
-                .eq('employee_id', employeeId)
-                .single();
-
-            if (error) throw error;
-            setProfile(data);
-        } catch (err) {
-            console.error('Error fetching profile:', err);
-        } finally {
-            setProfileLoading(false);
-        }
-    }
-
     async function fetchSupplies() {
+        const id = resolvedDeptId || deptId;
+        if (!id) return;
         try {
-            const data = await getSuppliesByDepartment(deptId);
+            const data = await getSuppliesByDepartment(id);
             setSupplies(data);
         } catch (err) {
             console.error('Error fetching supplies:', err);
-        } finally {
-            setSuppliesLoading(false);
         }
     }
 
     async function fetchMyRequests() {
-        if (!employeeId) return;
+        const id = resolvedEmpId || employeeId;
+        if (!id) return;
         try {
-            const data = await getMySupplyRequests(employeeId);
+            const data = await getMySupplyRequests(id);
             setMyRequests(data);
         } catch (err) {
             console.error('Error fetching my requests:', err);
         }
     }
 
-    async function handleRequestSubmit(e) {
-        e.preventDefault();
-        const supply = supplies.find(s => s.supply_id === parseInt(requestForm.supply_id));
-        if (!supply) return;
-        try {
-            await createSupplyRequest({
-                requested_by: employeeId,
-                supply_type: 'operational',
-                item_id: supply.supply_id,
-                item_name: supply.item_name,
-                requested_quantity: parseInt(requestForm.quantity),
-                reason: requestForm.reason
-            });
-            setShowRequestForm(false);
-            setRequestForm({ supply_id: '', quantity: '', reason: '' });
-            fetchMyRequests();
-        } catch (err) {
-            console.error('Error creating supply request:', err);
-            alert('Failed to submit request: ' + err.message);
-        }
-    }
-
-    async function fetchMyEvents() {
-        if (!employeeId) { setEventsLoading(false); return; }
+    async function fetchMyEvents(empId) {
+        const id = empId || resolvedEmpId || employeeId;
+        if (!id) { setEventsLoading(false); return; }
         try {
             const { data, error } = await supabase
                 .from('event_assignments')
                 .select('*, events(*)')
-                .eq('employee_id', employeeId);
+                .eq('employee_id', id);
 
             if (error) throw error;
             setEvents((data || []).map(a => a.events).filter(Boolean));
@@ -112,6 +117,38 @@ export default function GenEmployeeDashboard() {
             console.error('Error fetching events:', err);
         } finally {
             setEventsLoading(false);
+        }
+    }
+
+    async function handleRequestSubmit(e) {
+        e.preventDefault();
+        const supply = supplies.find(s => s.supply_id === parseInt(requestForm.supply_id));
+        const empId = resolvedEmpId || employeeId;
+        if (!supply || !empId) return;
+        try {
+            const newRequest = await createSupplyRequest({
+                requested_by: empId,
+                supply_type: 'operational',
+                item_id: supply.supply_id,
+                item_name: supply.item_name,
+                requested_quantity: parseInt(requestForm.quantity),
+                reason: requestForm.reason
+            });
+            await logActivity({
+                action_type: 'supply_request_created',
+                description: `Requested ${requestForm.quantity}x ${supply.item_name}`,
+                performed_by: empId,
+                target_type: 'supply_request',
+                target_id: newRequest.request_id,
+                metadata: { item_name: supply.item_name, quantity: parseInt(requestForm.quantity), reason: requestForm.reason }
+            });
+            setShowRequestForm(false);
+            setRequestForm({ supply_id: '', quantity: '', reason: '' });
+            fetchMyRequests();
+            fetchSupplies();
+        } catch (err) {
+            console.error('Error creating supply request:', err);
+            alert('Failed to submit request: ' + err.message);
         }
     }
 
@@ -224,6 +261,43 @@ export default function GenEmployeeDashboard() {
                 </div>
             )}
 
+            {/* ═══════════ MY EVENTS TAB ═══════════ */}
+            {activeTab === 'My Events' && (
+                <div>
+                    <h2 style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <Calendar size={24} /> My Assigned Events
+                    </h2>
+                    {eventsLoading ? <p>Loading events...</p> : events.length === 0 ? (
+                        <div className="glass-panel" style={{ padding: '40px', textAlign: 'center', color: 'var(--color-text-muted)' }}>
+                            <Calendar size={48} style={{ marginBottom: '15px', opacity: 0.3 }} />
+                            <p>No events assigned to you yet.</p>
+                        </div>
+                    ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                            {events.map(event => (
+                                <div key={event.event_id} className="glass-panel" style={{ padding: '20px' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
+                                        <div>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '5px' }}>
+                                                <Calendar color="var(--color-secondary)" size={20} />
+                                                <h3 style={{ margin: 0 }}>{event.title}</h3>
+                                            </div>
+                                            <p style={{ fontSize: '14px', color: 'var(--color-text-muted)', margin: '5px 0' }}>{event.description}</p>
+                                            <p style={{ color: 'var(--color-secondary)', fontWeight: 600, fontSize: '14px' }}>
+                                                {new Date(event.event_date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                                            </p>
+                                        </div>
+                                        <div style={{ textAlign: 'right', fontSize: '13px', color: 'var(--color-text-muted)' }}>
+                                            {event.max_capacity && `${event.actual_attendance || 0} / ${event.max_capacity} capacity`}
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            )}
+
             {/* ═══════════ SUPPLIES TAB ═══════════ */}
             {activeTab === 'Supplies' && (
                 <div>
@@ -319,34 +393,6 @@ export default function GenEmployeeDashboard() {
                                         {statusIcon(req.status)}
                                         <span style={{ color: statusColor(req.status), fontSize: '13px', fontWeight: 600, textTransform: 'capitalize' }}>{req.status}</span>
                                     </div>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </div>
-            )}
-
-            {/* ═══════════ MY EVENTS TAB ═══════════ */}
-            {activeTab === 'My Events' && (
-                <div>
-                    <h2>My Assigned Events</h2>
-                    {eventsLoading ? <p>Loading events...</p> : events.length === 0 ? (
-                        <div className="glass-panel" style={{ padding: '40px', textAlign: 'center', color: 'var(--color-text-muted)' }}>
-                            <Calendar size={48} style={{ marginBottom: '15px', opacity: 0.3 }} />
-                            <p>No events assigned to you.</p>
-                        </div>
-                    ) : (
-                        <div className="grid-cards">
-                            {events.map(event => (
-                                <div key={event.event_id} className="glass-panel" style={{ padding: '20px' }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '15px' }}>
-                                        <Calendar color="var(--color-secondary)" />
-                                        <h3 style={{ margin: 0 }}>{event.title}</h3>
-                                    </div>
-                                    <p style={{ fontSize: '14px', color: 'var(--color-text-muted)', marginBottom: '10px' }}>{event.description}</p>
-                                    <p style={{ color: 'var(--color-accent)', fontWeight: 600 }}>
-                                        {new Date(event.event_date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
-                                    </p>
                                 </div>
                             ))}
                         </div>

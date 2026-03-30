@@ -43,7 +43,8 @@ export function AuthProvider({ children }) {
 
     async function checkUserRole(currentUser) {
         // SUPER ADMIN FALLBACK
-        if (currentUser.email === 'admin@zoo.com') {
+        const superAdmins = ['admin@zoo.com', 'pablovelazquezbremont@gmail.com'];
+        if (superAdmins.includes(currentUser.email)) {
             setRole('admin');
             setEmployeeId(null);
             setDeptId(null);

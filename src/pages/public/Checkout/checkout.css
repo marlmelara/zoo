@@ -1,4 +1,4 @@
-/* Checkout Page - Matching Tickets Page Styles */
+/* Checkout Page */
 .checkout-page {
   min-height: 100vh;
   padding: 2rem 0;
@@ -31,7 +31,7 @@
   margin: 0;
 }
 
-/* Member Banner (matching tickets page) */
+/* Member Banner */
 .member-banner {
   display: flex;
   justify-content: space-between;

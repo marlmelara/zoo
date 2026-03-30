@@ -119,7 +119,6 @@ export default function Tickets() {
       quantities: quantities,
       totalTickets: getTotalTickets(),
       totalPrice: getTotalPrice(),
-      // Add any other relevant information
     };
     
     // Navigate to checkout page with the ticket data

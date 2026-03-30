@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { LayoutDashboard, Users, Ticket, ShoppingBag, DollarSign } from 'lucide-react';
+import { LayoutDashboard, Users, Ticket, ShoppingBag, DollarSign, Database, ChevronDown, ChevronUp } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import {
     getAdminDashboardStats,
     getEmployeesWithDepartments,
@@ -19,6 +20,7 @@ export default function AdminDashboard() {
     });
     const [loading, setLoading] = useState(true);
     const [employees, setEmployees] = useState([]);
+    const [showQuery, setShowQuery] = useState(false);
 
     // Create User State
     const [showCreateUser, setShowCreateUser] = useState(false);
@@ -82,6 +84,19 @@ export default function AdminDashboard() {
 
     // Whether dept is auto-set by role (non-manager roles)
     const isDeptAutoSet = newUser.role !== 'manager';
+
+    // Aggregate data for the chart
+    const departmentCounts = employees.reduce((acc, emp) => {
+        const deptName = emp.departments?.dept_name || 'Unassigned';
+        if (!acc[deptName]) acc[deptName] = 0;
+        acc[deptName]++;
+        return acc;
+    }, {});
+
+    const chartData = Object.keys(departmentCounts).map(dept => ({
+        name: dept,
+        Employees: departmentCounts[dept]
+    }));
 
     return (
         <div>
@@ -182,6 +197,60 @@ export default function AdminDashboard() {
                         <LayoutDashboard size={20} color="#f59e0b" />
                     </div>
                     <p style={{ fontSize: '24px', fontWeight: 'bold', margin: 0 }}>{stats.totalCustomers}</p>
+                </div>
+            </div>
+
+            {/* Chart + Query Viewer */}
+            <div className="glass-panel" style={{ padding: '20px', marginBottom: '40px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                    <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <Users size={20} color="var(--color-primary)" />
+                        Employees per Department
+                    </h3>
+                    <button 
+                        className="glass-button" 
+                        style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '12px', padding: '5px 10px' }}
+                        onClick={() => setShowQuery(!showQuery)}
+                    >
+                        <Database size={14} />
+                        {showQuery ? 'Hide Query' : 'Show SQL Query'}
+                        {showQuery ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                    </button>
+                </div>
+
+                {showQuery && (
+                    <div style={{ 
+                        background: 'rgba(0,0,0,0.3)', 
+                        padding: '15px', 
+                        borderRadius: '8px', 
+                        marginBottom: '20px',
+                        fontFamily: 'monospace',
+                        color: '#10b981',
+                        fontSize: '13px',
+                        border: '1px solid rgba(16, 185, 129, 0.2)'
+                    }}>
+                        <div style={{ color: 'var(--color-text-muted)', marginBottom: '5px', fontSize: '11px' }}>-- Supabase SQL Query equivalent</div>
+                        SELECT employees.*, departments.dept_name <br/>
+                        FROM employees <br/>
+                        LEFT JOIN departments <br/>
+                        ON employees.dept_id = departments.dept_id;
+                    </div>
+                )}
+
+                <div style={{ width: '100%', height: '300px' }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={chartData} margin={{ top: 5, right: 20, bottom: 5, left: -20 }}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" vertical={false} />
+                            <XAxis dataKey="name" stroke="rgba(255,255,255,0.5)" tick={{fill: 'rgba(255,255,255,0.5)', fontSize: 12}} />
+                            <YAxis stroke="rgba(255,255,255,0.5)" tick={{fill: 'rgba(255,255,255,0.5)', fontSize: 12}} allowDecimals={false} />
+                            <Tooltip 
+                                cursor={{fill: 'rgba(255,255,255,0.05)'}}
+                                contentStyle={{ background: 'rgba(15, 23, 42, 0.9)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: 'white' }}
+                                itemStyle={{ color: 'var(--color-primary)' }}
+                            />
+                            <Bar dataKey="Employees" fill="var(--color-primary)" radius={[4, 4, 0, 0]} />
+                        </BarChart>
+                    </ResponsiveContainer>
                 </div>
             </div>
 

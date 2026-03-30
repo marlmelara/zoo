@@ -21,6 +21,7 @@ export default function AdminDashboard() {
     const [loading, setLoading] = useState(true);
     const [employees, setEmployees] = useState([]);
     const [showData, setShowData] = useState(false);
+    const [showRawData, setShowRawData] = useState(false);
 
     // Create User State
     const [showCreateUser, setShowCreateUser] = useState(false);
@@ -263,6 +264,45 @@ export default function AdminDashboard() {
                         </BarChart>
                     </ResponsiveContainer>
                 </div>
+
+                {/* Raw Data Toggle Button */}
+                <button 
+                    className="glass-button" 
+                    style={{ marginTop: '20px', width: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '5px', fontSize: '13px' }}
+                    onClick={() => setShowRawData(!showRawData)}
+                >
+                    <Database size={16} />
+                    {showRawData ? 'Hide Raw Spreadsheet' : 'View Raw Spreadsheet'}
+                    {showRawData ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                </button>
+
+                {/* Raw Data Dropdown / Spreadsheet */}
+                {showRawData && (
+                    <div style={{ marginTop: '15px', overflowX: 'auto', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', padding: '10px' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', textAlign: 'left' }}>
+                            <thead>
+                                <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.2)' }}>
+                                    <th style={{ padding: '10px', color: 'var(--color-text-muted)' }}>ID</th>
+                                    <th style={{ padding: '10px', color: 'var(--color-text-muted)' }}>Name</th>
+                                    <th style={{ padding: '10px', color: 'var(--color-text-muted)' }}>Department</th>
+                                    <th style={{ padding: '10px', color: 'var(--color-text-muted)' }}>Role</th>
+                                    <th style={{ padding: '10px', color: 'var(--color-text-muted)' }}>Pay Rate</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {employees.map(emp => (
+                                    <tr key={emp.employee_id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                                        <td style={{ padding: '10px' }}>{emp.employee_id}</td>
+                                        <td style={{ padding: '10px', color: 'var(--color-primary)' }}>{emp.first_name} {emp.last_name}</td>
+                                        <td style={{ padding: '10px' }}>{emp.departments?.dept_name || 'N/A'}</td>
+                                        <td style={{ padding: '10px', textTransform: 'capitalize' }}>{emp.role}</td>
+                                        <td style={{ padding: '10px' }}>${(emp.pay_rate_cents / 100).toFixed(2)}/hr</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
             </div>
 
             {/* Employee Directory + System Status */}

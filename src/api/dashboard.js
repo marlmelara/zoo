@@ -62,7 +62,7 @@ export async function getAdminDashboardStats() {
 export async function getEmployeesWithDepartments() {
   const result = await supabase
     .from('employees')
-    .select('*, departments(dept_name)')
+    .select('*, departments:departments!employees_dept_id_fkey(dept_name)')
     .order('employee_id', { ascending: true });
 
   return handleSupabaseResult(result);

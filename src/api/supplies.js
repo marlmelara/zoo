@@ -56,7 +56,7 @@ export async function getPendingRequestsForManager(deptId) {
   // Get all pending requests from employees in this manager's department
   const result = await supabase
     .from('supply_requests')
-    .select('*, requester:requested_by(first_name, last_name, dept_id, departments(dept_name))')
+    .select('*, requester:requested_by(first_name, last_name, dept_id, departments:departments!employees_dept_id_fkey(dept_name))')
     .eq('status', 'pending')
     .order('created_at', { ascending: false });
 
@@ -73,7 +73,7 @@ export async function getPendingRequestsForManager(deptId) {
 export async function getAllSupplyRequests() {
   const result = await supabase
     .from('supply_requests')
-    .select('*, requester:requested_by(first_name, last_name, departments(dept_name)), reviewer:reviewed_by(first_name, last_name)')
+    .select('*, requester:requested_by(first_name, last_name, departments:departments!employees_dept_id_fkey(dept_name)), reviewer:reviewed_by(first_name, last_name)')
     .order('created_at', { ascending: false });
 
   return handleSupabaseResult(result);

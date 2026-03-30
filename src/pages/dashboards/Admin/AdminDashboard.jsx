@@ -20,7 +20,7 @@ export default function AdminDashboard() {
     });
     const [loading, setLoading] = useState(true);
     const [employees, setEmployees] = useState([]);
-    const [showQuery, setShowQuery] = useState(false);
+    const [showData, setShowData] = useState(false);
 
     // Create User State
     const [showCreateUser, setShowCreateUser] = useState(false);
@@ -210,30 +210,41 @@ export default function AdminDashboard() {
                     <button 
                         className="glass-button" 
                         style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '12px', padding: '5px 10px' }}
-                        onClick={() => setShowQuery(!showQuery)}
+                        onClick={() => setShowData(!showData)}
                     >
                         <Database size={14} />
-                        {showQuery ? 'Hide Query' : 'Show SQL Query'}
-                        {showQuery ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                        {showData ? 'Hide Data' : 'Show Data'}
+                        {showData ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                     </button>
                 </div>
 
-                {showQuery && (
+                {showData && (
                     <div style={{ 
                         background: 'rgba(0,0,0,0.3)', 
                         padding: '15px', 
                         borderRadius: '8px', 
                         marginBottom: '20px',
-                        fontFamily: 'monospace',
-                        color: '#10b981',
-                        fontSize: '13px',
-                        border: '1px solid rgba(16, 185, 129, 0.2)'
+                        border: '1px solid rgba(255, 255, 255, 0.1)'
                     }}>
-                        <div style={{ color: 'var(--color-text-muted)', marginBottom: '5px', fontSize: '11px' }}>-- Supabase SQL Query equivalent</div>
-                        SELECT employees.*, departments.dept_name <br/>
-                        FROM employees <br/>
-                        LEFT JOIN departments <br/>
-                        ON employees.dept_id = departments.dept_id;
+                        <div style={{ color: 'var(--color-text-muted)', marginBottom: '10px', fontSize: '12px', fontWeight: 'bold' }}>
+                            Aggregated Data (Employees joined with Departments)
+                        </div>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                            <thead>
+                                <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.1)', textAlign: 'left' }}>
+                                    <th style={{ padding: '8px 0', color: 'var(--color-text-muted)' }}>Department</th>
+                                    <th style={{ padding: '8px 0', color: 'var(--color-text-muted)' }}>Employees</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {chartData.map((data, idx) => (
+                                    <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                                        <td style={{ padding: '8px 0' }}>{data.name}</td>
+                                        <td style={{ padding: '8px 0', color: 'var(--color-primary)' }}>{data.Employees}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
                     </div>
                 )}
 

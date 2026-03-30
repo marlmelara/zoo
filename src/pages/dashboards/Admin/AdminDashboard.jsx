@@ -1,55 +1,50 @@
 import React, { useEffect, useState } from 'react';
-import { supabase } from '../../../lib/supabase';
-import { LayoutDashboard, Users, Ticket, ShoppingBag, DollarSign, TrendingUp } from 'lucide-react';
+import { LayoutDashboard, Users, Ticket, ShoppingBag, DollarSign } from 'lucide-react';
+import {
+    getAdminDashboardStats,
+    getEmployeesWithDepartments,
+    getDepartments,
+    createZooUser,
+    ROLE_DEPT_MAP,
+} from '../../../api/dashboard';
 
 export default function AdminDashboard() {
     const [stats, setStats] = useState({
-        totalRevenue: 0,
-        ticketRevenue: 0,
-        retailRevenue: 0,
+        totalRevenueCents: 0,
+        ticketRevenueCents: 0,
+        retailRevenueCents: 0,
         totalEmployees: 0,
         totalAnimals: 0,
-        totalVisitors: 0
+        totalCustomers: 0,
     });
     const [loading, setLoading] = useState(true);
     const [employees, setEmployees] = useState([]);
+
+    // Create User State
+    const [showCreateUser, setShowCreateUser] = useState(false);
+    const [newUser, setNewUser] = useState({
+        email: '', password: '', first_name: '', last_name: '', dept_id: '', role: 'security'
+    });
+    const [departments, setDepartments] = useState([]);
 
     useEffect(() => {
         fetchAdminData();
     }, []);
 
+    useEffect(() => {
+        if (showCreateUser) {
+            getDepartments().then(setDepartments).catch(console.error);
+        }
+    }, [showCreateUser]);
+
     async function fetchAdminData() {
         try {
-            // Parallel fetching for performance
-            const [
-                { count: animalCount },
-                { count: staffCount },
-                { count: visitorCount },
-                { data: tickets },
-                { data: sales },
-                { data: allEmployees }
-            ] = await Promise.all([
-                supabase.from('animals').select('*', { count: 'exact', head: true }),
-                supabase.from('employees').select('*', { count: 'exact', head: true }),
-                supabase.from('customers').select('*', { count: 'exact', head: true }),
-                supabase.from('tickets').select('price_cents'),
-                supabase.from('sale_items').select('quantity, price_at_sale_cents'),
-                supabase.from('employees').select('*, departments(dept_name)')
+            const [dashStats, allEmployees] = await Promise.all([
+                getAdminDashboardStats(),
+                getEmployeesWithDepartments(),
             ]);
-
-            const ticketRevenue = tickets?.reduce((sum, t) => sum + (t.price_cents || 0), 0) || 0;
-            const retailRevenue = sales?.reduce((sum, s) => sum + (s.quantity * s.price_at_sale_cents), 0) || 0;
-
-            setStats({
-                totalRevenue: (ticketRevenue + retailRevenue) / 100,
-                ticketRevenue: ticketRevenue / 100,
-                retailRevenue: retailRevenue / 100,
-                totalEmployees: staffCount || 0,
-                totalAnimals: animalCount || 0,
-                totalVisitors: visitorCount || 0
-            });
-            setEmployees(allEmployees || []);
-
+            setStats(dashStats);
+            setEmployees(allEmployees);
         } catch (error) {
             console.error('Error fetching admin data:', error);
         } finally {
@@ -57,45 +52,36 @@ export default function AdminDashboard() {
         }
     }
 
-    // Create User State
-    const [showCreateUser, setShowCreateUser] = useState(false);
-    const [newUser, setNewUser] = useState({
-        email: '', password: '', first_name: '', last_name: '', dept_id: '', role: 'employee'
-    });
-    const [departments, setDepartments] = useState([]);
-
-    useEffect(() => {
-        if (showCreateUser) fetchDepartments();
-    }, [showCreateUser]);
-
-    async function fetchDepartments() {
-        const { data } = await supabase.from('departments').select('*');
-        setDepartments(data || []);
-    }
+    // When role changes, auto-set department (except manager who picks their own)
+    const handleRoleChange = (role) => {
+        const deptName = ROLE_DEPT_MAP[role];
+        const matchedDept = departments.find(d => d.dept_name === deptName);
+        setNewUser({
+            ...newUser,
+            role,
+            dept_id: matchedDept ? String(matchedDept.dept_id) : '',
+        });
+    };
 
     const handleCreateUser = async (e) => {
         e.preventDefault();
         try {
-            const { error } = await supabase.rpc('create_zoo_user', {
-                email_param: newUser.email,
-                password_param: newUser.password,
-                first_name_param: newUser.first_name,
-                last_name_param: newUser.last_name,
-                department_id_param: parseInt(newUser.dept_id),
-                role_param: newUser.role
-            });
-
-            if (error) throw error;
-
+            await createZooUser(newUser);
             alert('User created successfully!');
             setShowCreateUser(false);
-            setNewUser({ email: '', password: '', first_name: '', last_name: '', dept_id: '', role: 'employee' });
+            setNewUser({ email: '', password: '', first_name: '', last_name: '', dept_id: '', role: 'security' });
             fetchAdminData();
         } catch (error) {
             console.error('Error creating user:', error);
             alert('Failed to create user: ' + error.message);
         }
     };
+
+    const formatDollars = (cents) =>
+        (cents / 100).toLocaleString(undefined, { minimumFractionDigits: 2 });
+
+    // Whether dept is auto-set by role (non-manager roles)
+    const isDeptAutoSet = newUser.role !== 'manager';
 
     return (
         <div>
@@ -116,7 +102,7 @@ export default function AdminDashboard() {
                         <DollarSign color="#10b981" />
                         <div>
                             <span style={{ display: 'block', fontSize: '12px', color: 'var(--color-text-muted)' }}>Total Revenue</span>
-                            <span style={{ fontWeight: 'bold', fontSize: '18px' }}>${stats.totalRevenue.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                            <span style={{ fontWeight: 'bold', fontSize: '18px' }}>${formatDollars(stats.totalRevenueCents)}</span>
                         </div>
                     </div>
                 </div>
@@ -140,15 +126,25 @@ export default function AdminDashboard() {
                             <input required type="email" placeholder="Email" className="glass-input" style={{ gridColumn: '1/-1' }} value={newUser.email} onChange={e => setNewUser({ ...newUser, email: e.target.value })} />
                             <input required type="password" placeholder="Password" className="glass-input" style={{ gridColumn: '1/-1' }} value={newUser.password} onChange={e => setNewUser({ ...newUser, password: e.target.value })} />
 
-                            <select required className="glass-input" style={{ gridColumn: '1/-1' }} value={newUser.dept_id} onChange={e => setNewUser({ ...newUser, dept_id: e.target.value })}>
-                                <option value="">Select Department...</option>
-                                {departments.map(d => <option key={d.dept_id} value={d.dept_id}>{d.dept_name}</option>)}
-                            </select>
-
-                            <select className="glass-input" style={{ gridColumn: '1/-1' }} value={newUser.role} onChange={e => setNewUser({ ...newUser, role: e.target.value })}>
-                                <option value="employee">Role: Employee (Default)</option>
+                            <select className="glass-input" style={{ gridColumn: '1/-1' }} value={newUser.role} onChange={e => handleRoleChange(e.target.value)}>
+                                <option value="security">Role: Security</option>
+                                <option value="retail">Role: Retail</option>
+                                <option value="caretaker">Role: Caretaker</option>
+                                <option value="vet">Role: Vet</option>
                                 <option value="manager">Role: Manager</option>
                                 <option value="admin">Role: Admin</option>
+                            </select>
+
+                            <select
+                                required
+                                className="glass-input"
+                                style={{ gridColumn: '1/-1', opacity: isDeptAutoSet ? 0.6 : 1 }}
+                                value={newUser.dept_id}
+                                onChange={e => setNewUser({ ...newUser, dept_id: e.target.value })}
+                                disabled={isDeptAutoSet}
+                            >
+                                <option value="">Select Department...</option>
+                                {departments.map(d => <option key={d.dept_id} value={d.dept_id}>{d.dept_name}</option>)}
                             </select>
 
                             <button type="submit" className="glass-button" style={{ gridColumn: '1/-1', background: 'var(--color-secondary)', marginTop: '10px' }}>Create Account</button>
@@ -164,14 +160,14 @@ export default function AdminDashboard() {
                         <h3 style={{ margin: 0 }}>Tickets</h3>
                         <Ticket size={20} color="var(--color-primary)" />
                     </div>
-                    <p style={{ fontSize: '24px', fontWeight: 'bold', margin: 0 }}>${stats.ticketRevenue.toLocaleString()}</p>
+                    <p style={{ fontSize: '24px', fontWeight: 'bold', margin: 0 }}>${formatDollars(stats.ticketRevenueCents)}</p>
                 </div>
                 <div className="glass-panel" style={{ padding: '20px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
                         <h3 style={{ margin: 0 }}>Retail</h3>
                         <ShoppingBag size={20} color="var(--color-secondary)" />
                     </div>
-                    <p style={{ fontSize: '24px', fontWeight: 'bold', margin: 0 }}>${stats.retailRevenue.toLocaleString()}</p>
+                    <p style={{ fontSize: '24px', fontWeight: 'bold', margin: 0 }}>${formatDollars(stats.retailRevenueCents)}</p>
                 </div>
                 <div className="glass-panel" style={{ padding: '20px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
@@ -185,11 +181,11 @@ export default function AdminDashboard() {
                         <h3 style={{ margin: 0 }}>Visitors</h3>
                         <LayoutDashboard size={20} color="#f59e0b" />
                     </div>
-                    <p style={{ fontSize: '24px', fontWeight: 'bold', margin: 0 }}>{stats.totalVisitors}</p>
+                    <p style={{ fontSize: '24px', fontWeight: 'bold', margin: 0 }}>{stats.totalCustomers}</p>
                 </div>
             </div>
 
-            {/* Quick Actions / User Management Preview */}
+            {/* Employee Directory + System Status */}
             <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '20px' }}>
                 <div className="glass-panel" style={{ padding: '20px' }}>
                     <h3 style={{ marginTop: 0 }}>Employee Directory (Admin View)</h3>
@@ -199,7 +195,7 @@ export default function AdminDashboard() {
                                 <tr style={{ borderBottom: '1px solid var(--glass-border)', textAlign: 'left' }}>
                                     <th style={{ padding: '10px' }}>Name</th>
                                     <th style={{ padding: '10px' }}>Department</th>
-                                    <th style={{ padding: '10px' }}>Role/Auth</th>
+                                    <th style={{ padding: '10px' }}>Role</th>
                                     <th style={{ padding: '10px' }}>Pay Rate</th>
                                 </tr>
                             </thead>
@@ -215,8 +211,20 @@ export default function AdminDashboard() {
                                                 {emp.departments?.dept_name}
                                             </span>
                                         </td>
-                                        <td style={{ padding: '10px', fontSize: '13px' }}>
-                                            {emp.user_id ? <span style={{ color: '#10b981' }}>Linked User</span> : <span style={{ color: 'var(--color-text-muted)' }}>No Account</span>}
+                                        <td style={{ padding: '10px' }}>
+                                            <span style={{
+                                                padding: '2px 8px', borderRadius: '10px', fontSize: '12px',
+                                                background: emp.role === 'admin' ? 'rgba(239,68,68,0.2)' :
+                                                    emp.role === 'manager' ? 'rgba(245,158,11,0.2)' :
+                                                    emp.role === 'vet' ? 'rgba(16,185,129,0.2)' :
+                                                    emp.role === 'caretaker' ? 'rgba(59,130,246,0.2)' :
+                                                    emp.role === 'security' ? 'rgba(168,85,247,0.2)' :
+                                                    emp.role === 'retail' ? 'rgba(236,72,153,0.2)' :
+                                                    'rgba(255,255,255,0.1)',
+                                                textTransform: 'capitalize',
+                                            }}>
+                                                {emp.role}
+                                            </span>
                                         </td>
                                         <td style={{ padding: '10px' }}>${(emp.pay_rate_cents / 100).toFixed(2)}/hr</td>
                                     </tr>

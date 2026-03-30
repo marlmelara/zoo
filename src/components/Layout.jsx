@@ -1,21 +1,69 @@
 import React from 'react';
 import { Link, useLocation, Outlet } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { LayoutDashboard, Cat, Users, Ticket, Calendar, ShoppingBag, Shield } from 'lucide-react';
+import {
+    LayoutDashboard, Cat, Users, Ticket, Calendar,
+    ShoppingBag, Shield, Stethoscope, Heart, Briefcase
+} from 'lucide-react';
 
 export default function Layout() {
     const location = useLocation();
     const { user, role, signOut } = useAuth();
 
-    const navItems = [
-        { name: 'Dashboard', path: '/dashboard', icon: <LayoutDashboard size={20} /> },
-        ...(role === 'admin' ? [{ name: 'Admin Panel', path: '/dashboard/admin', icon: <Shield size={20} /> }] : []),
-        { name: 'Animals', path: '/dashboard/animals', icon: <Cat size={20} /> },
-        { name: 'Staff', path: '/dashboard/staff', icon: <Users size={20} /> },
-        { name: 'Tickets', path: '/dashboard/tickets', icon: <Ticket size={20} /> },
-        { name: 'Events', path: '/dashboard/events', icon: <Calendar size={20} /> },
-        { name: 'Inventory', path: '/dashboard/inventory', icon: <ShoppingBag size={20} /> },
-    ];
+    // Build nav items based on role
+    const getNavItems = () => {
+        const items = [
+            { name: 'Dashboard', path: '/dashboard', icon: <LayoutDashboard size={20} /> },
+        ];
+
+        // Role-specific dashboard link
+        if (role === 'admin') {
+            items.push({ name: 'Admin Panel', path: '/dashboard/admin', icon: <Shield size={20} /> });
+            items.push({ name: 'Manager Panel', path: '/dashboard/manager', icon: <Briefcase size={20} /> });
+        }
+        if (role === 'manager') {
+            items.push({ name: 'Manager Panel', path: '/dashboard/manager', icon: <Briefcase size={20} /> });
+        }
+        if (role === 'vet') {
+            items.push({ name: 'Vet Portal', path: '/dashboard/vet', icon: <Stethoscope size={20} /> });
+        }
+        if (role === 'caretaker') {
+            items.push({ name: 'Caretaker Portal', path: '/dashboard/caretaker', icon: <Heart size={20} /> });
+        }
+        if (role === 'security' || role === 'retail') {
+            items.push({ name: 'My Portal', path: '/dashboard/employee', icon: <Users size={20} /> });
+        }
+
+        // Shared tabs (admin/manager get all, others get relevant ones)
+        if (role === 'admin' || role === 'manager') {
+            items.push(
+                { name: 'Animals', path: '/dashboard/animals', icon: <Cat size={20} /> },
+                { name: 'Staff', path: '/dashboard/staff', icon: <Users size={20} /> },
+                { name: 'Tickets', path: '/dashboard/tickets', icon: <Ticket size={20} /> },
+                { name: 'Events', path: '/dashboard/events', icon: <Calendar size={20} /> },
+                { name: 'Inventory', path: '/dashboard/inventory', icon: <ShoppingBag size={20} /> },
+            );
+        } else if (role === 'vet' || role === 'caretaker') {
+            items.push(
+                { name: 'Animals', path: '/dashboard/animals', icon: <Cat size={20} /> },
+                { name: 'Events', path: '/dashboard/events', icon: <Calendar size={20} /> },
+            );
+        } else {
+            // security, retail
+            items.push(
+                { name: 'Events', path: '/dashboard/events', icon: <Calendar size={20} /> },
+            );
+            if (role === 'retail') {
+                items.push(
+                    { name: 'Inventory', path: '/dashboard/inventory', icon: <ShoppingBag size={20} /> },
+                );
+            }
+        }
+
+        return items;
+    };
+
+    const navItems = getNavItems();
 
     return (
         <div style={{ display: 'flex', minHeight: '100vh' }}>

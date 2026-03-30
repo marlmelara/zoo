@@ -24,6 +24,11 @@ import AdminTickets from './pages/dashboards/Admin/tabs/AdminTickets';
 import Events from './pages/dashboards/Admin/tabs/Events';
 import Inventory from './pages/dashboards/Admin/tabs/Inventory';
 
+import ManagerDashboard from './pages/dashboards/Manager/ManagerDashboard';
+import VetDashboard from './pages/dashboards/Vet/VetDashboard';
+import CaretakerDashboard from './pages/dashboards/Caretaker/CaretakerDashboard';
+import GenEmployeeDashboard from './pages/dashboards/GenEmployee/GenEmployeeDashboard';
+
 const loadingScreenStyle = {
   height: '100vh',
   display: 'flex',
@@ -54,7 +59,7 @@ function App() {
           <Route path="/tickets" element={<PublicTickets />} />
           <Route path="/shop" element={<Shop />} />
           <Route path="/donations" element={<Donations />} />
-          <Route path="/checkout" element={<Checkout />} /> 
+          <Route path="/checkout" element={<Checkout />} />
 
           <Route path="/shop/gifts" element={<GiftShop />} />
           <Route path="/shop/food" element={<FoodShop />} />
@@ -64,6 +69,10 @@ function App() {
             <Route element={<Layout />}>
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/dashboard/admin" element={<AdminDashboard />} />
+              <Route path="/dashboard/manager" element={<ManagerDashboard />} />
+              <Route path="/dashboard/vet" element={<VetDashboard />} />
+              <Route path="/dashboard/caretaker" element={<CaretakerDashboard />} />
+              <Route path="/dashboard/employee" element={<GenEmployeeDashboard />} />
               <Route path="/dashboard/animals" element={<Animals />} />
               <Route path="/dashboard/staff" element={<Staff />} />
               <Route path="/dashboard/tickets" element={<AdminTickets />} />

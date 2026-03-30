@@ -7,6 +7,8 @@ export function AuthProvider({ children }) {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
     const [role, setRole] = useState(null);
+    const [employeeId, setEmployeeId] = useState(null);
+    const [deptId, setDeptId] = useState(null);
 
     useEffect(() => {
         // Initial Session Check
@@ -43,6 +45,8 @@ export function AuthProvider({ children }) {
         // SUPER ADMIN FALLBACK
         if (currentUser.email === 'admin@zoo.com') {
             setRole('admin');
+            setEmployeeId(null);
+            setDeptId(null);
             setLoading(false);
             return;
         }
@@ -50,20 +54,24 @@ export function AuthProvider({ children }) {
         try {
             const { data, error } = await supabase
                 .from('employees')
-                .select('dept_id, departments(dept_name)')
+                .select('role, employee_id, dept_id')
                 .eq('user_id', currentUser.id)
                 .single();
 
-            if (data) {
-                if (data.departments?.dept_name === 'Administration') setRole('admin');
-                else if (data.departments?.dept_name.includes('Manager')) setRole('manager');
-                else setRole('employee');
+            if (data?.role) {
+                setRole(data.role);
+                setEmployeeId(data.employee_id);
+                setDeptId(data.dept_id);
             } else {
-                setRole('employee');
+                setRole(null);
+                setEmployeeId(null);
+                setDeptId(null);
             }
         } catch (e) {
             console.error("Error fetching role", e);
-            setRole('employee');
+            setRole(null);
+            setEmployeeId(null);
+            setDeptId(null);
         } finally {
             setLoading(false);
         }
@@ -75,6 +83,8 @@ export function AuthProvider({ children }) {
         signOut: () => supabase.auth.signOut(),
         user,
         role,
+        employeeId,
+        deptId,
         loading
     };
 

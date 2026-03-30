@@ -12,7 +12,6 @@ export default function Donations() {
   const [form, setForm] = useState({
     firstName: '',
     lastName: '',
-    email: '',
     amount: '',
     address1: '',
     city: '',
@@ -48,7 +47,7 @@ export default function Donations() {
       // createDonation is expected to exist; adapt payload to your backend shape
       await createDonation({ ...form, fund: active });
       setStatus('success');
-      setForm({ firstName: '', lastName: '', email: '', amount: '' });
+      setForm({ firstName: '', lastName: '', amount: '' });
     } catch (err) {
       console.error(err);
       setStatus('error');
@@ -194,16 +193,6 @@ export default function Donations() {
             </div>
           </div>
 
-          <input
-            className="glass-input"
-            type="email"
-            name="email"
-            placeholder="Contact email"
-            value={form.email}
-            onChange={handleChange}
-            style={{ padding: '12px' }}
-          />
-
           <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '12px' }}>
             <p style={{ margin: '0 0 8px 0', color: 'var(--color-text-muted)', fontSize: '16px' }}>Payment information (demo only — no charges will be processed)</p>
 
@@ -224,7 +213,7 @@ export default function Donations() {
               <input className="glass-input" name="billingZip" placeholder="Billing postal code" value={form.billingZip} onChange={handleChange} />
             </div>
 
-            <input className="glass-input" name="cardEmail" placeholder="Cardholder email" value={form.cardEmail} onChange={handleChange} style={{ marginTop: '12px' }} />
+            <input className="glass-input" name="cardEmail" placeholder="Email Address" value={form.cardEmail} onChange={handleChange} style={{ marginTop: '12px' }} />
           </div>
 
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>

@@ -360,7 +360,7 @@
 }
 
 .time-slots-title {
-  font-size: 0.85rem;
+  font-size: 1rem;
   font-weight: 600;
   margin-bottom: 0.75rem;
   color: var(--color-text);
@@ -373,13 +373,13 @@
 }
 
 .time-slot {
-  padding: 0.5rem;
+  padding: 0.6rem;
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid var(--glass-border);
   border-radius: 6px;
   color: var(--color-text);
   cursor: pointer;
-  font-size: 0.75rem;
+  font-size: 0.85rem;
   transition: all 0.3s ease;
 }
 
@@ -403,4 +403,14 @@
 .selected-date {
   margin: 0;
   color: var(--color-text);
+}
+
+.checkout-button {
+  color: var(--color-text);
+  background: rgba(16, 185, 129, 0.1);
+  border-radius: 6px;
+}
+
+.total-tickets, .total-price {
+  margin: 0.5rem;
 }

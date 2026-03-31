@@ -355,7 +355,7 @@ export default function Tickets() {
                 <span className="price-amount">${getTotalPrice().toFixed(2)}</span>
               </div>
               <button 
-                className="glass-button checkout-button"
+                className="checkout-button"
                 onClick={handleCheckout}
               >
                 Proceed to Checkout

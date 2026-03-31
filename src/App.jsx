@@ -8,7 +8,7 @@ import Home from './pages/public/Home/Home';
 import PublicTickets from './pages/public/Tickets/Tickets';
 import Shop from './pages/public/Shop/Shop';
 import Donations from './pages/public/Donations/Donations';
-import Schedule from './pages/public/Schedule/Schedule'
+
 import Checkout from './pages/public/Checkout/checkout';
 
 import GiftShop from './pages/public/Shop/GiftShop';
@@ -72,8 +72,7 @@ function App() {
           <Route path="/shop" element={<Shop />} />
           <Route path="/donations" element={<Donations />} />
           <Route path="/checkout" element={<Checkout />} />
-          <Route path="/schedule" element={<Schedule />} />
-          
+
           <Route path="/shop/gifts" element={<GiftShop />} />
           <Route path="/shop/food" element={<FoodShop />} />
 

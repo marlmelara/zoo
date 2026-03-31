@@ -1,3 +1,4 @@
+// src/pages/public/Checkout/checkout.jsx
 import React, { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { FaCalendarAlt, FaClock, FaUser, FaChild, 
@@ -342,7 +343,7 @@ export default function Checkout() {
           </div>
         </div>
         
-        {/* Only show forms if user is logged in */}
+        {/* Only show forms if guest or logged in */}
         {(continueAsGuest || isLoggedIn) && (
           <>
             {/* Billing Information Section */}

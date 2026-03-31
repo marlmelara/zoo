@@ -8,7 +8,7 @@ import Home from './pages/public/Home/Home';
 import PublicTickets from './pages/public/Tickets/Tickets';
 import Shop from './pages/public/Shop/Shop';
 import Donations from './pages/public/Donations/Donations';
-import Schedule from './pages/public/Schedule/Schedule'
+import Schedule from './pages/public/Schedule/schedule'
 import Checkout from './pages/public/Checkout/checkout';
 
 import GiftShop from './pages/public/Shop/GiftShop';

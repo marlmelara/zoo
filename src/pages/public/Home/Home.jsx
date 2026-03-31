@@ -171,7 +171,7 @@ useEffect(() => {
         <section className="content-section">
           <div className="section-header">
             <h2 className="section-title">Today's Schedule</h2>
-            <a href="/events" className="section-link">
+            <a href="/schedule" className="section-link">
               Full schedule →
             </a>
           </div>
@@ -184,7 +184,7 @@ useEffect(() => {
         <section className="content-section">
           <div className="section-header">
             <h2 className="section-title">Upcoming Events</h2>
-            <a href="/schedule" className="section-link">
+            <a href="/events" className="section-link">
               View all events → 
             </a>
           </div>

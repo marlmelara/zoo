@@ -4,6 +4,9 @@ import { FaCalendarAlt, FaUser, FaChild, FaMapMarkerAlt, FaPhone, FaEnvelope, Fa
 import { FaPersonCane } from "react-icons/fa6";
 import './tickets.css';
 
+let dayTime = new Date();
+console.log(dayTime);
+
 export default function Tickets() {
   const navigate = useNavigate();  
 
@@ -16,8 +19,8 @@ export default function Tickets() {
   });
 
   // Generate calendar for March 2026
-  const [currentYear, setCurrentYear] = useState(2026);
-  const [currentMonthIndex, setCurrentMonthIndex] = useState(2); // 2 = March
+  const [currentYear, setCurrentYear] = useState(dayTime.getFullYear());
+  const [currentMonthIndex, setCurrentMonthIndex] = useState(dayTime.getMonth()); // 2 = March
 
   const timeSlots = [
     '9:00 AM', '10:00 AM', '11:00 AM', '12:00 PM',
@@ -63,6 +66,7 @@ export default function Tickets() {
     const daysInMonth = lastDay.getDate();
     const startingDayOfWeek = firstDay.getDay();
     
+
     const days = [];
     
     for (let i = 0; i < startingDayOfWeek; i++) {

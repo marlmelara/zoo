@@ -10,26 +10,11 @@ const TABS = [
 export default function Donations() {
   const [active, setActive] = useState('general');
   const [form, setForm] = useState({
-    firstName: '',
-    lastName: '',
     amount: '',
-    address1: '',
-    city: '',
-    state: '',
-    zip: '',
-    country: '',
-    cardFirstName: '',
-    cardLastName: '',
-    cardNumber: '',
-    cardExp: '',
-    cardCvc: '',
-    billingCountry: '',
-    billingZip: '',
-    cardEmail: '',
   });
   const [status, setStatus] = useState(null);
 
-  const presetAmounts = [10, 25, 50, 100];
+  const presetAmounts = [10, 25, 50, 100, 150, 200, 500, 1000];
 
   function handleChange(e) {
     const { name, value } = e.target;
@@ -44,10 +29,9 @@ export default function Donations() {
     e.preventDefault();
     setStatus('submitting');
     try {
-      // createDonation is expected to exist; adapt payload to your backend shape
-      await createDonation({ ...form, fund: active });
+      await createDonation({ amount: form.amount, fund: active });
       setStatus('success');
-      setForm({ firstName: '', lastName: '', amount: '' });
+      setForm({ amount: '' });
     } catch (err) {
       console.error(err);
       setStatus('error');
@@ -114,106 +98,43 @@ export default function Donations() {
           </p>
         </div>
 
-        {/* Full-width form: donation amount, donor info, mock card fields */}
-        <form onSubmit={handleSubmit} style={{ display: 'grid', gap: '20px', fontSize: '18px' }}>
-          <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
-            <div style={{ display: 'grid', gap: '6px', minWidth: '220px', flex: '1 1 260px' }}>
-              <label style={{ color: 'var(--color-text-muted)', fontSize: '16px' }}>Donation amount</label>
-              <input
-                className="glass-input"
-                type="number"
-                name="amount"
-                placeholder="Donation amount"
-                value={form.amount}
-                onChange={handleChange}
-                style={{ width: '100%', padding: '12px' }}
-              />
-            </div>
-
-            <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
-              {presetAmounts.map((a) => {
-                const isSelected = String(form.amount) === String(a);
-                return (
-                  <button
-                    key={a}
-                    type="button"
-                    onClick={() => handlePreset(a)}
-                    className={isSelected ? 'glass-button' : 'glass-button glass-button-small'}
-                    style={{
-                      padding: '10px 14px',
-                      minWidth: '64px',
-                      borderRadius: '8px',
-                      ...(isSelected ? { background: 'var(--color-accent, #2b8cff)', color: '#fff' } : {}),
-                    }}
-                  >
-                    ${a}
-                  </button>
-                );
-              })}
-            </div>
+        {/* Full-width form: donation amount only */}
+        <form onSubmit={handleSubmit} style={{ display: 'grid', gap: '24px', fontSize: '18px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(100px, 1fr))', gap: '14px', justifyContent: 'center', width: '100%', maxWidth: '560px', margin: '0 auto 12px' }}>
+            {presetAmounts.map((a) => {
+              const isSelected = String(form.amount) === String(a);
+              return (
+                <button
+                  key={a}
+                  type="button"
+                  onClick={() => handlePreset(a)}
+                  className={isSelected ? 'glass-button' : 'glass-button glass-button-small'}
+                  style={{
+                    fontSize: '18px',
+                    padding: '16px 14px',
+                    minHeight: '64px',
+                    borderRadius: '10px',
+                    ...(isSelected ? { background: 'var(--color-accent, #2b8cff)', color: '#fff' } : {}),
+                  }}
+                >
+                  ${a}
+                </button>
+              );
+            })}
           </div>
 
-          {/* Names moved into Donor Address section below */}
-
-          <div style={{ marginTop: '6px' }}>
-            <h4 style={{ margin: '6px 0', fontSize: '18px' }}>Donor Address</h4>
-            <div style={{ display: 'grid', gap: '12px' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                <input
-                  className="glass-input"
-                  name="firstName"
-                  placeholder="First name"
-                  value={form.firstName}
-                  onChange={handleChange}
-                />
-                <input
-                  className="glass-input"
-                  name="lastName"
-                  placeholder="Last name"
-                  value={form.lastName}
-                  onChange={handleChange}
-                />
-              </div>
-
-              <input
-                className="glass-input"
-                name="address1"
-                placeholder="Address"
-                value={form.address1}
-                onChange={handleChange}
-              />
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
-                <input className="glass-input" name="city" placeholder="City" value={form.city} onChange={handleChange} />
-                <input className="glass-input" name="state" placeholder="State" value={form.state} onChange={handleChange} />
-                <input className="glass-input" name="zip" placeholder="Postal code" value={form.zip} onChange={handleChange} />
-              </div>
-
-              <input className="glass-input" name="country" placeholder="Country" value={form.country} onChange={handleChange} />
-            </div>
-          </div>
-
-          <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '12px' }}>
-            <p style={{ margin: '0 0 8px 0', color: 'var(--color-text-muted)', fontSize: '16px' }}>Payment information (demo only — no charges will be processed)</p>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-              <input className="glass-input" name="cardFirstName" placeholder="Card first name" value={form.cardFirstName} onChange={handleChange} />
-              <input className="glass-input" name="cardLastName" placeholder="Card last name" value={form.cardLastName} onChange={handleChange} />
-            </div>
-
-            <input className="glass-input" name="cardNumber" placeholder="Card number" value={form.cardNumber} onChange={handleChange} />
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-              <input className="glass-input" name="cardExp" placeholder="MM/YY" value={form.cardExp} onChange={handleChange} />
-              <input className="glass-input" name="cardCvc" placeholder="CVC" value={form.cardCvc} onChange={handleChange} />
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginTop: '8px' }}>
-              <input className="glass-input" name="billingCountry" placeholder="Billing country" value={form.billingCountry} onChange={handleChange} />
-              <input className="glass-input" name="billingZip" placeholder="Billing postal code" value={form.billingZip} onChange={handleChange} />
-            </div>
-
-            <input className="glass-input" name="cardEmail" placeholder="Email Address" value={form.cardEmail} onChange={handleChange} style={{ marginTop: '12px' }} />
+          <div style={{ display: 'grid', gap: '6px', minWidth: '220px', maxWidth: '420px', margin: '0 auto' }}>
+            <input
+              className="glass-input"
+              type="text"
+              inputMode="decimal"
+              pattern="[0-9]*"
+              name="amount"
+              placeholder="other"
+              value={form.amount}
+              onChange={handleChange}
+              style={{ width: '100%', padding: '12px', MozAppearance: 'textfield', WebkitAppearance: 'none', appearance: 'none' }}
+            />
           </div>
 
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>

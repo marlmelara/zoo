@@ -1,8 +1,7 @@
 // src/pages/public/Checkout/checkout.jsx
 import React, { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { FaCalendarAlt, FaClock, FaUser, FaChild, 
-  FaExclamationTriangle, FaSignInAlt, FaUserPlus} from 'react-icons/fa';
+import { FaCalendarAlt, FaClock, FaUser, FaChild, FaExclamationTriangle, FaUserPlus} from 'react-icons/fa';
 import { FaPersonCane } from "react-icons/fa6";
 
 import './checkout.css';

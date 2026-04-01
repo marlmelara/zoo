@@ -17,48 +17,95 @@ export default function Home() {
   const [upcomingEvents, setUpcomingEvents] = useState([]);
   const [submitStatus, setSubmitStatus] = useState(null);
 
-useEffect(() => {
+const [todaySchedule, setTodaySchedule] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
     const fetchUpcomingEvents = async () => {
       try {
         const events = await getUpcomingEvents();
         setUpcomingEvents(events);
+        
+        // Fetch today's schedule (filter events for today)
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        
+        const todaysEvents = events.filter(event => {
+          const eventDate = new Date(event.event_date);
+          eventDate.setHours(0, 0, 0, 0);
+          return eventDate.getTime() === today.getTime();
+        });
+        
+        // Sort by time
+        const sortedEvents = [...todaysEvents].sort((a, b) => {
+          if (a.event_time && b.event_time) {
+            return a.event_time.localeCompare(b.event_time);
+          }
+          return 0;
+        });
+        
+        setTodaySchedule(sortedEvents);
       } catch (error) {
-        console.error('Error fetching upcoming events:', error);
+        console.error('Error fetching data:', error);
+      } finally {
+        setLoading(false);
       }
     };
 
     fetchUpcomingEvents();
   }, []);
 
+  const formatTime = (timeString) => {
+    if (!timeString) return 'Time TBD';
+    try {
+      const [hours, minutes] = timeString.split(':');
+      const hour = parseInt(hours);
+      const ampm = hour >= 12 ? 'PM' : 'AM';
+      const hour12 = hour % 12 || 12;
+      return `${hour12}:${minutes} ${ampm}`;
+    } catch {
+      return timeString;
+    }
+  };
+
+  const formatDate = () => {
+    const today = new Date();
+    return today.toLocaleDateString('en-US', { 
+      weekday: 'long', 
+      month: 'long', 
+      day: 'numeric' 
+    });
+  };
+  
   const slides = [
     {
       image: '/images/elephant2.jpg',
       title: 'Stop by the Zoo!',
-      subtitle: 'Experience over x species from around the world',
-      buttons: [{ text: '🎟️ Buy Tickets', link: '/tickets', variant: 'primary' }]
+      subtitle: 'Experience over 20+ species from around the world',
+      buttons: [{ text: 'Buy Tickets', link: '/tickets', variant: 'primary' }]
     },
     {
       image: '/images/giraffe.jpg',
       title: 'Daily Animal Encounters',
       subtitle: 'Get up close with our friendly animals',
-      buttons: [{ text: '⏰ View Schedule', link: '/schedule', variant: 'secondary' }]
+      buttons: [{ text: 'View Schedule', link: '/schedule', variant: 'secondary' }]
     },
     {
       image: '/images/lion.jpg',
       title: 'New Lion Exhibit',
       subtitle: 'Now open! Visit our majestic lions',
-      buttons: [{ text: '🦁 Learn More', link: '/exhibits/lions', variant: 'primary' }]
+      buttons: [{ text: 'Learn More', link: '/map', variant: 'primary' }]
     },
     {
       image: '/images/penguin.jpg',
       title: 'Lunch with the Zoo Keepers!',
       subtitle: 'Learn more about how you can support the zoo!',
-      buttons: [{ text: '🍽️ RVSP for the lunch!', link: '/RSVP', variant: 'secondary' }]
+      buttons: [{ text: '🍽️ RVSP for the lunch!', link: '/tickets', variant: 'secondary' }]
     }
   ];
 
   return (
-    <div className="home">
+    <div className="home" style = {{color: "white"}}>
       {/* Navigation Bar */}
       <nav className="navbar">
         <div className="navbar-container">
@@ -121,7 +168,7 @@ useEffect(() => {
                 <div className="hero-overlay"></div>
                 <div className="hero-content">
                     <h2 className="hero-title">{slide.title}</h2>
-                    <p className="hero-subtitle">{slide.subtitle}</p>
+                    <p className="hero-subtitle" style = {{color: "white"}}>{slide.subtitle}</p>
                     <div className="hero-buttons">
                       {slide.buttons.map((button, btnIndex) => (
                         <a 
@@ -167,20 +214,57 @@ useEffect(() => {
       </section>
 
       <div className="container">
-        {/* Upcoming Events */}
+        {/* Today's Schedule */}
         <section className="content-section">
           <div className="section-header">
             <h2 className="section-title">Today's Schedule</h2>
-            <a href="/schedule" className="section-link">
-              Full schedule →
-            </a>
+            <span className="schedule-date">{formatDate()}</span>
           </div>
-          <div className="card">
-            <p className="card-placeholder">Animal shows and feeding times will appear here. </p>
+          
+          <div className="schedule-card-home">
+            <div className="schedule-note-home">
+              Schedule updated each morning before we open at 9 a.m. 
+            </div>
+            
+            {loading ? (
+              <div className="loading-schedule">Loading schedule...</div>
+            ) : todaySchedule.length === 0 ? (
+              <div className="no-schedule">
+                <p>No events scheduled for today.</p>
+                <p className="no-schedule-sub">Check back later for animal encounters and more!</p>
+              </div>
+            ) : (
+              <div className="schedule-table-home">
+                <div className="schedule-table-header-home">
+                  <div className="time-header-home">Time</div>
+                  <div className="event-header-home">Event</div>
+                </div>
+                {todaySchedule.map((event, index) => (
+                  <div key={event.event_id || index} className="schedule-table-row-home">
+                    <div className="time-cell-home">
+                      <FaClock className="time-icon-home" />
+                      {formatTime(event.event_time)}
+                    </div>
+                    <div className="event-cell-home">
+                      <div className="event-name-home">{event.event_name}</div>
+                      {event.venue && (
+                        <div className="event-location-home">📍 {event.venue}</div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            
+            <div className="schedule-footer-home">
+              <a href="/schedule" className="view-full-link">
+                View Full Schedule →
+              </a>
+            </div>
           </div>
         </section>
 
-        {/* Today's Schedule */}
+        {/* Upcoming Events */}
         <section className="content-section">
           <div className="section-header">
             <h2 className="section-title">Upcoming Events</h2>

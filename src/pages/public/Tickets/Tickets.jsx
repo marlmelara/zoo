@@ -144,7 +144,7 @@ export default function Tickets() {
           {/* Member Banner */}
           <div className="member-banner glass-panel">
             <p>Coog Zoo Members log in now to reserve free admission and check out other great benefits!</p>
-            <button className="glass-button">Log In</button>
+            <a href="/login" className="glass-button" style = {{size: "2rem"}}>Log In</a>
           </div>
 
           {/* Ticket Pricing Table */}
@@ -347,15 +347,15 @@ export default function Tickets() {
 
             <div className="checkout-section">
               <div className="total-tickets">
-                <span>Total Tickets:</span>
+                <span>Total Tickets: </span>
                 <span className="total-number">{getTotalTickets()}</span>
               </div>
               <div className="total-price">
-                <span>Total Price:</span>
+                <span>Total Price: </span>
                 <span className="price-amount">${getTotalPrice().toFixed(2)}</span>
               </div>
               <button 
-                className="checkout-button"
+                className="checkout-button glass-button"
                 onClick={handleCheckout}
               >
                 Proceed to Checkout
@@ -402,11 +402,11 @@ export default function Tickets() {
                   </div>
           </div>
         {/* Copyright Bar */}
-          <div className="footer-bottom">
-              <div className="footer-bottom-content">
-                <p>&copy; {new Date().getFullYear()} Coog Zoo. All rights reserved.</p>
-              </div>
+        <div className="footer-bottom">
+          <div className="footer-bottom-content">
+            <p>&copy; {new Date().getFullYear()} Coog Zoo. All rights reserved.</p>
           </div>
+        </div>
       </div>
     </footer>
   </div>

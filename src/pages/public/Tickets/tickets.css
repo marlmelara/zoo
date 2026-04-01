@@ -212,7 +212,7 @@
   background: var(--color-primary);
   padding: 0.2rem 0.6rem;
   border-radius: 20px;
-  font-size: 0.7rem;
+  font-size: 0.95rem;
   font-weight: 600;
   color: white;
 }
@@ -360,7 +360,7 @@
 }
 
 .time-slots-title {
-  font-size: 0.85rem;
+  font-size: 1rem;
   font-weight: 600;
   margin-bottom: 0.75rem;
   color: var(--color-text);
@@ -369,7 +369,7 @@
 .time-slots-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 0.5rem;
+  gap: 0.75rem;
 }
 
 .time-slot {
@@ -379,7 +379,7 @@
   border-radius: 6px;
   color: var(--color-text);
   cursor: pointer;
-  font-size: 0.75rem;
+  font-size: 0.85rem;
   transition: all 0.3s ease;
 }
 
@@ -397,10 +397,14 @@
   padding: 0.6rem;
   background: rgba(16, 185, 129, 0.1);
   border-radius: 6px;
-  font-size: 0.8rem;
+  font-size: 1rem;
 }
 
 .selected-date {
   margin: 0;
   color: var(--color-text);
+}
+
+.total-tickets, .total-price {
+  margin: 0.5rem;
 }

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { createDonation } from '../../../api/donations';
 
 const TABS = [
@@ -52,6 +53,27 @@ export default function Donations() {
         padding: '40px',
       }}
     >
+      <div style={{ textAlign: 'center', marginBottom: '24px' }}>
+        <Link
+          to="/"
+          style={{
+            textDecoration: 'none',
+            display: 'inline-block',
+          }}
+          aria-label="Go to homepage"
+        >
+          <img
+            src="/images/test.jpg"
+            alt="Coog Zoo"
+            style={{
+              maxWidth: '200px',
+              width: '100%',
+              height: 'auto',
+              cursor: 'pointer',
+            }}
+          />
+        </Link>
+      </div>
       <section style={{ marginBottom: '20px' }}>
         <h1 style={{ fontSize: '42px', marginBottom: '8px', textAlign: 'center' }}>Support Our Zoo!</h1>
         <p style={{ fontSize: '20px', color: 'var(--color-text-muted)', maxWidth: '800px', textAlign: 'center' }}>

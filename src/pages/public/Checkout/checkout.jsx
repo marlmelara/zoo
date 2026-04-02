@@ -1,16 +1,18 @@
 // src/pages/public/Checkout/checkout.jsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { FaCalendarAlt, FaClock, FaUser, FaChild, FaExclamationTriangle, FaUserPlus} from 'react-icons/fa';
 import { FaPersonCane } from "react-icons/fa6";
+import { getShopItems } from '../../../api/inventory';
 
 import './checkout.css';
+
 
 export default function Checkout() {
   const location = useLocation();
   const navigate = useNavigate();
   const ticketData = location.state?.ticketData;
-  
+  const [items, setItems] = useState([]);  
   // State for login/guest mode
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [showLoginForm, setShowLoginForm] = useState(false);
@@ -34,6 +36,10 @@ export default function Checkout() {
     confirmEmail: ''
   });
   
+  useEffect(() => {
+      getShopItems(2).then(setItems);
+    }, []);
+
   const [shippingInfo, setShippingInfo] = useState({
     firstName: '',
     lastName: '',
@@ -226,6 +232,64 @@ export default function Checkout() {
             </div>
           </div>
         )}
+
+        {/* Add Food Panel */}
+        {(() => {
+          const [currentIndex, setCurrentIndex] = useState(0);
+          const visibleCount = 4;
+
+          const prev = () => setCurrentIndex(i => Math.max(0, i - 1));
+          const next = () => setCurrentIndex(i => Math.min(items.length - visibleCount, i + 1));
+
+          const visibleItems = items.slice(currentIndex, currentIndex + visibleCount);
+
+          return (
+            <div className="food-banner glass-panel">
+              <p style={{ marginTop: '3px', textAlign: 'center' }}>
+                Want to add in some snacks and treats? It isn't too late!
+              </p>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <button onClick={prev} className="glass-button" style={{ fontSize: '1.2rem', padding: '8px 14px' }}>←</button>
+                <div style={{
+                  display: 'flex',
+                  gap: '12px',
+                  overflow: 'hidden',
+                  flex: 1,
+                  transition: 'all 0.3s ease'
+                }}>
+                  {visibleItems.map((item) => (
+                    <div
+                      key={item.item_id}
+                      className="glass-panel"
+                      style={{
+                        flex: '1 0 0',
+                        padding: '8px',
+                        borderRadius: '8px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        transition: 'transform 0.3s ease'
+                      }}
+                    >
+                      {item.image_url && (
+                        <img
+                          src={item.image_url}
+                          alt={item.item_name}
+                          style={{ width: '100%', height: '150px', objectFit: 'cover', borderRadius: '5px', marginBottom: '6px' }}
+                        />
+                      )}
+                      <h3 style={{ margin: '4px 0' }}>{item.item_name}</h3>
+                      <p style={{ color: 'var(--color-text-muted)', fontSize: '0.85rem', textAlign: 'center' }}>{item.description}</p>
+                      <p style={{ color: 'var(--color-primary)', fontWeight: 700 }}>${(item.price_cents / 100).toFixed(2)}</p>
+                      <button className="glass-button" style={{ marginTop: 'auto', width: '100%' }}>Add to Order</button>
+                    </div>
+                  ))}
+                </div>
+                <button onClick={next} className="glass-button" style={{ fontSize: '1.2rem', padding: '8px 14px' }}>→</button>
+              </div>
+            </div>
+          );
+        })()}
         
         {/* Login Form (when expanded) */}
         {showLoginForm && !isLoggedIn && !continueAsGuest && (

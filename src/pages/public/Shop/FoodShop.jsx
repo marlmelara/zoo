@@ -50,9 +50,6 @@ export default function FoodShop() {
             <p style={{ color: 'var(--color-primary)', fontWeight: 700 }}>
               ${(item.price_cents / 100).toFixed(2)}
             </p>
-            <button className="glass-button" style={{ marginTop: 'auto', paddingTop: '16px' }}>
-              Add to Cart
-            </button>
           </div>
         ))}
       </section>

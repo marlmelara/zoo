@@ -42,7 +42,7 @@ export default function Shop() {
             <h2 style={{ marginTop: 0 }}>{section.title}</h2>
             <p style={{ color: 'var(--color-text-muted)' }}>{section.description}</p>
             <button className="glass-button" style={{ marginTop: '192px' }} onClick={() => navigate(section.path)}>
-              Explore
+              Browse
             </button>
           </div>
         ))}

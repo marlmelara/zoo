@@ -63,7 +63,7 @@ export default function Donations() {
           aria-label="Go to homepage"
         >
           <img
-            src="/images/test.jpg"
+            src="/images/logo.png"
             alt="Coog Zoo"
             style={{
               maxWidth: '200px',

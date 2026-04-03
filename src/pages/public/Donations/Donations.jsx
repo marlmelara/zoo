@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { createDonation } from '../../../api/donations';
+import logo from '../../../images/logo.png';
 
 const TABS = [
   { key: 'general', title: 'General Donations', image: '/images/donation-general.jpg' },
@@ -63,7 +64,7 @@ export default function Donations() {
           aria-label="Go to homepage"
         >
           <img
-            src="/images/logo.png"
+            src={logo}
             alt="Coog Zoo"
             style={{
               maxWidth: '200px',

@@ -3,6 +3,7 @@ import { Swiper, SwiperSlide } from 'swiper/react';
 import { Autoplay, Pagination, Navigation, EffectFade } from 'swiper/modules';
 import { getUpcomingEvents, getHomeStats } from '../../../api/public';
 import "./home.css"; 
+import logo from '../../../images/logo.png';
 
 // Import React Icons
 import { FaClock, FaTicketAlt, FaMap, FaMapMarkerAlt, FaPhone, FaEnvelope } from 'react-icons/fa';
@@ -305,7 +306,7 @@ const [todaySchedule, setTodaySchedule] = useState([]);
               <div className="footer-section footer-brand">
                 <div className="footer-logo">
                   <div className="logo-placeholder">
-                    🦁 Coog Zoo
+                    <img src={logo} style = {{maxWidth: '200px', width: '100%', height: 'auto'}} alt="Coog Zoo"></img>
                   </div>
                 </div>
                 <p className="footer-description">

@@ -8,6 +8,7 @@ import Home from './pages/public/Home/Home';
 import PublicTickets from './pages/public/Tickets/Tickets';
 import Shop from './pages/public/Shop/Shop';
 import Schedule from './pages/public/Schedule/Schedule';
+import Events from './pages/public/Events/Events';
 import Donations from './pages/public/Donations/Donations';
 import Checkout from './pages/public/Checkout/checkout';
 
@@ -21,7 +22,7 @@ import AdminDashboard from './pages/dashboards/Admin/AdminDashboard';
 import Animals from './pages/dashboards/Admin/tabs/Animals';
 import Staff from './pages/dashboards/Admin/tabs/Staff';
 import AdminTickets from './pages/dashboards/Admin/tabs/AdminTickets';
-import Events from './pages/dashboards/Admin/tabs/Events';
+import AdminEvents from './pages/dashboards/Admin/tabs/Events';
 import Inventory from './pages/dashboards/Admin/tabs/Inventory';
 
 import ManagerDashboard from './pages/dashboards/Manager/ManagerDashboard';

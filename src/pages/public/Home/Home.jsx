@@ -101,7 +101,7 @@ const [todaySchedule, setTodaySchedule] = useState([]);
       image: '/images/penguin.jpg',
       title: 'Lunch with the Zoo Keepers!',
       subtitle: 'Learn more about how you can support the zoo!',
-      buttons: [{ text: '🍽️ RVSP for the lunch!', link: '/tickets', variant: 'secondary' }]
+      buttons: [{ text: 'RVSP for the lunch!', link: '/tickets', variant: 'secondary' }]
     }
   ];
 
@@ -116,7 +116,7 @@ const [todaySchedule, setTodaySchedule] = useState([]);
           <a href="/membership" className="navbar-link">
             🐯 Membership
           </a>
-          <a href="/events" className="navbar-link">
+          <a href="/calendar" className="navbar-link">
             📅 Events
           </a>
           <a href="/shop" className="navbar-link">

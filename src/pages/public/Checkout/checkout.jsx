@@ -19,7 +19,13 @@ export default function Checkout() {
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [continueAsGuest, setContinueAsGuest] = useState(false);
-  
+  const [foodQuantities, setFoodQuantities] = useState({});
+  const handleFoodQuantityChange = (itemId, change) => {
+    setFoodQuantities(prev => ({
+      ...prev,
+      [itemId]: Math.max(0, (prev[itemId] || 0) + change)
+    }));
+  };
   // Form state
   const [sameAsBilling, setSameAsBilling] = useState(true);
   const [billingInfo, setBillingInfo] = useState({
@@ -35,6 +41,11 @@ export default function Checkout() {
     email: '',
     confirmEmail: ''
   });
+
+  const [shopItems, setShopItems] = useState([]);
+  useEffect(() => {
+    getShopItems(1).then(setShopItems);
+  }, []);
   
   useEffect(() => {
       getShopItems(2).then(setItems);
@@ -152,7 +163,7 @@ export default function Checkout() {
       billing: billingInfo,
       shipping: sameAsBilling ? billingInfo : shippingInfo
     });
-    
+    localStorage.removeItem('shopCart');
     if (isLoggedIn) {
       alert('Order placed successfully! Redirecting to your dashboard...');
       navigate('/dashboard');
@@ -160,7 +171,16 @@ export default function Checkout() {
       alert('Order placed successfully! You can create an account to track your orders.');
     }
   };
-  
+  const savedCart = JSON.parse(localStorage.getItem('shopCart') || '{}');
+  const shopData = location.state?.shopData || (
+    shopItems.length > 0
+      ? {
+          items: shopItems
+            .filter(item => savedCart[item.item_id] > 0)
+            .map(item => ({ ...item, quantity: savedCart[item.item_id] }))
+        }
+      : null
+  );
   // Handle case where user navigates directly to checkout
   if (!ticketData) {
     return (
@@ -198,7 +218,12 @@ export default function Checkout() {
     return details[type];
   };
   
-  const subtotal = ticketData.totalPrice;
+  const calcSubtotal = (list, getQty) =>  list?.reduce((sum, i) => sum + (i.price_cents / 100) * getQty(i), 0) || 0;
+  const foodSubtotal = calcSubtotal(items, i => foodQuantities[i.item_id] || 0);
+  const shopSubtotal = calcSubtotal(shopData?.items, i => i.quantity);
+  
+  const ticketsubtotal = ticketData.totalPrice;
+  const subtotal = (ticketsubtotal + shopSubtotal + foodSubtotal);
   const tax = subtotal * 0.0825;
   const total = subtotal + tax;
   
@@ -281,7 +306,11 @@ export default function Checkout() {
                       <h3 style={{ margin: '4px 0' }}>{item.item_name}</h3>
                       <p style={{ color: 'var(--color-text-muted)', fontSize: '0.85rem', textAlign: 'center' }}>{item.description}</p>
                       <p style={{ color: 'var(--color-primary)', fontWeight: 700 }}>${(item.price_cents / 100).toFixed(2)}</p>
-                      <button className="glass-button" style={{ marginTop: 'auto', width: '100%' }}>Add to Order</button>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: 'auto', width: '100%', justifyContent: 'center' }}>
+                        <button className="glass-button" onClick={() => handleFoodQuantityChange(item.item_id, -1)}>−</button>
+                        <span>{foodQuantities[item.item_id] || 0}</span>
+                        <button className="glass-button" onClick={() => handleFoodQuantityChange(item.item_id, 1)}>+</button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -389,6 +418,36 @@ export default function Checkout() {
             })}
           </div>
           
+          {/* Shop items */}
+          {shopData && shopData.items.map(item => (
+            <div key={item.item_id} className="ticket-item-simple">
+              <div className="ticket-info-simple">
+                <div>
+                  <div className="ticket-type-simple">{item.item_name}</div>
+                  <div className="ticket-quantity-simple">Quantity: {item.quantity}</div>
+                </div>
+              </div>
+              <div className="ticket-price-simple">
+                ${((item.price_cents / 100) * item.quantity).toFixed(2)}
+              </div>
+            </div>
+          ))}
+
+          {/* Food Stuff */}
+          {items.filter(item => foodQuantities[item.item_id] > 0).map(item => (
+            <div key={item.item_id} className="ticket-item-simple">
+              <div className="ticket-info-simple">
+                <div>
+                  <div className="ticket-type-simple">{item.item_name}</div>
+                  <div className="ticket-quantity-simple">Quantity: {foodQuantities[item.item_id]}</div>
+                </div>
+              </div>
+              <div className="ticket-price-simple">
+                ${((item.price_cents / 100) * foodQuantities[item.item_id]).toFixed(2)}
+              </div>
+            </div>
+          ))}
+
           {/* Order Totals */}
           <div className="order-totals-simple">
             <div className="total-row-simple">

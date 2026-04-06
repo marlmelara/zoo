@@ -5,6 +5,34 @@ import { getShopItems } from '../../../api/inventory';
 export default function GiftShop() {
   const navigate = useNavigate();
   const [items, setItems] = useState([]);
+  const [quantities, setQuantities] = useState(() => {
+    const saved = localStorage.getItem('shopCart');
+    return saved ? JSON.parse(saved) : {};
+  });
+
+  const handleQuantityChange = (itemId, change) => {
+    setQuantities(prev => {
+      const updated = {
+        ...prev,
+        [itemId]: Math.max(0, (prev[itemId] || 0) + change)
+      };
+      localStorage.setItem('shopCart', JSON.stringify(updated));
+      return updated;
+    });
+  };
+
+  const handleCheckout = () => {
+    const selectedItems = items
+      .filter(item => quantities[item.item_id] > 0)
+      .map(item => ({ ...item, quantity: quantities[item.item_id] }));
+
+    if (selectedItems.length === 0) {
+      alert('Please add at least one item');
+      return;
+    }
+    /*changed to tickets to avoid bug*/
+    navigate('/tickets', { state: { shopData: { items: selectedItems } } });
+  };
 
   useEffect(() => {
     getShopItems(1).then(setItems);
@@ -50,13 +78,17 @@ export default function GiftShop() {
             <p style={{ color: 'var(--color-primary)', fontWeight: 700 }}>
               ${(item.price_cents / 100).toFixed(2)}
             </p>
-            <button className="glass-button" style={{ marginTop: 'auto', paddingTop: '16px' }}>
-              Add to Cart
-            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: 'auto' }}>
+              <button className="glass-button" onClick={() => handleQuantityChange(item.item_id, -1)}>−</button>
+              <span>{quantities[item.item_id] || 0}</span>
+              <button className="glass-button" onClick={() => handleQuantityChange(item.item_id, 1)}>+</button>
+            </div>
           </div>
         ))}
       </section>
-
+      <button className="glass-button" onClick={handleCheckout}>
+        Proceed to Checkout
+      </button>
       <button
         className="glass-button"
         onClick={() => navigate('/shop')}

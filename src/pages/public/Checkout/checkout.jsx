@@ -62,6 +62,52 @@ export default function Checkout() {
     phone: '',
     mobile: ''
   });
+
+  const [paymentInfo, setPaymentInfo] = useState({
+    cardNumber: '',
+    cardName: '',
+    expiry: '',
+    cvv: ''
+  });
+
+  const formatCardNumber = (value) => {
+    const v = value.replace(/\s+/g, '').replace(/[^0-9]/gi, '');
+    const matches = v.match(/\d{4,16}/g);
+    const match = (matches && matches[0]) || '';
+    const parts = [];
+    for (let i = 0, len = match.length; i < len; i += 4) {
+      parts.push(match.substring(i, i + 4));
+    }
+    if (parts.length) {
+      return parts.join(' ');
+    } else {
+      return value;
+    }
+  };
+
+  const formatExpiry = (value) => {
+    const v = value.replace(/\s+/g, '').replace(/[^0-9]/gi, '');
+    if (v.length >= 2) {
+      return `${v.slice(0, 2)}/${v.slice(2, 4)}`;
+    }
+    return v;
+  };
+
+  const handlePaymentChange = (e) => {
+    const { name, value } = e.target;
+    let formattedValue = value;
+    
+    if (name === 'cardNumber') {
+      formattedValue = formatCardNumber(value);
+    } else if (name === 'expiry') {
+      formattedValue = formatExpiry(value);
+    }
+    
+    setPaymentInfo(prev => ({
+      ...prev,
+      [name]: formattedValue
+    }));
+  };
   
   // Handle login
   const handleLogin = (e) => {
@@ -157,6 +203,23 @@ export default function Checkout() {
       return;
     }
     
+    // Handle card validation 
+    if (!paymentInfo.cardNumber || paymentInfo.cardNumber.replace(/\s/g, '').length < 16) {
+      alert('Please enter a valid card number');
+      return;
+    }
+    if (!paymentInfo.cardName) {
+      alert('Please enter the name on card');
+      return;
+    }
+    if (!paymentInfo.expiry || paymentInfo.expiry.length < 5) {
+      alert('Please enter a valid expiration date (MM/YY)');
+      return;
+    }
+    if (!paymentInfo.cvv || paymentInfo.cvv.length < 3) {
+      alert('Please enter a valid CVV');
+      return;
+    }
     console.log('Order placed:', {
       isLoggedIn,
       tickets: ticketData,
@@ -258,10 +321,10 @@ export default function Checkout() {
           </div>
         )}
 
-        {/* Add Food Panel */}
+        {/* Food Panel */}
         {(() => {
           const [currentIndex, setCurrentIndex] = useState(0);
-          const visibleCount = 4;
+          const visibleCount = 5;
 
           const prev = () => setCurrentIndex(i => Math.max(0, i - 1));
           const next = () => setCurrentIndex(i => Math.min(items.length - visibleCount, i + 1));
@@ -270,26 +333,26 @@ export default function Checkout() {
 
           return (
             <div className="food-banner glass-panel">
-              <p style={{ marginTop: '3px', textAlign: 'center' }}>
+              <p style={{ marginTop: '1rem', marginBottom: '1rem', textAlign: 'center' }}>
                 Want to add in some snacks and treats? It isn't too late!
               </p>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <button onClick={prev} className="glass-button" style={{ fontSize: '1.2rem', padding: '8px 14px' }}>←</button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <button onClick={prev} className="glass-button" style={{ fontSize: '1.2rem', padding: '8px 14px', flexShrink: 0 }}>←</button>
                 <div style={{
                   display: 'flex',
-                  gap: '12px',
-                  overflow: 'hidden',
+                  gap: '16px',
+                  overflowX: 'auto',
                   flex: 1,
-                  transition: 'all 0.3s ease'
+                  padding: '8px 4px',
                 }}>
                   {visibleItems.map((item) => (
                     <div
                       key={item.item_id}
-                      className="glass-panel"
+                      className="glass-panel food-item-card"
                       style={{
-                        flex: '1 0 0',
-                        padding: '8px',
-                        borderRadius: '8px',
+                        flex: '0 0 200px',
+                        padding: '12px',
+                        borderRadius: '12px',
                         display: 'flex',
                         flexDirection: 'column',
                         alignItems: 'center',
@@ -297,24 +360,31 @@ export default function Checkout() {
                       }}
                     >
                       {item.image_url && (
-                        <img
-                          src={item.image_url}
-                          alt={item.item_name}
-                          style={{ width: '100%', height: '150px', objectFit: 'cover', borderRadius: '5px', marginBottom: '6px' }}
-                        />
+                        <div className="food-image-container">
+                          {item.image_url && (
+                            <img
+                              src={item.image_url}
+                              alt={item.item_name}
+                              style={{ width: '100%', height: '150px', objectFit: 'contain', borderRadius: '5px', marginBottom: '6px' }}
+                            />
+                          )}
+                        </div>
                       )}
-                      <h3 style={{ margin: '4px 0' }}>{item.item_name}</h3>
-                      <p style={{ color: 'var(--color-text-muted)', fontSize: '0.85rem', textAlign: 'center' }}>{item.description}</p>
-                      <p style={{ color: 'var(--color-primary)', fontWeight: 700 }}>${(item.price_cents / 100).toFixed(2)}</p>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: 'auto', width: '100%', justifyContent: 'center' }}>
-                        <button className="glass-button" onClick={() => handleFoodQuantityChange(item.item_id, -1)}>−</button>
-                        <span>{foodQuantities[item.item_id] || 0}</span>
-                        <button className="glass-button" onClick={() => handleFoodQuantityChange(item.item_id, 1)}>+</button>
+                      <h3 style={{ margin: '8px 0 4px 0', fontSize: '0.9rem', textAlign: 'center' }}>{item.item_name}</h3>
+                      <p style={{ color: 'var(--color-primary)', fontWeight: 700, fontSize: '1rem', margin: '4px 0' }}>
+                        ${(item.price_cents / 100).toFixed(2)}
+                      </p>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: 'auto', width: '100%', justifyContent: 'center' }}>
+                        <button className="glass-button" onClick={() => handleFoodQuantityChange(item.item_id, -1)} style={{ padding: '4px 12px' }}>−</button>
+                        <span style={{ fontSize: '1rem', fontWeight: '600', minWidth: '30px', textAlign: 'center' }}>
+                          {foodQuantities[item.item_id] || 0}
+                        </span>
+                        <button className="glass-button" onClick={() => handleFoodQuantityChange(item.item_id, 1)} style={{ padding: '4px 12px' }}>+</button>
                       </div>
                     </div>
                   ))}
                 </div>
-                <button onClick={next} className="glass-button" style={{ fontSize: '1.2rem', padding: '8px 14px' }}>→</button>
+                <button onClick={next} className="glass-button" style={{ fontSize: '1.2rem', padding: '8px 14px', flexShrink: 0 }}>→</button>
               </div>
             </div>
           );
@@ -727,11 +797,79 @@ export default function Checkout() {
             </div>
         </div>
         )}
+      {/* Credit Card Information Section */}
+      <div className="glass-panel">
+        <h2 className="section-title-inline">Payment Information</h2>
+        
+        <div className="form-grid-checkout">
+          <div className="form-group-checkout full-width">
+            <label>Card Number <span className="required">*</span></label>
+            <div className="card-input-wrapper">
+              <input 
+                type="text" 
+                name="cardNumber" 
+                value={paymentInfo.cardNumber}
+                onChange={handlePaymentChange}
+                placeholder="1234 5678 9012 3456"
+                maxLength="19"
+                required
+              />
+              <span className="card-icons">
+                <span className="card-icon">💳</span>
+              </span>
+            </div>
+          </div>
+          
+          <div className="form-group-checkout full-width">
+            <label>Name on Card <span className="required">*</span></label>
+            <input 
+              type="text" 
+              name="cardName" 
+              value={paymentInfo.cardName}
+              onChange={handlePaymentChange}
+              placeholder="As it appears on card"
+              required
+            />
+          </div>
+          
+          <div className="form-group-checkout">
+            <label>Expiration Date <span className="required">*</span></label>
+            <input 
+              type="text" 
+              name="expiry" 
+              value={paymentInfo.expiry}
+              onChange={handlePaymentChange}
+              placeholder="MM/YY"
+              maxLength="5"
+              required
+            />
+          </div>
+          
+          <div className="form-group-checkout">
+            <label>CVV <span className="required">*</span></label>
+            <input 
+              type="password" 
+              name="cvv" 
+              value={paymentInfo.cvv}
+              onChange={handlePaymentChange}
+              placeholder="123"
+              maxLength="4"
+              required
+            />
+          </div>
+        </div>
+        
+        <div className="secure-payment-note">
+          <span className="lock-icon">🔒</span>
+          <p>Your payment information is secure. We use SSL encryption to protect your data.</p>
+        </div>
+      </div>
+
+      {/* Place Order Button */}
+      <button className="checkout-button-final" onClick={handlePlaceOrder}>
+        Place Order - ${total.toFixed(2)}
+      </button>
     </div>
-            {/* Place Order Button */}
-            <button className="checkout-button-final" onClick={handlePlaceOrder}>
-              Place Order - ${total.toFixed(2)}
-            </button>
           </>
         )}
       </div>

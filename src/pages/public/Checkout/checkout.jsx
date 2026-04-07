@@ -4,6 +4,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { FaCalendarAlt, FaClock, FaUser, FaChild, FaExclamationTriangle, FaUserPlus} from 'react-icons/fa';
 import { FaPersonCane } from "react-icons/fa6";
 import { getShopItems } from '../../../api/inventory';
+import { supabase } from '../../../lib/supabase';
 
 import './checkout.css';
 
@@ -190,48 +191,107 @@ export default function Checkout() {
   };
   
   // Handle form submission
-  const handlePlaceOrder = (e) => {
+  const handlePlaceOrder = async (e) => {
     e.preventDefault();
-    
+
     if (!billingInfo.firstName || !billingInfo.lastName) {
       alert('Please enter your name');
       return;
     }
-    
+
     if (!billingInfo.email || billingInfo.email !== billingInfo.confirmEmail) {
       alert('Please ensure emails match');
       return;
     }
-    
-    // Handle card validation 
+
     if (!paymentInfo.cardNumber || paymentInfo.cardNumber.replace(/\s/g, '').length < 16) {
       alert('Please enter a valid card number');
       return;
     }
+
     if (!paymentInfo.cardName) {
       alert('Please enter the name on card');
       return;
     }
+
     if (!paymentInfo.expiry || paymentInfo.expiry.length < 5) {
       alert('Please enter a valid expiration date (MM/YY)');
       return;
     }
+
     if (!paymentInfo.cvv || paymentInfo.cvv.length < 3) {
       alert('Please enter a valid CVV');
       return;
     }
-    console.log('Order placed:', {
-      isLoggedIn,
-      tickets: ticketData,
-      billing: billingInfo,
-      shipping: sameAsBilling ? billingInfo : shippingInfo
-    });
-    localStorage.removeItem('shopCart');
-    if (isLoggedIn) {
-      alert('Order placed successfully! Redirecting to your dashboard...');
-      navigate('/dashboard');
-    } else {
-      alert('Order placed successfully! You can create an account to track your orders.');
+
+    try {
+      const totalAmountCents = Math.round(total * 100);
+
+      const { data: transaction, error: transactionError } = await supabase.from('transactions').insert([{
+            total_amount_cents: totalAmountCents,
+            donation_id: null,
+          }]).select().single();
+
+      if (transactionError) throw transactionError;
+
+      const purchasedShopItems = (shopData?.items || []).map(item => ({
+        item_id: item.item_id,
+        quantity: item.quantity,
+      }));
+
+      const purchasedFoodItems = items
+        .filter(item => (foodQuantities[item.item_id] || 0) > 0)
+        .map(item => ({
+          item_id: item.item_id,
+          quantity: foodQuantities[item.item_id],
+        }));
+
+      const purchasedItems = [...purchasedShopItems, ...purchasedFoodItems];
+
+      for (const item of purchasedItems) {
+        const { data: inventoryRow, error: fetchError } = await supabase
+          .from('inventory')
+          .select('item_id, stock_count')
+          .eq('item_id', item.item_id)
+          .single();
+
+        if (fetchError) throw fetchError;
+
+        const newStockCount = inventoryRow.stock_count - item.quantity;
+
+        if (newStockCount < 0) {
+          throw new Error(`Not enough stock for item ${item.item_id}`);
+        }
+
+        const { error: updateError } = await supabase
+          .from('inventory')
+          .update({ stock_count: newStockCount })
+          .eq('item_id', item.item_id);
+
+        if (updateError) throw updateError;
+      }
+
+      console.log('Transaction created:', transaction);
+
+      console.log('Order placed:', {
+        transaction,
+        isLoggedIn,
+        tickets: ticketData,
+        billing: billingInfo,
+        shipping: sameAsBilling ? billingInfo : shippingInfo
+      });
+
+      localStorage.removeItem('shopCart');
+
+      if (isLoggedIn) {
+        alert('Order placed successfully! Redirecting to your dashboard...');
+        navigate('/dashboard');
+      } else {
+        alert('Order placed successfully! You can create an account to track your orders.');
+      }
+    } catch (error) {
+      console.error('Checkout failed:', error);
+      alert('Checkout failed: ' + error.message);
     }
   };
   const savedCart = JSON.parse(localStorage.getItem('shopCart') || '{}');

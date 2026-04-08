@@ -379,7 +379,7 @@ export default function CaretakerDashboard() {
                                     </div>
                                     <p style={{ fontSize: '14px', color: 'var(--color-text-muted)', marginBottom: '10px' }}>{event.description}</p>
                                     <p style={{ color: 'var(--color-secondary)', fontWeight: 600 }}>
-                                        {new Date(event.event_date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                                        {new Date(event.event_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
                                     </p>
                                     <p style={{ fontSize: '13px', color: 'var(--color-text-muted)' }}>
                                         Capacity: {event.actual_attendance || 0} / {event.max_capacity}

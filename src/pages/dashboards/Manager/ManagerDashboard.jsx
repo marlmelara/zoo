@@ -58,6 +58,7 @@ export default function ManagerDashboard() {
 
     // Event assignments state
     const [eventAssignments, setEventAssignments] = useState({});
+    const [venues, setVenues] = useState([]);
 
     const isAdmin = role === 'admin';
 
@@ -229,13 +230,14 @@ export default function ManagerDashboard() {
 
     async function fetchEvents() {
         try {
-            const { data, error } = await supabase
-                .from('events')
-                .select('*')
-                .order('event_date', { ascending: false });
+            const [{ data, error }, { data: venueData }] = await Promise.all([
+                supabase.from('events').select('*').order('event_date', { ascending: false }),
+                supabase.from('venues').select('*').order('venue_name')
+            ]);
 
             if (error) throw error;
             setEvents(data || []);
+            setVenues(venueData || []);
 
             // Also fetch event assignments for each event
             if (data?.length) {
@@ -888,25 +890,58 @@ export default function ManagerDashboard() {
                                                 <p style={{ color: 'var(--color-secondary)', fontWeight: 600, fontSize: '14px' }}>
                                                     {new Date(event.event_date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
                                                 </p>
+                                                {event.start_time && event.end_time && (
+                                                    <p style={{ fontSize: '13px', color: 'var(--color-text-muted)', margin: '4px 0' }}>
+                                                        <Clock size={13} style={{ marginRight: '4px', verticalAlign: 'middle' }} />
+                                                        {event.start_time?.slice(0, 5)} – {event.end_time?.slice(0, 5)}
+                                                    </p>
+                                                )}
+                                                {event.venue_id && (
+                                                    <p style={{ fontSize: '13px', color: 'var(--color-text-muted)', margin: '4px 0' }}>
+                                                        📍 {venues.find(v => v.venue_id === event.venue_id)?.venue_name || 'Unknown venue'}
+                                                    </p>
+                                                )}
                                             </div>
                                             <div style={{ textAlign: 'right', fontSize: '13px', color: 'var(--color-text-muted)' }}>
                                                 {event.actual_attendance || 0} / {event.max_capacity} capacity
                                             </div>
                                         </div>
 
-                                        {/* Assigned employees */}
+                                        {/* Personnel & Animals */}
                                         <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '12px', marginTop: '10px' }}>
-                                            <p style={{ fontSize: '12px', color: 'var(--color-text-muted)', margin: '0 0 8px' }}>Assigned Staff:</p>
+                                            <p style={{ fontSize: '12px', color: 'var(--color-text-muted)', margin: '0 0 8px' }}>Personnel:</p>
                                             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '10px' }}>
-                                                {assigned.length === 0 ? (
+                                                {assigned.filter(a => a.employee_id).length === 0 ? (
                                                     <span style={{ fontSize: '13px', color: 'var(--color-text-muted)', fontStyle: 'italic' }}>No staff assigned</span>
-                                                ) : assigned.map(a => (
+                                                ) : assigned.filter(a => a.employee_id).map(a => (
                                                     <div key={a.assignment_id} style={{
                                                         display: 'flex', alignItems: 'center', gap: '6px',
                                                         background: 'rgba(255,255,255,0.08)', padding: '5px 10px', borderRadius: '8px', fontSize: '13px'
                                                     }}>
                                                         <Users size={14} />
                                                         <span>{a.employees?.first_name} {a.employees?.last_name}</span>
+                                                        <button
+                                                            onClick={() => handleRemoveEventAssignment(a.assignment_id)}
+                                                            style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '0 2px', fontSize: '16px', lineHeight: 1 }}
+                                                            title="Remove"
+                                                        >
+                                                            &times;
+                                                        </button>
+                                                    </div>
+                                                ))}
+                                            </div>
+
+                                            <p style={{ fontSize: '12px', color: 'var(--color-text-muted)', margin: '0 0 8px' }}>Animals:</p>
+                                            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '10px' }}>
+                                                {assigned.filter(a => a.animal_id).length === 0 ? (
+                                                    <span style={{ fontSize: '13px', color: 'var(--color-text-muted)', fontStyle: 'italic' }}>No animals assigned</span>
+                                                ) : assigned.filter(a => a.animal_id).map(a => (
+                                                    <div key={a.assignment_id} style={{
+                                                        display: 'flex', alignItems: 'center', gap: '6px',
+                                                        background: 'rgba(255,255,255,0.08)', padding: '5px 10px', borderRadius: '8px', fontSize: '13px'
+                                                    }}>
+                                                        <Cat size={14} />
+                                                        <span>{a.animals?.name}</span>
                                                         <button
                                                             onClick={() => handleRemoveEventAssignment(a.assignment_id)}
                                                             style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '0 2px', fontSize: '16px', lineHeight: 1 }}

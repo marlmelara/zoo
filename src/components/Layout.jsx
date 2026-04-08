@@ -2,7 +2,7 @@ import React from 'react';
 import { Link, useLocation, Outlet } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import {
-    LayoutDashboard, Cat, Users, Ticket, Calendar,
+    LayoutDashboard, Cat, Users, Calendar,
     ShoppingBag, Shield, Stethoscope, Heart, Briefcase
 } from 'lucide-react';
 
@@ -20,7 +20,6 @@ export default function Layout() {
                 { name: 'Manager Panel', path: '/dashboard/manager', icon: <Briefcase size={20} /> },
                 { name: 'Animals', path: '/dashboard/animals', icon: <Cat size={20} /> },
                 { name: 'Staff', path: '/dashboard/staff', icon: <Users size={20} /> },
-                { name: 'Tickets', path: '/dashboard/tickets', icon: <Ticket size={20} /> },
                 { name: 'Events', path: '/dashboard/events', icon: <Calendar size={20} /> },
                 { name: 'Inventory', path: '/dashboard/inventory', icon: <ShoppingBag size={20} /> },
             );

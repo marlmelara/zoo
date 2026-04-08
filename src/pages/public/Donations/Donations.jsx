@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { createDonation } from '../../../api/donations';
+import { Link, useNavigate } from 'react-router-dom';
 import logo from '../../../images/logo.png';
 
 const TABS = [
@@ -10,6 +9,7 @@ const TABS = [
 ];
 
 export default function Donations() {
+  const navigate = useNavigate();
   const [active, setActive] = useState('general');
   const [form, setForm] = useState({
     amount: '',
@@ -27,17 +27,21 @@ export default function Donations() {
     setForm((p) => ({ ...p, amount: String(amount) }));
   }
 
-  async function handleSubmit(e) {
+  function handleSubmit(e) {
     e.preventDefault();
-    setStatus('submitting');
-    try {
-      await createDonation({ amount: form.amount, fund: active });
-      setStatus('success');
-      setForm({ amount: '' });
-    } catch (err) {
-      console.error(err);
+    if (!form.amount || parseFloat(form.amount) <= 0) {
       setStatus('error');
+      return;
     }
+    // Navigate to checkout with donation data — checkout handles payment
+    navigate('/checkout', {
+      state: {
+        donationData: {
+          amount: form.amount,
+          fund: active,
+        },
+      },
+    });
   }
 
   const activeTab = TABS.find((t) => t.key === active);

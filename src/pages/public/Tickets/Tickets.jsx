@@ -1,14 +1,14 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';  
-import { FaCalendarAlt, FaUser, FaChild, FaMapMarkerAlt, FaPhone, FaEnvelope, FaMinus, FaPlus } from 'react-icons/fa';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { FaCalendarAlt, FaUser, FaChild, FaMapMarkerAlt, FaPhone, FaEnvelope, FaMinus, FaPlus, FaClock, FaTicketAlt } from 'react-icons/fa';
 import { FaPersonCane } from "react-icons/fa6";
+import { getUpcomingEvents } from '../../../api/public';
 import './tickets.css';
 
 let dayTime = new Date();
-console.log(dayTime);
 
 export default function Tickets() {
-  const navigate = useNavigate();  
+  const navigate = useNavigate();
 
   const [selectedDate, setSelectedDate] = useState(null);
   const [selectedTime, setSelectedTime] = useState(null);
@@ -17,6 +17,14 @@ export default function Tickets() {
     youth: 0,
     senior: 0
   });
+  const [upcomingEvents, setUpcomingEvents] = useState([]);
+  const [eventsLoading, setEventsLoading] = useState(true);
+
+  useEffect(() => {
+    getUpcomingEvents(20).then(events => {
+      setUpcomingEvents(events.filter(e => e.ticket_price_cents > 0));
+    }).catch(console.error).finally(() => setEventsLoading(false));
+  }, []);
 
   // Generate calendar for March 2026
   const [currentYear, setCurrentYear] = useState(dayTime.getFullYear());
@@ -148,7 +156,7 @@ export default function Tickets() {
           {/* Member Banner */}
           <div className="member-banner glass-panel">
             <p>Coog Zoo Members log in now to reserve free admission and check out other great benefits!</p>
-            <a href="/login" className="glass-button" style = {{size: "2rem"}}>Log In</a>
+            <a href="/account" className="glass-button" style={{ fontSize: '0.9rem' }}>Log In</a>
           </div>
 
           {/* Ticket Pricing Table */}
@@ -266,7 +274,91 @@ export default function Tickets() {
               <span className="membership-price">$89.99</span>
               <span className="membership-period">/ year</span>
             </div>
-            <button className="glass-button membership-button">Become a Member</button>
+            <button
+              className="glass-button membership-button"
+              onClick={() => navigate('/account')}
+            >
+              Become a Member
+            </button>
+            <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginTop: '10px', textAlign: 'center' }}>
+              You must be signed in or create an account to purchase a membership. Membership discounts (10–20% off) apply to future ticket and shop purchases.
+            </p>
+          </div>
+
+          {/* Event Tickets */}
+          <div className="glass-panel" style={{ padding: '24px' }}>
+            <h2 style={{ marginBottom: '4px' }}>Event Tickets</h2>
+            <p style={{ color: 'var(--color-text-muted)', fontSize: '0.85rem', marginBottom: '16px' }}>
+              Event tickets include zoo admission — no separate admission ticket needed.
+            </p>
+
+            {eventsLoading ? (
+              <p style={{ color: 'var(--color-text-muted)', fontSize: '0.9rem' }}>Loading events...</p>
+            ) : upcomingEvents.length === 0 ? (
+              <p style={{ color: 'var(--color-text-muted)', fontSize: '0.9rem', fontStyle: 'italic' }}>No upcoming ticketed events at this time.</p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {upcomingEvents.map(event => {
+                  const formatTime = (t) => {
+                    if (!t) return '';
+                    const [h, m] = t.split(':');
+                    const hr = parseInt(h);
+                    return `${hr % 12 || 12}:${m} ${hr >= 12 ? 'PM' : 'AM'}`;
+                  };
+                  return (
+                    <div key={event.event_id} style={{
+                      background: 'rgba(255,255,255,0.05)',
+                      border: '1px solid rgba(255,255,255,0.1)',
+                      borderRadius: '10px',
+                      padding: '14px 16px',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      gap: '12px',
+                      flexWrap: 'wrap'
+                    }}>
+                      <div style={{ flex: 1, minWidth: '180px' }}>
+                        <div style={{ fontWeight: 600, marginBottom: '4px' }}>{event.title || event.event_name}</div>
+                        <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
+                          <span>
+                            <FaCalendarAlt style={{ marginRight: '4px', verticalAlign: 'middle' }} />
+                            {new Date(event.event_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                          </span>
+                          {event.start_time && event.end_time && (
+                            <span>
+                              <FaClock style={{ marginRight: '4px', verticalAlign: 'middle' }} />
+                              {formatTime(event.start_time)} – {formatTime(event.end_time)}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <span style={{ fontWeight: 600, color: 'var(--color-primary)', fontSize: '1rem' }}>
+                          ${(event.ticket_price_cents / 100).toFixed(2)}
+                        </span>
+                        <button
+                          className="glass-button"
+                          style={{ background: 'var(--color-secondary)', padding: '8px 16px', fontSize: '0.85rem', whiteSpace: 'nowrap' }}
+                          onClick={() => navigate('/checkout', {
+                            state: {
+                              eventTicket: {
+                                event_id: event.event_id,
+                                title: event.title || event.event_name,
+                                date: new Date(event.event_date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }),
+                                price_cents: event.ticket_price_cents,
+                                quantity: 1,
+                              }
+                            }
+                          })}
+                        >
+                          <FaTicketAlt style={{ marginRight: '5px' }} /> Buy
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
 

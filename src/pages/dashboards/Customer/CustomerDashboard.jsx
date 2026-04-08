@@ -1,15 +1,17 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../contexts/AuthContext';
 import { supabase } from '../../../lib/supabase';
 import {
     User, Ticket, Heart, Calendar, MapPin, Phone, Mail,
-    Star, Gift
+    Star, Gift, ShoppingCart, RefreshCw
 } from 'lucide-react';
 
 const TABS = ['My Profile', 'My Tickets', 'My Donations', 'Upcoming Events'];
 
 export default function CustomerDashboard() {
     const { user, customerId } = useAuth();
+    const navigate = useNavigate();
     const [activeTab, setActiveTab] = useState('My Profile');
 
     const [profile, setProfile] = useState(null);
@@ -342,31 +344,50 @@ export default function CustomerDashboard() {
                                     <Star size={20} color={membershipColor(profile.membership_type)} /> Membership
                                 </h3>
                                 {profile.membership_type ? (
-                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '15px' }}>
-                                        <div style={{ background: 'rgba(255,255,255,0.05)', padding: '15px', borderRadius: '10px' }}>
-                                            <p style={{ fontSize: '12px', color: 'var(--color-text-muted)', margin: '0 0 5px' }}>Plan</p>
-                                            <p style={{ fontWeight: 600, margin: 0, textTransform: 'capitalize', color: membershipColor(profile.membership_type) }}>
-                                                {profile.membership_type}
-                                            </p>
+                                    <div>
+                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '15px' }}>
+                                            <div style={{ background: 'rgba(255,255,255,0.05)', padding: '15px', borderRadius: '10px' }}>
+                                                <p style={{ fontSize: '12px', color: 'var(--color-text-muted)', margin: '0 0 5px' }}>Plan</p>
+                                                <p style={{ fontWeight: 600, margin: 0, textTransform: 'capitalize', color: membershipColor(profile.membership_type) }}>
+                                                    {profile.membership_type}
+                                                </p>
+                                            </div>
+                                            <div style={{ background: 'rgba(255,255,255,0.05)', padding: '15px', borderRadius: '10px' }}>
+                                                <p style={{ fontSize: '12px', color: 'var(--color-text-muted)', margin: '0 0 5px' }}>Start Date</p>
+                                                <p style={{ fontWeight: 600, margin: 0 }}>
+                                                    {profile.membership_start ? new Date(profile.membership_start).toLocaleDateString() : 'N/A'}
+                                                </p>
+                                            </div>
+                                            <div style={{ background: 'rgba(255,255,255,0.05)', padding: '15px', borderRadius: '10px' }}>
+                                                <p style={{ fontSize: '12px', color: 'var(--color-text-muted)', margin: '0 0 5px' }}>Expires</p>
+                                                <p style={{ fontWeight: 600, margin: 0, color: profile.membership_end && new Date(profile.membership_end) < new Date() ? '#ef4444' : 'inherit' }}>
+                                                    {profile.membership_end ? new Date(profile.membership_end).toLocaleDateString() : 'N/A'}
+                                                </p>
+                                            </div>
                                         </div>
-                                        <div style={{ background: 'rgba(255,255,255,0.05)', padding: '15px', borderRadius: '10px' }}>
-                                            <p style={{ fontSize: '12px', color: 'var(--color-text-muted)', margin: '0 0 5px' }}>Start Date</p>
-                                            <p style={{ fontWeight: 600, margin: 0 }}>
-                                                {profile.membership_start ? new Date(profile.membership_start).toLocaleDateString() : 'N/A'}
-                                            </p>
-                                        </div>
-                                        <div style={{ background: 'rgba(255,255,255,0.05)', padding: '15px', borderRadius: '10px' }}>
-                                            <p style={{ fontSize: '12px', color: 'var(--color-text-muted)', margin: '0 0 5px' }}>Expires</p>
-                                            <p style={{ fontWeight: 600, margin: 0, color: profile.membership_end && new Date(profile.membership_end) < new Date() ? '#ef4444' : 'inherit' }}>
-                                                {profile.membership_end ? new Date(profile.membership_end).toLocaleDateString() : 'N/A'}
-                                            </p>
-                                        </div>
+                                        {profile.membership_end && new Date(profile.membership_end) < new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) && (
+                                            <div style={{ marginTop: '15px', padding: '12px 16px', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                <span style={{ fontSize: '0.85rem', color: '#fca5a5' }}>
+                                                    <RefreshCw size={14} style={{ marginRight: '6px', verticalAlign: 'middle' }} />
+                                                    {new Date(profile.membership_end) < new Date() ? 'Your membership has expired.' : 'Your membership expires soon.'}
+                                                </span>
+                                                <button className="glass-button" onClick={() => navigate('/checkout', { state: { membershipRenewal: { type: profile.membership_type, customerId: profile.customer_id } } })} style={{ background: 'var(--color-secondary)', padding: '8px 16px', fontSize: '0.8rem' }}>
+                                                    Renew Membership
+                                                </button>
+                                            </div>
+                                        )}
+                                        <p style={{ marginTop: '12px', fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
+                                            As a member, you get free general admission and discounted rates on tickets and shop purchases.
+                                        </p>
                                     </div>
                                 ) : (
                                     <div style={{ textAlign: 'center', padding: '20px', color: 'var(--color-text-muted)' }}>
                                         <Gift size={32} style={{ marginBottom: '10px', opacity: 0.5 }} />
                                         <p>You don't have an active membership.</p>
-                                        <p style={{ fontSize: '13px' }}>Visit the zoo to learn about our membership plans!</p>
+                                        <p style={{ fontSize: '13px', marginBottom: '15px' }}>Become a member for free admission, discounts, and exclusive perks!</p>
+                                        <button className="glass-button" onClick={() => navigate('/tickets')} style={{ background: 'var(--color-primary)', padding: '10px 24px', fontSize: '0.9rem' }}>
+                                            View Membership Plans
+                                        </button>
                                     </div>
                                 )}
                             </div>
@@ -378,14 +399,28 @@ export default function CustomerDashboard() {
             {/* ═══════════ MY TICKETS TAB ═══════════ */}
             {activeTab === 'My Tickets' && (
                 <div>
-                    <h2 style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <Ticket size={24} /> My Tickets
-                    </h2>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+                        <h2 style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: 0 }}>
+                            <Ticket size={24} /> My Tickets
+                        </h2>
+                        <button className="glass-button" onClick={() => navigate('/tickets')} style={{ background: 'var(--color-secondary)', padding: '8px 18px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <ShoppingCart size={14} /> Buy Tickets
+                        </button>
+                    </div>
+                    {profile?.membership_type && (
+                        <div style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)', borderRadius: '10px', padding: '10px 16px', marginBottom: '15px', fontSize: '0.85rem', color: '#6ee7b7' }}>
+                            <Star size={14} style={{ marginRight: '6px', verticalAlign: 'middle' }} />
+                            As a <strong style={{ textTransform: 'capitalize' }}>{profile.membership_type}</strong> member, you get free general admission and discounted rates on event tickets!
+                        </div>
+                    )}
                     {ticketsLoading ? <p>Loading tickets...</p> : tickets.length === 0 ? (
                         <div className="glass-panel" style={{ padding: '40px', textAlign: 'center', color: 'var(--color-text-muted)' }}>
                             <Ticket size={48} style={{ marginBottom: '15px', opacity: 0.3 }} />
                             <p>No tickets purchased yet.</p>
-                            <p style={{ fontSize: '13px' }}>Buy tickets from our website to visit the zoo!</p>
+                            <p style={{ fontSize: '13px', marginBottom: '15px' }}>Buy tickets from our website to visit the zoo!</p>
+                            <button className="glass-button" onClick={() => navigate('/tickets')} style={{ background: 'var(--color-primary)', padding: '10px 24px' }}>
+                                Browse Tickets
+                            </button>
                         </div>
                     ) : (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -442,14 +477,22 @@ export default function CustomerDashboard() {
             {/* ═══════════ MY DONATIONS TAB ═══════════ */}
             {activeTab === 'My Donations' && (
                 <div>
-                    <h2 style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <Heart size={24} /> My Donations
-                    </h2>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+                        <h2 style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: 0 }}>
+                            <Heart size={24} /> My Donations
+                        </h2>
+                        <button className="glass-button" onClick={() => navigate('/donations')} style={{ background: '#ef4444', padding: '8px 18px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <Heart size={14} /> Make a Donation
+                        </button>
+                    </div>
                     {donationsLoading ? <p>Loading donations...</p> : donations.length === 0 ? (
                         <div className="glass-panel" style={{ padding: '40px', textAlign: 'center', color: 'var(--color-text-muted)' }}>
                             <Heart size={48} style={{ marginBottom: '15px', opacity: 0.3 }} />
                             <p>No donations on record.</p>
-                            <p style={{ fontSize: '13px' }}>Your donations help protect endangered animals and fund conservation programs.</p>
+                            <p style={{ fontSize: '13px', marginBottom: '15px' }}>Your donations help protect endangered animals and fund conservation programs.</p>
+                            <button className="glass-button" onClick={() => navigate('/donations')} style={{ background: '#ef4444', padding: '10px 24px' }}>
+                                Donate Now
+                            </button>
                         </div>
                     ) : (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -493,9 +536,14 @@ export default function CustomerDashboard() {
             {/* ═══════════ UPCOMING EVENTS TAB ═══════════ */}
             {activeTab === 'Upcoming Events' && (
                 <div>
-                    <h2 style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <Calendar size={24} /> Upcoming Events
-                    </h2>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+                        <h2 style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: 0 }}>
+                            <Calendar size={24} /> Upcoming Events
+                        </h2>
+                        <button className="glass-button" onClick={() => navigate('/tickets')} style={{ background: 'var(--color-secondary)', padding: '8px 18px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <Ticket size={14} /> Buy Event Tickets
+                        </button>
+                    </div>
                     {eventsLoading ? <p>Loading events...</p> : events.length === 0 ? (
                         <div className="glass-panel" style={{ padding: '40px', textAlign: 'center', color: 'var(--color-text-muted)' }}>
                             <Calendar size={48} style={{ marginBottom: '15px', opacity: 0.3 }} />
@@ -516,11 +564,16 @@ export default function CustomerDashboard() {
                                                 {new Date(event.event_date).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
                                             </p>
                                         </div>
-                                        <div style={{ textAlign: 'right', fontSize: '13px', color: 'var(--color-text-muted)' }}>
+                                        <div style={{ textAlign: 'right', fontSize: '13px' }}>
                                             {event.max_capacity && (
-                                                <p style={{ margin: 0 }}>
+                                                <p style={{ margin: '0 0 8px', color: 'var(--color-text-muted)' }}>
                                                     {event.max_capacity - (event.actual_attendance || 0)} spots left
                                                 </p>
+                                            )}
+                                            {event.ticket_price_cents > 0 && (
+                                                <button className="glass-button" onClick={() => navigate('/checkout', { state: { eventTicket: { event_id: event.event_id, title: event.title, date: new Date(event.event_date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }), price_cents: event.ticket_price_cents, quantity: 1 } } })} style={{ background: 'var(--color-secondary)', padding: '6px 14px', fontSize: '0.8rem' }}>
+                                                    ${(event.ticket_price_cents / 100).toFixed(2)} — Buy Ticket
+                                                </button>
                                             )}
                                         </div>
                                     </div>

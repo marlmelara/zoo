@@ -1,938 +1,996 @@
-// src/pages/public/Checkout/checkout.jsx
-import React, { useState, useEffect } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
-import { FaCalendarAlt, FaClock, FaUser, FaChild, FaExclamationTriangle, FaUserPlus} from 'react-icons/fa';
-import { FaPersonCane } from "react-icons/fa6";
+import React, { useState, useEffect, useCallback } from 'react';
+import { useLocation, useNavigate, Link } from 'react-router-dom';
+import {
+  FaShoppingCart, FaUser, FaChild, FaClock, FaTrash,
+  FaLock, FaCreditCard, FaEnvelope, FaCheckCircle, FaHeart,
+  FaTag, FaCrown, FaTimesCircle,
+} from 'react-icons/fa';
+import { FaPersonCane } from 'react-icons/fa6';
+import { useAuth } from '../../../contexts/AuthContext';
 import { getShopItems } from '../../../api/inventory';
+import { createTransaction, createSaleItems } from '../../../api/transactions';
+import { createReceipt } from '../../../api/receipts';
 import { supabase } from '../../../lib/supabase';
-
 import './checkout.css';
 
+// ── Constants ──
+const TICKET_PRICES = {
+  adult:  2499,
+  youth:  1799,
+  senior: 1999,
+};
+const TICKET_LABELS = {
+  adult:  { name: 'Adult (12-64)',  icon: FaUser },
+  youth:  { name: 'Youth (3-11)',   icon: FaChild },
+  senior: { name: 'Senior (65+)',   icon: FaPersonCane },
+};
+const TAX_RATE = 0.0825;
+const CART_TIMEOUT_MINUTES = 15;
 
 export default function Checkout() {
   const location = useLocation();
   const navigate = useNavigate();
-  const ticketData = location.state?.ticketData;
-  const [items, setItems] = useState([]);  
-  // State for login/guest mode
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [showLoginForm, setShowLoginForm] = useState(false);
+  const { user, role, customerId } = useAuth();
+
+  // ── Determine checkout mode from route state ──
+  const ticketData    = location.state?.ticketData    || null;
+  const donationData  = location.state?.donationData  || null;
+  const isDonation    = !!donationData;
+
+  // ── Customer data (loaded if logged in) ──
+  const [customer, setCustomer] = useState(null);
+  const [memberDiscount, setMemberDiscount] = useState(0);
+
+  // ── Auth mode on checkout ──
+  const [authMode, setAuthMode] = useState(user ? 'logged-in' : null); // null | 'guest' | 'logged-in'
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
-  const [continueAsGuest, setContinueAsGuest] = useState(false);
+  const [loginError, setLoginError] = useState('');
+  const [loginLoading, setLoginLoading] = useState(false);
+
+  // ── Shop items (gift + food from localStorage cart) ──
+  const [shopItems, setShopItems] = useState([]);
+  const [foodItems, setFoodItems] = useState([]);
   const [foodQuantities, setFoodQuantities] = useState({});
-  const handleFoodQuantityChange = (itemId, change) => {
+
+  // ── Cart timer ──
+  const [cartExpiry, setCartExpiry] = useState(null);
+  const [timeLeft, setTimeLeft] = useState(null);
+
+  // ── Billing / Shipping ──
+  const [sameAsBilling, setSameAsBilling] = useState(true);
+  const [billing, setBilling] = useState({
+    firstName: '', lastName: '', email: '', confirmEmail: '',
+    street: '', city: '', state: 'Texas', zip: '', phone: '',
+  });
+  const [shipping, setShipping] = useState({
+    firstName: '', lastName: '',
+    street: '', city: '', state: 'Texas', zip: '', phone: '',
+  });
+
+  // ── Payment ──
+  const [payment, setPayment] = useState({ cardNumber: '', cardName: '', expiry: '', cvv: '' });
+
+  // ── Order state ──
+  const [submitting, setSubmitting] = useState(false);
+  const [orderComplete, setOrderComplete] = useState(false);
+  const [orderTransaction, setOrderTransaction] = useState(null);
+
+  // ── Event ticket data (for event-specific tickets) ──
+  const eventTicket = location.state?.eventTicket || null; // { event_id, title, date, price_cents, quantity }
+
+  // ══════════════════════════════════════
+  // Effects
+  // ══════════════════════════════════════
+
+  // Load customer profile if logged in
+  useEffect(() => {
+    if (!user || !customerId) return;
+    setAuthMode('logged-in');
+
+    (async () => {
+      const { data } = await supabase
+        .from('customers')
+        .select('*')
+        .eq('customer_id', customerId)
+        .single();
+
+      if (data) {
+        setCustomer(data);
+        // Pre-fill billing from customer profile
+        setBilling(prev => ({
+          ...prev,
+          firstName: data.first_name || '',
+          lastName:  data.last_name || '',
+          email:     data.email || user.email || '',
+          confirmEmail: data.email || user.email || '',
+          street:    data.billing_street || data.address || '',
+          city:      data.billing_city || data.city || '',
+          state:     data.billing_state || data.state || 'Texas',
+          zip:       data.billing_zip || data.zip_code || '',
+          phone:     data.billing_phone || data.phone || '',
+        }));
+
+        if (data.shipping_same_as_billing === false) {
+          setSameAsBilling(false);
+          setShipping({
+            firstName: data.first_name || '',
+            lastName:  data.last_name || '',
+            street:    data.shipping_street || '',
+            city:      data.shipping_city || '',
+            state:     data.shipping_state || 'Texas',
+            zip:       data.shipping_zip || '',
+            phone:     data.shipping_phone || '',
+          });
+        }
+
+        // Membership discount
+        if (data.is_member && data.membership_end) {
+          const endDate = new Date(data.membership_end);
+          if (endDate >= new Date()) {
+            const discountMap = { premium: 0.20, family: 0.15, individual: 0.10 };
+            setMemberDiscount(discountMap[data.membership_type] || 0.10);
+          }
+        }
+      }
+    })();
+  }, [user, customerId]);
+
+  // Load shop items from localStorage cart
+  useEffect(() => {
+    if (isDonation) return; // donations don't have cart items
+    const savedCart = JSON.parse(localStorage.getItem('shopCart') || '{}');
+    const hasCartItems = Object.values(savedCart).some(q => q > 0);
+
+    if (hasCartItems) {
+      getShopItems(1).then(items => {
+        const cartItems = items
+          .filter(i => savedCart[i.item_id] > 0)
+          .map(i => ({ ...i, quantity: savedCart[i.item_id] }));
+        setShopItems(cartItems);
+      });
+    }
+
+    getShopItems(2).then(setFoodItems);
+  }, [isDonation]);
+
+  // Cart timer — start when non-donation checkout loads
+  useEffect(() => {
+    if (isDonation || orderComplete) return;
+
+    const stored = localStorage.getItem('cartExpiresAt');
+    let expiry;
+
+    if (stored) {
+      expiry = new Date(stored);
+      if (expiry <= new Date()) {
+        // expired — clear cart
+        handleCartExpired();
+        return;
+      }
+    } else {
+      expiry = new Date(Date.now() + CART_TIMEOUT_MINUTES * 60 * 1000);
+      localStorage.setItem('cartExpiresAt', expiry.toISOString());
+    }
+
+    setCartExpiry(expiry);
+
+    const interval = setInterval(() => {
+      const remaining = expiry - new Date();
+      if (remaining <= 0) {
+        clearInterval(interval);
+        handleCartExpired();
+      } else {
+        setTimeLeft(remaining);
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [isDonation, orderComplete]);
+
+  const handleCartExpired = () => {
+    localStorage.removeItem('shopCart');
+    localStorage.removeItem('cartExpiresAt');
+    setTimeLeft(0);
+    alert('Your cart has expired. Please re-select your items.');
+    navigate('/tickets');
+  };
+
+  // ══════════════════════════════════════
+  // Handlers
+  // ══════════════════════════════════════
+
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    setLoginError('');
+    try {
+      setLoginLoading(true);
+      const { error } = await supabase.auth.signInWithPassword({
+        email: loginEmail, password: loginPassword,
+      });
+      if (error) throw error;
+      // Auth context will pick up the session — page will re-render with user
+    } catch (err) {
+      setLoginError(err.message || 'Login failed.');
+    } finally {
+      setLoginLoading(false);
+    }
+  };
+
+  const handleFoodQty = (itemId, delta) => {
     setFoodQuantities(prev => ({
       ...prev,
-      [itemId]: Math.max(0, (prev[itemId] || 0) + change)
+      [itemId]: Math.max(0, (prev[itemId] || 0) + delta),
     }));
   };
-  // Form state
-  const [sameAsBilling, setSameAsBilling] = useState(true);
-  const [billingInfo, setBillingInfo] = useState({
-    firstName: '',
-    lastName: '',
-    street: '',
-    city: '',
-    country: 'United States',
-    state: '',
-    zipCode: '',
-    phone: '',
-    mobile: '',
-    email: '',
-    confirmEmail: ''
-  });
 
-  const [shopItems, setShopItems] = useState([]);
-  useEffect(() => {
-    getShopItems(1).then(setShopItems);
-  }, []);
-  
-  useEffect(() => {
-      getShopItems(2).then(setItems);
-    }, []);
-
-  const [shippingInfo, setShippingInfo] = useState({
-    firstName: '',
-    lastName: '',
-    street: '',
-    city: '',
-    country: 'United States',
-    state: '',
-    zipCode: '',
-    phone: '',
-    mobile: ''
-  });
-
-  const [paymentInfo, setPaymentInfo] = useState({
-    cardNumber: '',
-    cardName: '',
-    expiry: '',
-    cvv: ''
-  });
-
-  const formatCardNumber = (value) => {
-    const v = value.replace(/\s+/g, '').replace(/[^0-9]/gi, '');
-    const matches = v.match(/\d{4,16}/g);
-    const match = (matches && matches[0]) || '';
-    const parts = [];
-    for (let i = 0, len = match.length; i < len; i += 4) {
-      parts.push(match.substring(i, i + 4));
-    }
-    if (parts.length) {
-      return parts.join(' ');
-    } else {
-      return value;
-    }
+  const handleBillingChange = (e) => {
+    const { name, value } = e.target;
+    setBilling(prev => ({ ...prev, [name]: value }));
   };
 
-  const formatExpiry = (value) => {
-    const v = value.replace(/\s+/g, '').replace(/[^0-9]/gi, '');
-    if (v.length >= 2) {
-      return `${v.slice(0, 2)}/${v.slice(2, 4)}`;
-    }
-    return v;
+  const handleShippingChange = (e) => {
+    const { name, value } = e.target;
+    setShipping(prev => ({ ...prev, [name]: value }));
+  };
+
+  const formatCardNumber = (v) => {
+    const digits = v.replace(/\D/g, '').slice(0, 16);
+    return digits.replace(/(\d{4})(?=\d)/g, '$1 ');
+  };
+
+  const formatExpiry = (v) => {
+    const digits = v.replace(/\D/g, '').slice(0, 4);
+    if (digits.length >= 2) return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+    return digits;
   };
 
   const handlePaymentChange = (e) => {
-    const { name, value } = e.target;
-    let formattedValue = value;
-    
-    if (name === 'cardNumber') {
-      formattedValue = formatCardNumber(value);
-    } else if (name === 'expiry') {
-      formattedValue = formatExpiry(value);
+    let { name, value } = e.target;
+    if (name === 'cardNumber') value = formatCardNumber(value);
+    if (name === 'expiry')     value = formatExpiry(value);
+    if (name === 'cvv')        value = value.replace(/\D/g, '').slice(0, 4);
+    setPayment(prev => ({ ...prev, [name]: value }));
+  };
+
+  // ── Price calculations ──
+  const calcTicketSubtotal = useCallback(() => {
+    if (!ticketData) return 0;
+    let total = 0;
+    for (const [type, qty] of Object.entries(ticketData.quantities)) {
+      const base = TICKET_PRICES[type] || 0;
+      const discounted = memberDiscount > 0 ? Math.round(base * (1 - memberDiscount)) : base;
+      total += discounted * qty;
     }
-    
-    setPaymentInfo(prev => ({
-      ...prev,
-      [name]: formattedValue
-    }));
-  };
-  
-  // Handle login
-  const handleLogin = (e) => {
-    e.preventDefault();
-    console.log('Logging in with:', loginEmail, loginPassword);
-    
-    setIsLoggedIn(true);
-    setShowLoginForm(false);
-    
-    setBillingInfo({
-      ...billingInfo,
-      firstName: 'John',
-      lastName: 'Doe',
-      email: loginEmail,
-      confirmEmail: loginEmail
-    });
-    
-    alert('Logged in successfully!');
-  };
-  
-  // Handle continue as guest
-  const handleContinueAsGuest = () => {
-    setContinueAsGuest(true);
-    setShowLoginForm(false);
-  };
-  
-  // Handle logout
-  const handleLogout = () => {
-    setIsLoggedIn(false);
-    setContinueAsGuest(false);
-    setBillingInfo({
-      firstName: '',
-      lastName: '',
-      street: '',
-      city: '',
-      country: 'United States',
-      state: '',
-      zipCode: '',
-      phone: '',
-      mobile: '',
-      email: '',
-      confirmEmail: ''
-    });
-  };
-  
-  // Handle billing form changes
-  const handleBillingChange = (e) => {
-    const { name, value } = e.target;
-    setBillingInfo(prev => ({
-      ...prev,
-      [name]: value
-    }));
-  };
-  
-  // Handle shipping form changes
-  const handleShippingChange = (e) => {
-    const { name, value } = e.target;
-    setShippingInfo(prev => ({
-      ...prev,
-      [name]: value
-    }));
-  };
-  
-  // Sync shipping with billing
-  const handleSameAsBillingChange = () => {
-    if (!sameAsBilling) {
-      setShippingInfo({
-        firstName: billingInfo.firstName,
-        lastName: billingInfo.lastName,
-        street: billingInfo.street,
-        city: billingInfo.city,
-        country: billingInfo.country,
-        state: billingInfo.state,
-        zipCode: billingInfo.zipCode,
-        phone: billingInfo.phone,
-        mobile: billingInfo.mobile
-      });
-    }
-    setSameAsBilling(!sameAsBilling);
-  };
-  
-  // Handle form submission
+    return total;
+  }, [ticketData, memberDiscount]);
+
+  const calcEventTicketSubtotal = useCallback(() => {
+    if (!eventTicket) return 0;
+    const base = eventTicket.price_cents || 0;
+    const discounted = memberDiscount > 0 ? Math.round(base * (1 - memberDiscount)) : base;
+    return discounted * (eventTicket.quantity || 1);
+  }, [eventTicket, memberDiscount]);
+
+  const calcShopSubtotal = useCallback(() => {
+    return shopItems.reduce((sum, i) => {
+      const price = memberDiscount > 0 ? Math.round(i.price_cents * (1 - memberDiscount)) : i.price_cents;
+      return sum + price * i.quantity;
+    }, 0);
+  }, [shopItems, memberDiscount]);
+
+  const calcFoodSubtotal = useCallback(() => {
+    return foodItems.reduce((sum, i) => {
+      const qty = foodQuantities[i.item_id] || 0;
+      if (qty === 0) return sum;
+      const price = memberDiscount > 0 ? Math.round(i.price_cents * (1 - memberDiscount)) : i.price_cents;
+      return sum + price * qty;
+    }, 0);
+  }, [foodItems, foodQuantities, memberDiscount]);
+
+  const donationAmountCents = donationData ? Math.round(parseFloat(donationData.amount) * 100) : 0;
+
+  const subtotalCents = isDonation
+    ? donationAmountCents
+    : calcTicketSubtotal() + calcEventTicketSubtotal() + calcShopSubtotal() + calcFoodSubtotal();
+
+  const taxCents = isDonation ? 0 : Math.round(subtotalCents * TAX_RATE);
+  const totalCents = subtotalCents + taxCents;
+
+  const fmt = (cents) => `$${(cents / 100).toFixed(2)}`;
+
+  // ══════════════════════════════════════
+  // Place order
+  // ══════════════════════════════════════
+
   const handlePlaceOrder = async (e) => {
     e.preventDefault();
 
-    if (!billingInfo.firstName || !billingInfo.lastName) {
-      alert('Please enter your name');
-      return;
-    }
-
-    if (!billingInfo.email || billingInfo.email !== billingInfo.confirmEmail) {
-      alert('Please ensure emails match');
-      return;
-    }
-
-    if (!paymentInfo.cardNumber || paymentInfo.cardNumber.replace(/\s/g, '').length < 16) {
-      alert('Please enter a valid card number');
-      return;
-    }
-
-    if (!paymentInfo.cardName) {
-      alert('Please enter the name on card');
-      return;
-    }
-
-    if (!paymentInfo.expiry || paymentInfo.expiry.length < 5) {
-      alert('Please enter a valid expiration date (MM/YY)');
-      return;
-    }
-
-    if (!paymentInfo.cvv || paymentInfo.cvv.length < 3) {
-      alert('Please enter a valid CVV');
-      return;
+    // Validation
+    if (!isDonation) {
+      if (!billing.firstName || !billing.lastName) return alert('Please enter your name.');
+      if (!billing.email || billing.email !== billing.confirmEmail) return alert('Emails do not match.');
+      if (!payment.cardNumber || payment.cardNumber.replace(/\s/g, '').length < 16) return alert('Enter a valid card number.');
+      if (!payment.cardName) return alert('Enter the name on card.');
+      if (!payment.expiry || payment.expiry.length < 5) return alert('Enter a valid expiration date.');
+      if (!payment.cvv || payment.cvv.length < 3) return alert('Enter a valid CVV.');
+    } else {
+      if (!billing.email) return alert('Please enter your email for the donation receipt.');
+      if (!payment.cardNumber || payment.cardNumber.replace(/\s/g, '').length < 16) return alert('Enter a valid card number.');
+      if (!payment.cardName) return alert('Enter the name on card.');
+      if (!payment.expiry || payment.expiry.length < 5) return alert('Enter a valid expiration date.');
+      if (!payment.cvv || payment.cvv.length < 3) return alert('Enter a valid CVV.');
     }
 
     try {
-      const totalAmountCents = Math.round(total * 100);
+      setSubmitting(true);
 
-      const { data: transaction, error: transactionError } = await supabase.from('transactions').insert([{
-            total_amount_cents: totalAmountCents,
-            donation_id: null,
-          }]).select().single();
-
-      if (transactionError) throw transactionError;
-
-      const purchasedShopItems = (shopData?.items || []).map(item => ({
-        item_id: item.item_id,
-        quantity: item.quantity,
-      }));
-
-      const purchasedFoodItems = items
-        .filter(item => (foodQuantities[item.item_id] || 0) > 0)
-        .map(item => ({
-          item_id: item.item_id,
-          quantity: foodQuantities[item.item_id],
-        }));
-
-      const purchasedItems = [...purchasedShopItems, ...purchasedFoodItems];
-
-      for (const item of purchasedItems) {
-        const { data: inventoryRow, error: fetchError } = await supabase
-          .from('inventory')
-          .select('item_id, stock_count')
-          .eq('item_id', item.item_id)
+      // 1. Create donation record if donation flow
+      let donationId = null;
+      if (isDonation) {
+        const { data: don, error: donErr } = await supabase
+          .from('donations')
+          .insert([{
+            donor_name: billing.firstName ? `${billing.firstName} ${billing.lastName}` : payment.cardName,
+            amount_cents: donationAmountCents,
+            customer_id: customerId || null,
+          }])
+          .select()
           .single();
-
-        if (fetchError) throw fetchError;
-
-        const newStockCount = inventoryRow.stock_count - item.quantity;
-
-        if (newStockCount < 0) {
-          throw new Error(`Not enough stock for item ${item.item_id}`);
-        }
-
-        const { error: updateError } = await supabase
-          .from('inventory')
-          .update({ stock_count: newStockCount })
-          .eq('item_id', item.item_id);
-
-        if (updateError) throw updateError;
+        if (donErr) throw donErr;
+        donationId = don.donation_id;
       }
 
-      console.log('Transaction created:', transaction);
-
-      console.log('Order placed:', {
-        transaction,
-        isLoggedIn,
-        tickets: ticketData,
-        billing: billingInfo,
-        shipping: sameAsBilling ? billingInfo : shippingInfo
+      // 2. Create transaction
+      const transaction = await createTransaction({
+        totalAmountCents: totalCents,
+        customerId: customerId || null,
+        guestEmail: authMode === 'guest' ? billing.email : null,
+        isDonation,
+        donationId,
       });
 
-      localStorage.removeItem('shopCart');
-
-      if (isLoggedIn) {
-        alert('Order placed successfully! Redirecting to your dashboard...');
-        navigate('/dashboard');
-      } else {
-        alert('Order placed successfully! You can create an account to track your orders.');
+      // 3. Create tickets
+      if (ticketData) {
+        const ticketRows = [];
+        for (const [type, qty] of Object.entries(ticketData.quantities)) {
+          if (qty <= 0) continue;
+          const base = TICKET_PRICES[type];
+          const price = memberDiscount > 0 ? Math.round(base * (1 - memberDiscount)) : base;
+          for (let i = 0; i < qty; i++) {
+            ticketRows.push({
+              customer_id: customerId || null,
+              type,
+              price_cents: price,
+              transaction_id: transaction.transaction_id,
+              event_id: null, // admission only
+            });
+          }
+        }
+        if (ticketRows.length > 0) {
+          const { error: tickErr } = await supabase.from('tickets').insert(ticketRows);
+          if (tickErr) throw tickErr;
+        }
       }
-    } catch (error) {
-      console.error('Checkout failed:', error);
-      alert('Checkout failed: ' + error.message);
+
+      // 4. Create event tickets
+      if (eventTicket) {
+        const base = eventTicket.price_cents;
+        const price = memberDiscount > 0 ? Math.round(base * (1 - memberDiscount)) : base;
+        const eventTicketRows = [];
+        for (let i = 0; i < (eventTicket.quantity || 1); i++) {
+          eventTicketRows.push({
+            customer_id: customerId || null,
+            type: 'event',
+            price_cents: price,
+            transaction_id: transaction.transaction_id,
+            event_id: eventTicket.event_id,
+          });
+        }
+        const { error: evtErr } = await supabase.from('tickets').insert(eventTicketRows);
+        if (evtErr) throw evtErr;
+      }
+
+      // 5. Process shop + food items, update inventory
+      const allPurchasedItems = [];
+
+      for (const item of shopItems) {
+        const price = memberDiscount > 0 ? Math.round(item.price_cents * (1 - memberDiscount)) : item.price_cents;
+        allPurchasedItems.push({
+          transaction_id: transaction.transaction_id,
+          item_id: item.item_id,
+          quantity: item.quantity,
+          price_at_sale_cents: price,
+        });
+      }
+
+      for (const item of foodItems) {
+        const qty = foodQuantities[item.item_id] || 0;
+        if (qty <= 0) continue;
+        const price = memberDiscount > 0 ? Math.round(item.price_cents * (1 - memberDiscount)) : item.price_cents;
+        allPurchasedItems.push({
+          transaction_id: transaction.transaction_id,
+          item_id: item.item_id,
+          quantity: qty,
+          price_at_sale_cents: price,
+        });
+      }
+
+      if (allPurchasedItems.length > 0) {
+        await createSaleItems(allPurchasedItems);
+
+        // Update stock counts
+        for (const si of allPurchasedItems) {
+          const { data: inv, error: invErr } = await supabase
+            .from('inventory')
+            .select('stock_count')
+            .eq('item_id', si.item_id)
+            .single();
+          if (invErr) throw invErr;
+          const newStock = inv.stock_count - si.quantity;
+          if (newStock < 0) throw new Error(`Not enough stock for item ${si.item_id}`);
+          const { error: updErr } = await supabase
+            .from('inventory')
+            .update({ stock_count: newStock })
+            .eq('item_id', si.item_id);
+          if (updErr) throw updErr;
+        }
+      }
+
+      // 6. Save billing/shipping to customer profile if logged in
+      if (customerId) {
+        await supabase.from('customers').update({
+          billing_street: billing.street,
+          billing_city:   billing.city,
+          billing_state:  billing.state,
+          billing_zip:    billing.zip,
+          billing_phone:  billing.phone,
+          shipping_same_as_billing: sameAsBilling,
+          ...(sameAsBilling ? {} : {
+            shipping_street: shipping.street,
+            shipping_city:   shipping.city,
+            shipping_state:  shipping.state,
+            shipping_zip:    shipping.zip,
+            shipping_phone:  shipping.phone,
+          }),
+        }).eq('customer_id', customerId);
+      }
+
+      // 7. Create receipt
+      const receiptItems = [];
+      if (ticketData) {
+        for (const [type, qty] of Object.entries(ticketData.quantities)) {
+          if (qty <= 0) continue;
+          const base = TICKET_PRICES[type];
+          const price = memberDiscount > 0 ? Math.round(base * (1 - memberDiscount)) : base;
+          receiptItems.push({ description: `${TICKET_LABELS[type].name} Ticket`, quantity: qty, unitPriceCents: price });
+        }
+      }
+      if (eventTicket) {
+        const base = eventTicket.price_cents;
+        const price = memberDiscount > 0 ? Math.round(base * (1 - memberDiscount)) : base;
+        receiptItems.push({ description: `Event: ${eventTicket.title}`, quantity: eventTicket.quantity || 1, unitPriceCents: price });
+      }
+      for (const item of shopItems) {
+        const price = memberDiscount > 0 ? Math.round(item.price_cents * (1 - memberDiscount)) : item.price_cents;
+        receiptItems.push({ description: item.item_name, quantity: item.quantity, unitPriceCents: price });
+      }
+      for (const item of foodItems) {
+        const qty = foodQuantities[item.item_id] || 0;
+        if (qty <= 0) continue;
+        const price = memberDiscount > 0 ? Math.round(item.price_cents * (1 - memberDiscount)) : item.price_cents;
+        receiptItems.push({ description: item.item_name, quantity: qty, unitPriceCents: price });
+      }
+      if (isDonation) {
+        receiptItems.push({ description: `Donation — ${donationData.fund}`, quantity: 1, unitPriceCents: donationAmountCents });
+      }
+
+      try {
+        await createReceipt({
+          transactionId: transaction.transaction_id,
+          email: billing.email,
+          customerName: `${billing.firstName} ${billing.lastName}`.trim() || payment.cardName,
+          items: receiptItems,
+          subtotalCents: subtotalCents,
+          taxCents: taxCents,
+          totalCents: totalCents,
+          isDonation,
+          donationFund: donationData?.fund || null,
+        });
+      } catch (receiptErr) {
+        console.warn('Receipt creation failed (non-blocking):', receiptErr);
+      }
+
+      // 8. Cleanup
+      localStorage.removeItem('shopCart');
+      localStorage.removeItem('cartExpiresAt');
+
+      setOrderTransaction(transaction);
+      setOrderComplete(true);
+
+    } catch (err) {
+      console.error('Checkout failed:', err);
+      alert('Checkout failed: ' + err.message);
+    } finally {
+      setSubmitting(false);
     }
   };
-  const savedCart = JSON.parse(localStorage.getItem('shopCart') || '{}');
-  const shopData = location.state?.shopData || (
-    shopItems.length > 0
-      ? {
-          items: shopItems
-            .filter(item => savedCart[item.item_id] > 0)
-            .map(item => ({ ...item, quantity: savedCart[item.item_id] }))
-        }
-      : null
-  );
-  // Handle case where user navigates directly to checkout
-  if (!ticketData) {
+
+  // ══════════════════════════════════════
+  // Timer display
+  // ══════════════════════════════════════
+  const formatTimer = (ms) => {
+    if (!ms || ms <= 0) return '0:00';
+    const mins = Math.floor(ms / 60000);
+    const secs = Math.floor((ms % 60000) / 1000);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  // ══════════════════════════════════════
+  // Order complete screen
+  // ══════════════════════════════════════
+  if (orderComplete) {
     return (
-      <div className="checkout-error">
-        <div className="error-container">
-          <FaExclamationTriangle className="error-icon" />
-          <h2>No Tickets Selected</h2>
-          <p>Please select your tickets before proceeding to checkout.</p>
-          <button onClick={() => navigate('/tickets')} className="back-button">
-            Return to Tickets
-          </button>
+      <div className="checkout-page">
+        <div className="checkout-wrapper">
+          <div className="checkout-success glass-panel">
+            <FaCheckCircle size={64} style={{ color: 'var(--color-primary)', marginBottom: '16px' }} />
+            <h2>{isDonation ? 'Thank You for Your Donation!' : 'Order Confirmed!'}</h2>
+            <p style={{ color: 'var(--color-text-muted)', margin: '12px 0 8px' }}>
+              {isDonation
+                ? `Your generous donation of ${fmt(donationAmountCents)} has been received.`
+                : `Your order total was ${fmt(totalCents)}.`
+              }
+            </p>
+            {billing.email && (
+              <p style={{ color: 'var(--color-text-muted)', fontSize: '0.9rem' }}>
+                A confirmation receipt has been sent to <strong style={{ color: 'white' }}>{billing.email}</strong>.
+              </p>
+            )}
+            {orderTransaction && (
+              <p style={{ color: 'var(--color-text-muted)', fontSize: '0.85rem', marginTop: '8px' }}>
+                Transaction #{orderTransaction.transaction_id}
+              </p>
+            )}
+            <div style={{ display: 'flex', gap: '12px', marginTop: '24px', flexWrap: 'wrap', justifyContent: 'center' }}>
+              {user && (
+                <button className="glass-button" onClick={() => navigate('/dashboard/customer')}>
+                  Go to Dashboard
+                </button>
+              )}
+              <button className="glass-button" style={{ background: 'transparent', border: '1px solid var(--glass-border)' }}
+                      onClick={() => navigate('/')}>
+                Return Home
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     );
   }
-  
-  // Format date for display
-  const formatDate = (date) => {
-    if (!date) return '';
-    return date.toLocaleDateString('en-US', { 
-      weekday: 'long', 
-      month: 'long', 
-      day: 'numeric', 
-      year: 'numeric' 
-    });
-  };
-  
-  // Get ticket details
-  const getTicketDetails = (type) => {
-    const details = {
-      adult: { name: 'Adult (12-64)', icon: FaUser, price: 24.99 },
-      youth: { name: 'Youth (3-11)', icon: FaChild, price: 17.99 },
-      senior: { name: 'Senior (65+)', icon: FaPersonCane, price: 19.99 }
-    };
-    return details[type];
-  };
-  
-  const calcSubtotal = (list, getQty) =>  list?.reduce((sum, i) => sum + (i.price_cents / 100) * getQty(i), 0) || 0;
-  const foodSubtotal = calcSubtotal(items, i => foodQuantities[i.item_id] || 0);
-  const shopSubtotal = calcSubtotal(shopData?.items, i => i.quantity);
-  
-  const ticketsubtotal = ticketData.totalPrice;
-  const subtotal = (ticketsubtotal + shopSubtotal + foodSubtotal);
-  const tax = subtotal * 0.0825;
-  const total = subtotal + tax;
-  
+
+  // ══════════════════════════════════════
+  // No items guard (non-donation)
+  // ══════════════════════════════════════
+  if (!isDonation && !ticketData && !eventTicket) {
+    return (
+      <div className="checkout-page">
+        <div className="checkout-wrapper">
+          <div className="checkout-empty glass-panel">
+            <FaTimesCircle size={48} style={{ color: '#ef4444', marginBottom: '12px' }} />
+            <h2>Nothing to Check Out</h2>
+            <p style={{ color: 'var(--color-text-muted)' }}>
+              Select tickets or items before heading to checkout.
+            </p>
+            <button className="glass-button" style={{ marginTop: '16px' }} onClick={() => navigate('/tickets')}>
+              Browse Tickets
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ══════════════════════════════════════
+  // Main checkout render
+  // ══════════════════════════════════════
   return (
     <div className="checkout-page">
-      <div className="checkout-container">
-        <div className="page-header">
-          <h1 className="page-title">Checkout</h1>
-          <p className="page-description">
-            Complete your purchase to secure your tickets
-          </p>
-        </div>
-        
-        {/* Account Banner */}
-        {!isLoggedIn && !continueAsGuest && (
-          <div className="member-banner glass-panel">
-            <p>Have an account with us? Sign in now for faster checkout and to track your orders!</p>
-            <div className="banner-buttons">
-              <button 
-                className="glass-button"
-                onClick={() => setShowLoginForm(!showLoginForm)}
-              >
-                {showLoginForm ? 'Cancel' : 'Log In'}
-              </button>
-              <button 
-                className="guest-button-banner"
-                onClick={handleContinueAsGuest}
-              >
-                Continue as Guest
-              </button>
-            </div>
+      <div className="checkout-wrapper">
+        {/* ── Left column: forms ── */}
+        <div className="checkout-forms">
+
+          {/* Header */}
+          <div className="checkout-header">
+            <h1>{isDonation ? <><FaHeart style={{ color: '#ef4444' }} /> Make a Donation</> : <><FaShoppingCart /> Checkout</>}</h1>
+            {!isDonation && timeLeft != null && (
+              <div className={`cart-timer ${timeLeft < 120000 ? 'urgent' : ''}`}>
+                <FaClock /> Cart reserved for {formatTimer(timeLeft)}
+              </div>
+            )}
           </div>
-        )}
 
-        {/* Food Panel */}
-        {(() => {
-          const [currentIndex, setCurrentIndex] = useState(0);
-          const visibleCount = 5;
+          {/* Auth banner — only show if not logged in and not yet chosen */}
+          {!user && authMode === null && (
+            <div className="glass-panel auth-banner">
+              <p>Have an account? Sign in for faster checkout{!isDonation && ' and member discounts'}.</p>
+              <div className="auth-banner-actions">
+                <button className="glass-button" onClick={() => setAuthMode('login')}>Sign In</button>
+                <button className="glass-button ghost" onClick={() => setAuthMode('guest')}>
+                  Continue as Guest
+                </button>
+              </div>
+            </div>
+          )}
 
-          const prev = () => setCurrentIndex(i => Math.max(0, i - 1));
-          const next = () => setCurrentIndex(i => Math.min(items.length - visibleCount, i + 1));
+          {/* Inline login form */}
+          {authMode === 'login' && !user && (
+            <div className="glass-panel auth-login-form">
+              <h3>Sign in to your account</h3>
+              {loginError && <div className="form-error">{loginError}</div>}
+              <form onSubmit={handleLogin}>
+                <div className="form-row-2col">
+                  <div className="form-group">
+                    <label>Email</label>
+                    <input type="email" value={loginEmail} onChange={e => setLoginEmail(e.target.value)} placeholder="your@email.com" required />
+                  </div>
+                  <div className="form-group">
+                    <label>Password</label>
+                    <input type="password" value={loginPassword} onChange={e => setLoginPassword(e.target.value)} placeholder="Password" required />
+                  </div>
+                </div>
+                <div className="auth-login-actions">
+                  <button type="submit" className="glass-button" disabled={loginLoading}>
+                    {loginLoading ? 'Signing in...' : 'Sign In'}
+                  </button>
+                  <Link to="/signup" className="glass-button ghost" style={{ textDecoration: 'none', textAlign: 'center' }}>
+                    Create Account
+                  </Link>
+                  <button type="button" className="text-link" onClick={() => setAuthMode('guest')}>
+                    Continue as guest instead
+                  </button>
+                </div>
+                <Link to="/forgot-password" className="text-link" style={{ fontSize: '0.8rem', marginTop: '4px' }}>
+                  Forgot password?
+                </Link>
+              </form>
+            </div>
+          )}
 
-          const visibleItems = items.slice(currentIndex, currentIndex + visibleCount);
-
-          return (
-            <div className="food-banner glass-panel">
-              <p style={{ marginTop: '1rem', marginBottom: '1rem', textAlign: 'center' }}>
-                Want to add in some snacks and treats? It isn't too late!
+          {/* Logged in banner */}
+          {user && customer && (
+            <div className="glass-panel auth-logged-in">
+              <p>Welcome back, <strong>{customer.first_name || 'Member'}</strong>!
+                {memberDiscount > 0 && (
+                  <span className="member-badge">
+                    <FaCrown /> {Math.round(memberDiscount * 100)}% member discount applied
+                  </span>
+                )}
               </p>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <button onClick={prev} className="glass-button" style={{ fontSize: '1.2rem', padding: '8px 14px', flexShrink: 0 }}>←</button>
-                <div style={{
-                  display: 'flex',
-                  gap: '16px',
-                  overflowX: 'auto',
-                  flex: 1,
-                  padding: '8px 4px',
-                }}>
-                  {visibleItems.map((item) => (
-                    <div
-                      key={item.item_id}
-                      className="glass-panel food-item-card"
-                      style={{
-                        flex: '0 0 200px',
-                        padding: '12px',
-                        borderRadius: '12px',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        transition: 'transform 0.3s ease'
-                      }}
-                    >
-                      {item.image_url && (
-                        <div className="food-image-container">
-                          {item.image_url && (
-                            <img
-                              src={item.image_url}
-                              alt={item.item_name}
-                              style={{ width: '100%', height: '150px', objectFit: 'contain', borderRadius: '5px', marginBottom: '6px' }}
-                            />
-                          )}
+            </div>
+          )}
+
+          {/* ── Billing ── */}
+          {(authMode === 'guest' || authMode === 'logged-in' || user) && (
+            <>
+              <div className="glass-panel form-section">
+                <h2><FaEnvelope style={{ marginRight: '8px' }} /> {isDonation ? 'Donor Information' : 'Billing Information'}</h2>
+                <div className="form-row-2col">
+                  <div className="form-group">
+                    <label>First Name <span className="req">*</span></label>
+                    <input name="firstName" value={billing.firstName} onChange={handleBillingChange} placeholder="First name" required />
+                  </div>
+                  <div className="form-group">
+                    <label>Last Name <span className="req">*</span></label>
+                    <input name="lastName" value={billing.lastName} onChange={handleBillingChange} placeholder="Last name" required />
+                  </div>
+                </div>
+                <div className="form-group full">
+                  <label>Email <span className="req">*</span></label>
+                  <input type="email" name="email" value={billing.email} onChange={handleBillingChange} placeholder="your@email.com" required />
+                </div>
+                {!isDonation && (
+                  <div className="form-group full">
+                    <label>Confirm Email <span className="req">*</span></label>
+                    <input type="email" name="confirmEmail" value={billing.confirmEmail} onChange={handleBillingChange} placeholder="Confirm email" required />
+                  </div>
+                )}
+                {!isDonation && (
+                  <>
+                    <div className="form-group full">
+                      <label>Street Address <span className="req">*</span></label>
+                      <input name="street" value={billing.street} onChange={handleBillingChange} placeholder="Street address" required />
+                    </div>
+                    <div className="form-row-2col">
+                      <div className="form-group">
+                        <label>City <span className="req">*</span></label>
+                        <input name="city" value={billing.city} onChange={handleBillingChange} placeholder="City" required />
+                      </div>
+                      <div className="form-group">
+                        <label>State <span className="req">*</span></label>
+                        <select name="state" value={billing.state} onChange={handleBillingChange}>
+                          {US_STATES.map(s => <option key={s} value={s}>{s}</option>)}
+                        </select>
+                      </div>
+                    </div>
+                    <div className="form-row-2col">
+                      <div className="form-group">
+                        <label>Zip Code <span className="req">*</span></label>
+                        <input name="zip" value={billing.zip} onChange={handleBillingChange} placeholder="Zip code" required />
+                      </div>
+                      <div className="form-group">
+                        <label>Phone <span className="req">*</span></label>
+                        <input type="tel" name="phone" value={billing.phone} onChange={handleBillingChange} placeholder="(123) 456-7890" required />
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {/* ── Shipping (non-donation only) ── */}
+              {!isDonation && (
+                <div className="glass-panel form-section">
+                  <h2>Shipping Information</h2>
+                  <label className="checkbox-row">
+                    <input type="checkbox" checked={sameAsBilling} onChange={() => setSameAsBilling(!sameAsBilling)} />
+                    <span>Same as billing address</span>
+                  </label>
+                  {!sameAsBilling && (
+                    <>
+                      <div className="form-row-2col">
+                        <div className="form-group">
+                          <label>First Name <span className="req">*</span></label>
+                          <input name="firstName" value={shipping.firstName} onChange={handleShippingChange} placeholder="First name" required />
                         </div>
-                      )}
-                      <h3 style={{ margin: '8px 0 4px 0', fontSize: '0.9rem', textAlign: 'center' }}>{item.item_name}</h3>
-                      <p style={{ color: 'var(--color-primary)', fontWeight: 700, fontSize: '1rem', margin: '4px 0' }}>
-                        ${(item.price_cents / 100).toFixed(2)}
-                      </p>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: 'auto', width: '100%', justifyContent: 'center' }}>
-                        <button className="glass-button" onClick={() => handleFoodQuantityChange(item.item_id, -1)} style={{ padding: '4px 12px' }}>−</button>
-                        <span style={{ fontSize: '1rem', fontWeight: '600', minWidth: '30px', textAlign: 'center' }}>
-                          {foodQuantities[item.item_id] || 0}
-                        </span>
-                        <button className="glass-button" onClick={() => handleFoodQuantityChange(item.item_id, 1)} style={{ padding: '4px 12px' }}>+</button>
+                        <div className="form-group">
+                          <label>Last Name <span className="req">*</span></label>
+                          <input name="lastName" value={shipping.lastName} onChange={handleShippingChange} placeholder="Last name" required />
+                        </div>
+                      </div>
+                      <div className="form-group full">
+                        <label>Street Address <span className="req">*</span></label>
+                        <input name="street" value={shipping.street} onChange={handleShippingChange} placeholder="Street address" required />
+                      </div>
+                      <div className="form-row-2col">
+                        <div className="form-group">
+                          <label>City <span className="req">*</span></label>
+                          <input name="city" value={shipping.city} onChange={handleShippingChange} placeholder="City" required />
+                        </div>
+                        <div className="form-group">
+                          <label>State <span className="req">*</span></label>
+                          <select name="state" value={shipping.state} onChange={handleShippingChange}>
+                            {US_STATES.map(s => <option key={s} value={s}>{s}</option>)}
+                          </select>
+                        </div>
+                      </div>
+                      <div className="form-row-2col">
+                        <div className="form-group">
+                          <label>Zip Code <span className="req">*</span></label>
+                          <input name="zip" value={shipping.zip} onChange={handleShippingChange} placeholder="Zip code" required />
+                        </div>
+                        <div className="form-group">
+                          <label>Phone <span className="req">*</span></label>
+                          <input type="tel" name="phone" value={shipping.phone} onChange={handleShippingChange} placeholder="(123) 456-7890" required />
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+
+              {/* ── Payment ── */}
+              <div className="glass-panel form-section">
+                <h2><FaCreditCard style={{ marginRight: '8px' }} /> Payment</h2>
+                <div className="form-group full">
+                  <label>Card Number <span className="req">*</span></label>
+                  <input name="cardNumber" value={payment.cardNumber} onChange={handlePaymentChange} placeholder="1234 5678 9012 3456" maxLength={19} required />
+                </div>
+                <div className="form-group full">
+                  <label>Name on Card <span className="req">*</span></label>
+                  <input name="cardName" value={payment.cardName} onChange={handlePaymentChange} placeholder="As it appears on card" required />
+                </div>
+                <div className="form-row-2col">
+                  <div className="form-group">
+                    <label>Expiry <span className="req">*</span></label>
+                    <input name="expiry" value={payment.expiry} onChange={handlePaymentChange} placeholder="MM/YY" maxLength={5} required />
+                  </div>
+                  <div className="form-group">
+                    <label>CVV <span className="req">*</span></label>
+                    <input type="password" name="cvv" value={payment.cvv} onChange={handlePaymentChange} placeholder="123" maxLength={4} required />
+                  </div>
+                </div>
+                <div className="secure-note">
+                  <FaLock /> Your payment information is secure and encrypted.
+                </div>
+              </div>
+
+              {/* ── Place order (mobile) ── */}
+              <button
+                className="place-order-btn mobile-only"
+                onClick={handlePlaceOrder}
+                disabled={submitting}
+              >
+                {submitting ? 'Processing...' : isDonation ? `Donate ${fmt(totalCents)}` : `Pay ${fmt(totalCents)}`}
+              </button>
+            </>
+          )}
+        </div>
+
+        {/* ── Right column: order summary ── */}
+        <div className="checkout-summary">
+          <div className="glass-panel summary-panel">
+            <h2 className="summary-title">
+              {isDonation ? 'Donation Summary' : 'Order Summary'}
+            </h2>
+
+            {/* Donation amount */}
+            {isDonation && (
+              <div className="summary-section">
+                <div className="summary-line">
+                  <span><FaHeart style={{ color: '#ef4444', marginRight: '6px' }} />
+                    {donationData.fund === 'general' && 'General Donation'}
+                    {donationData.fund === 'animal' && 'Animal Wellbeing'}
+                    {donationData.fund === 'conservation' && 'Conservation Fund'}
+                  </span>
+                  <span>{fmt(donationAmountCents)}</span>
+                </div>
+              </div>
+            )}
+
+            {/* Admission tickets */}
+            {ticketData && (
+              <div className="summary-section">
+                <h3 className="summary-section-label">Admission Tickets</h3>
+                {ticketData.date && (
+                  <div className="summary-meta">
+                    {ticketData.date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+                    {ticketData.time && ` at ${ticketData.time}`}
+                  </div>
+                )}
+                {Object.entries(ticketData.quantities).map(([type, qty]) => {
+                  if (qty <= 0) return null;
+                  const base = TICKET_PRICES[type];
+                  const price = memberDiscount > 0 ? Math.round(base * (1 - memberDiscount)) : base;
+                  const label = TICKET_LABELS[type];
+                  const Icon = label.icon;
+                  return (
+                    <div key={type} className="summary-line">
+                      <span><Icon className="summary-icon" /> {label.name} x{qty}</span>
+                      <span>
+                        {memberDiscount > 0 && <span className="original-price">{fmt(base * qty)}</span>}
+                        {fmt(price * qty)}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Event ticket */}
+            {eventTicket && (
+              <div className="summary-section">
+                <h3 className="summary-section-label">Event Ticket</h3>
+                <div className="summary-meta">{eventTicket.title} — {eventTicket.date}</div>
+                <div className="summary-line">
+                  <span><FaTag className="summary-icon" /> x{eventTicket.quantity || 1}</span>
+                  <span>
+                    {memberDiscount > 0 && <span className="original-price">{fmt(eventTicket.price_cents * (eventTicket.quantity || 1))}</span>}
+                    {fmt(calcEventTicketSubtotal())}
+                  </span>
+                </div>
+                <div className="summary-note">Includes zoo admission</div>
+              </div>
+            )}
+
+            {/* Shop items */}
+            {shopItems.length > 0 && (
+              <div className="summary-section">
+                <h3 className="summary-section-label">Gift Shop</h3>
+                {shopItems.map(item => {
+                  const price = memberDiscount > 0 ? Math.round(item.price_cents * (1 - memberDiscount)) : item.price_cents;
+                  return (
+                    <div key={item.item_id} className="summary-line">
+                      <span>{item.item_name} x{item.quantity}</span>
+                      <span>
+                        {memberDiscount > 0 && <span className="original-price">{fmt(item.price_cents * item.quantity)}</span>}
+                        {fmt(price * item.quantity)}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Food items */}
+            {foodItems.filter(i => (foodQuantities[i.item_id] || 0) > 0).length > 0 && (
+              <div className="summary-section">
+                <h3 className="summary-section-label">Food & Snacks</h3>
+                {foodItems.filter(i => (foodQuantities[i.item_id] || 0) > 0).map(item => {
+                  const qty = foodQuantities[item.item_id];
+                  const price = memberDiscount > 0 ? Math.round(item.price_cents * (1 - memberDiscount)) : item.price_cents;
+                  return (
+                    <div key={item.item_id} className="summary-line">
+                      <span>{item.item_name} x{qty}</span>
+                      <span>{fmt(price * qty)}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Add food inline (non-donation) */}
+            {!isDonation && foodItems.length > 0 && (
+              <details className="food-add-section">
+                <summary className="food-add-toggle">Add food & snacks</summary>
+                <div className="food-add-grid">
+                  {foodItems.map(item => (
+                    <div key={item.item_id} className="food-add-item">
+                      <div className="food-add-info">
+                        <span className="food-add-name">{item.item_name}</span>
+                        <span className="food-add-price">{fmt(item.price_cents)}</span>
+                      </div>
+                      <div className="food-add-controls">
+                        <button onClick={() => handleFoodQty(item.item_id, -1)} className="qty-btn">−</button>
+                        <span className="qty-display">{foodQuantities[item.item_id] || 0}</span>
+                        <button onClick={() => handleFoodQty(item.item_id, 1)} className="qty-btn">+</button>
                       </div>
                     </div>
                   ))}
                 </div>
-                <button onClick={next} className="glass-button" style={{ fontSize: '1.2rem', padding: '8px 14px', flexShrink: 0 }}>→</button>
-              </div>
-            </div>
-          );
-        })()}
-        
-        {/* Login Form (when expanded) */}
-        {showLoginForm && !isLoggedIn && !continueAsGuest && (
-          <div className="glass-panel login-expanded">
-            <form onSubmit={handleLogin} className="login-form-expanded">
-              <h3>Sign in to your account</h3>
-              <div className="form-row-expanded">
-                <div className="form-group-expanded">
-                  <label>Email Address</label>
-                  <input 
-                    type="email" 
-                    value={loginEmail}
-                    onChange={(e) => setLoginEmail(e.target.value)}
-                    placeholder="your@email.com"
-                    required
-                  />
-                </div>
-                <div className="form-group-expanded">
-                  <label>Password</label>
-                  <input 
-                    type="password" 
-                    value={loginPassword}
-                    onChange={(e) => setLoginPassword(e.target.value)}
-                    placeholder="Enter your password"
-                    required
-                  />
-                </div>
-              </div>
-              <div className="login-actions">
-                <button type="submit" className="login-submit-button">
-                  Sign In
-                </button>
-                <button 
-                  type="button" 
-                  className="create-account-button"
-                  onClick={() => navigate('/signup')}
-                >
-                  <FaUserPlus /> Create an account
-                </button>
-              </div>
-              <a href="/forgot-password" className="forgot-password">
-                Forgot password?
-              </a>
-            </form>
-          </div>
-        )}
-        
-        {/* Logged In Banner */}
-        {isLoggedIn && (
-          <div className="member-banner logged-in-banner glass-panel">
-            <p>Welcome back, <strong>{billingInfo.firstName || 'Valued Member'}</strong>! Your account information has been pre-filled.</p>
-            <button className="glass-button" onClick={handleLogout}>
-              Not you? Sign out
-            </button>
-          </div>
-        )}
-        
-        {/* Order Summary Section */}
-        <div className="glass-panel tickets-table">
-          <h2 className="section-title-inline">Order Summary</h2>
-          
-          {/* Visit Details */}
-          <div className="summary-card-simple">
-            <div className="detail-row-simple">
-              <FaCalendarAlt className="detail-icon" />
-              <span><strong>Date:</strong> {formatDate(ticketData.date)}</span>
-            </div>
-            <div className="detail-row-simple">
-              <FaClock className="detail-icon" />
-              <span><strong>Time:</strong> {ticketData.time}</span>
-            </div>
-          </div>
-          
-          {/* Ticket Details */}
-          <div className="ticket-items-simple">
-            {Object.entries(ticketData.quantities).map(([type, quantity]) => {
-              if (quantity > 0) {
-                const details = getTicketDetails(type);
-                const IconComponent = details.icon;
-                const itemSubtotal = details.price * quantity;
-                return (
-                  <div key={type} className="ticket-item-simple">
-                    <div className="ticket-info-simple">
-                      <IconComponent className="ticket-icon" />
-                      <div>
-                        <div className="ticket-type-simple">{details.name}</div>
-                        <div className="ticket-quantity-simple">Quantity: {quantity}</div>
-                      </div>
-                    </div>
-                    <div className="ticket-price-simple">
-                      ${itemSubtotal.toFixed(2)}
-                    </div>
+              </details>
+            )}
+
+            {/* Totals */}
+            <div className="summary-totals">
+              {!isDonation && (
+                <>
+                  <div className="summary-line">
+                    <span>Subtotal</span>
+                    <span>{fmt(subtotalCents)}</span>
                   </div>
-                );
-              }
-              return null;
-            })}
-          </div>
-          
-          {/* Shop items */}
-          {shopData && shopData.items.map(item => (
-            <div key={item.item_id} className="ticket-item-simple">
-              <div className="ticket-info-simple">
-                <div>
-                  <div className="ticket-type-simple">{item.item_name}</div>
-                  <div className="ticket-quantity-simple">Quantity: {item.quantity}</div>
+                  <div className="summary-line">
+                    <span>Tax (8.25%)</span>
+                    <span>{fmt(taxCents)}</span>
+                  </div>
+                </>
+              )}
+              {memberDiscount > 0 && (
+                <div className="summary-line discount-line">
+                  <span><FaCrown /> Member Discount ({Math.round(memberDiscount * 100)}%)</span>
+                  <span>Applied</span>
                 </div>
-              </div>
-              <div className="ticket-price-simple">
-                ${((item.price_cents / 100) * item.quantity).toFixed(2)}
+              )}
+              <div className="summary-line grand-total">
+                <span>Total</span>
+                <span>{fmt(totalCents)}</span>
               </div>
             </div>
-          ))}
 
-          {/* Food Stuff */}
-          {items.filter(item => foodQuantities[item.item_id] > 0).map(item => (
-            <div key={item.item_id} className="ticket-item-simple">
-              <div className="ticket-info-simple">
-                <div>
-                  <div className="ticket-type-simple">{item.item_name}</div>
-                  <div className="ticket-quantity-simple">Quantity: {foodQuantities[item.item_id]}</div>
-                </div>
-              </div>
-              <div className="ticket-price-simple">
-                ${((item.price_cents / 100) * foodQuantities[item.item_id]).toFixed(2)}
-              </div>
-            </div>
-          ))}
-
-          {/* Order Totals */}
-          <div className="order-totals-simple">
-            <div className="total-row-simple">
-              <span>Subtotal:</span>
-              <span>${subtotal.toFixed(2)}</span>
-            </div>
-            <div className="total-row-simple">
-              <span>Tax (8.25%):</span>
-              <span>${tax.toFixed(2)}</span>
-            </div>
-            <div className="total-row-simple grand-total-simple">
-              <span>Total:</span>
-              <span>${total.toFixed(2)}</span>
-            </div>
+            {/* Place order button (desktop) */}
+            {(authMode === 'guest' || authMode === 'logged-in' || user) && (
+              <button
+                className="place-order-btn"
+                onClick={handlePlaceOrder}
+                disabled={submitting}
+              >
+                {submitting ? 'Processing...' : isDonation ? `Donate ${fmt(totalCents)}` : `Pay ${fmt(totalCents)}`}
+              </button>
+            )}
           </div>
         </div>
-        
-        {/* Only show forms if guest or logged in */}
-        {(continueAsGuest || isLoggedIn) && (
-          <>
-            {/* Billing Information Section */}
-            <div className="glass-panel">
-              <h2 className="section-title-inline">Billing Contact</h2>
-              
-              <div className="form-grid-checkout">
-                <div className="form-group-checkout">
-                  <label>First Name <span className="required">*</span></label>
-                  <input 
-                    type="text" 
-                    name="firstName" 
-                    value={billingInfo.firstName}
-                    onChange={handleBillingChange}
-                    placeholder="First name"
-                    required
-                  />
-                </div>
-                
-                <div className="form-group-checkout">
-                  <label>Last Name <span className="required">*</span></label>
-                  <input 
-                    type="text" 
-                    name="lastName" 
-                    value={billingInfo.lastName}
-                    onChange={handleBillingChange}
-                    placeholder="Last name"
-                    required
-                  />
-                </div>
-                
-                <div className="form-group-checkout full-width">
-                  <label>Street Address <span className="required">*</span></label>
-                  <input 
-                    type="text" 
-                    name="street" 
-                    value={billingInfo.street}
-                    onChange={handleBillingChange}
-                    placeholder="Street address"
-                    required
-                  />
-                </div>
-                
-                <div className="form-group-checkout">
-                  <label>City <span className="required">*</span></label>
-                  <input 
-                    type="text" 
-                    name="city" 
-                    value={billingInfo.city}
-                    onChange={handleBillingChange}
-                    placeholder="City"
-                    required
-                  />
-                </div>
-                
-                <div className="form-group-checkout">
-                  <label>Country <span className="required">*</span></label>
-                  <select name="country" value={billingInfo.country} onChange={handleBillingChange} required>
-                    <option value="United States">United States</option>
-                    <option value="Canada">Canada</option>
-                    <option value="Mexico">Mexico</option>
-                    <option value="Other">Other</option>
-                  </select>
-                </div>
-                
-                <div className="form-group-checkout">
-                  <label>State <span className="required">*</span></label>
-                  <select name="state" value={billingInfo.state} onChange={handleBillingChange} required>
-                    <option value="Texas">Texas</option>
-                    <option value="California">California</option>
-                    <option value="New York">New York</option>
-                    <option value="Florida">Florida</option>
-                    <option value="Illinois">Illinois</option>
-                  </select>
-                </div>
-                
-                <div className="form-group-checkout">
-                  <label>Zip Code <span className="required">*</span></label>
-                  <input 
-                    type="text" 
-                    name="zipCode" 
-                    value={billingInfo.zipCode}
-                    onChange={handleBillingChange}
-                    placeholder="Zip code"
-                    required
-                  />
-                </div>
-                
-                <div className="form-group-checkout">
-                  <label>Phone Number <span className="required">*</span></label>
-                  <input 
-                    type="tel" 
-                    name="phone" 
-                    value={billingInfo.phone}
-                    onChange={handleBillingChange}
-                    placeholder="(123) 456-7890"
-                    required
-                  />
-                </div>
-                
-                <div className="form-group-checkout">
-                  <label>Mobile <span className="optional">(Optional)</span></label>
-                  <input 
-                    type="tel" 
-                    name="mobile" 
-                    value={billingInfo.mobile}
-                    onChange={handleBillingChange}
-                    placeholder="Mobile number"
-                  />
-                </div>
-                
-                <div className="form-group-checkout full-width">
-                  <label>Email Address <span className="required">*</span></label>
-                  <input 
-                    type="email" 
-                    name="email" 
-                    value={billingInfo.email}
-                    onChange={handleBillingChange}
-                    placeholder="your@email.com"
-                    required
-                  />
-                </div>
-                
-                <div className="form-group-checkout full-width">
-                  <label>Confirm Email Address <span className="required">*</span></label>
-                    <input 
-                        type="email" 
-                        name="confirmEmail" 
-                        value={billingInfo.confirmEmail}
-                        onChange={handleBillingChange}
-                        placeholder="Confirm your email"
-                        required
-                    />
-                        </div>
-                    </div>
-                </div>
-            
-                {/* Shipping Information Section - Complete Version */}
-                <div className="glass-panel">
-                    <h2 className="section-title-inline">Shipping Contact</h2>
-                        <div className="same-as-billing-checkout">
-                            <label className="checkbox-label-checkout">
-                                <input 
-                                    type="checkbox" 
-                                    checked={sameAsBilling}
-                                    onChange={handleSameAsBillingChange}
-                                />
-                                <span>Make shipping same as billing</span>
-                            </label>
-                </div>
-  
-            {!sameAsBilling && (
-                <div className="shipping-form-checkout">
-                    <div className="form-grid-checkout">
-        
-            <div className="form-group-checkout">
-            <label>First Name <span className="required">*</span></label>
-            <input 
-                type="text" 
-                name="firstName" 
-                value={shippingInfo.firstName}
-                onChange={handleShippingChange}
-                placeholder="First name"
-                required={!sameAsBilling}
-            />
-            </div>
-        
-            <div className="form-group-checkout">
-            <label>Last Name <span className="required">*</span></label>
-            <input 
-                type="text" 
-                name="lastName" 
-                value={shippingInfo.lastName}
-                onChange={handleShippingChange}
-                placeholder="Last name"
-                required={!sameAsBilling}
-            />
-            </div>
-        
-            <div className="form-group-checkout full-width">
-            <label>Street Address <span className="required">*</span></label>
-            <input 
-                type="text" 
-                name="street" 
-                value={shippingInfo.street}
-                onChange={handleShippingChange}
-                placeholder="Street address"
-                required={!sameAsBilling}
-            />
-            </div>
-        
-            <div className="form-group-checkout">
-            <label>City <span className="required">*</span></label>
-            <input 
-                type="text" 
-                name="city" 
-                value={shippingInfo.city}
-                onChange={handleShippingChange}
-                placeholder="City"
-                required={!sameAsBilling}
-            />
-            </div>
-        
-            <div className="form-group-checkout">
-            <label>Country <span className="required">*</span></label>
-            <select name="country" value={shippingInfo.country} onChange={handleShippingChange} required={!sameAsBilling}>
-                <option value="United States">United States</option>
-                <option value="Canada">Canada</option>
-                <option value="Mexico">Mexico</option>
-                <option value="Other">Other</option>
-            </select>
-            </div>
-        
-            <div className="form-group-checkout">
-            <label>State <span className="required">*</span></label>
-            <select name="state" value={shippingInfo.state} onChange={handleShippingChange} required={!sameAsBilling}>
-                <option value="Texas">Texas</option>
-                <option value="California">California</option>
-                <option value="New York">New York</option>
-                <option value="Florida">Florida</option>
-                <option value="Illinois">Illinois</option>
-            </select>
-            </div>
-        
-            <div className="form-group-checkout">
-            <label>Zip Code <span className="required">*</span></label>
-            <input 
-                type="text" 
-                name="zipCode" 
-                value={shippingInfo.zipCode}
-                onChange={handleShippingChange}
-                placeholder="Zip code"
-                required={!sameAsBilling}
-            />
-            </div>
-        
-            <div className="form-group-checkout">
-            <label>Phone Number <span className="required">*</span></label>
-            <input 
-                type="tel" 
-                name="phone" 
-                value={shippingInfo.phone}
-                onChange={handleShippingChange}
-                placeholder="(123) 456-7890"
-                required={!sameAsBilling}
-            />
-            </div>
-        
-            <div className="form-group-checkout">
-                <label>Mobile <span className="optional">(Optional)</span></label>
-                    <input 
-                        type="tel" 
-                        name="mobile" 
-                        value={shippingInfo.mobile}
-                        onChange={handleShippingChange}
-                        placeholder="Mobile number"
-                    />
-                </div>
-            </div>
-        </div>
-        )}
-      {/* Credit Card Information Section */}
-      <div className="glass-panel">
-        <h2 className="section-title-inline">Payment Information</h2>
-        
-        <div className="form-grid-checkout">
-          <div className="form-group-checkout full-width">
-            <label>Card Number <span className="required">*</span></label>
-            <div className="card-input-wrapper">
-              <input 
-                type="text" 
-                name="cardNumber" 
-                value={paymentInfo.cardNumber}
-                onChange={handlePaymentChange}
-                placeholder="1234 5678 9012 3456"
-                maxLength="19"
-                required
-              />
-              <span className="card-icons">
-                <span className="card-icon">💳</span>
-              </span>
-            </div>
-          </div>
-          
-          <div className="form-group-checkout full-width">
-            <label>Name on Card <span className="required">*</span></label>
-            <input 
-              type="text" 
-              name="cardName" 
-              value={paymentInfo.cardName}
-              onChange={handlePaymentChange}
-              placeholder="As it appears on card"
-              required
-            />
-          </div>
-          
-          <div className="form-group-checkout">
-            <label>Expiration Date <span className="required">*</span></label>
-            <input 
-              type="text" 
-              name="expiry" 
-              value={paymentInfo.expiry}
-              onChange={handlePaymentChange}
-              placeholder="MM/YY"
-              maxLength="5"
-              required
-            />
-          </div>
-          
-          <div className="form-group-checkout">
-            <label>CVV <span className="required">*</span></label>
-            <input 
-              type="password" 
-              name="cvv" 
-              value={paymentInfo.cvv}
-              onChange={handlePaymentChange}
-              placeholder="123"
-              maxLength="4"
-              required
-            />
-          </div>
-        </div>
-        
-        <div className="secure-payment-note">
-          <span className="lock-icon">🔒</span>
-          <p>Your payment information is secure. We use SSL encryption to protect your data.</p>
-        </div>
-      </div>
-
-      {/* Place Order Button */}
-      <button className="checkout-button-final" onClick={handlePlaceOrder}>
-        Place Order - ${total.toFixed(2)}
-      </button>
-    </div>
-          </>
-        )}
       </div>
     </div>
   );
 }
+
+// ── US States list ──
+const US_STATES = [
+  'Alabama','Alaska','Arizona','Arkansas','California','Colorado','Connecticut',
+  'Delaware','Florida','Georgia','Hawaii','Idaho','Illinois','Indiana','Iowa',
+  'Kansas','Kentucky','Louisiana','Maine','Maryland','Massachusetts','Michigan',
+  'Minnesota','Mississippi','Missouri','Montana','Nebraska','Nevada','New Hampshire',
+  'New Jersey','New Mexico','New York','North Carolina','North Dakota','Ohio',
+  'Oklahoma','Oregon','Pennsylvania','Rhode Island','South Carolina','South Dakota',
+  'Tennessee','Texas','Utah','Vermont','Virginia','Washington','West Virginia',
+  'Wisconsin','Wyoming',
+];

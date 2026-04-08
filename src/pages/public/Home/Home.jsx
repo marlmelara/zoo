@@ -6,7 +6,7 @@ import "./home.css";
 import logo from '../../../images/logo.png';
 
 // Import React Icons
-import { FaClock, FaTicketAlt, FaMap, FaMapMarkerAlt, FaPhone, FaEnvelope, FaArrowRight, FaTimes } from 'react-icons/fa';
+import { FaClock, FaTicketAlt, FaMap, FaMapMarkerAlt, FaPhone, FaEnvelope, FaArrowRight } from 'react-icons/fa';
 
 // Import Swiper styles
 import 'swiper/css';
@@ -190,10 +190,10 @@ export default function Home() {
       <nav className="navbar">
         <div className="navbar-container">
           <a href="/tickets" className="navbar-link">🎟️ Buy Tickets</a>
-          <a href="/membership" className="navbar-link">🐯 Membership</a>
           <a href="/calendar" className="navbar-link">📅 Events</a>
           <a href="/shop" className="navbar-link">🛍️ Shop</a>
-          <a href="/dashboard" className="navbar-link">🔑 Login</a>
+          <a href="/account" className="navbar-link">🔑 Customer Login</a>
+          <a href="/login" className="navbar-link">🏢 Staff Portal</a>
         </div>
       </nav>
 
@@ -291,7 +291,9 @@ export default function Home() {
                   {todaySchedule.map((event, index) => (
                     <div key={event.event_id || index} className="schedule-row-home">
                       <div className="schedule-time-home">
-                        {formatTime(event.event_time)}
+                        {event.start_time && event.end_time
+                          ? `${formatTime(event.start_time)} – ${formatTime(event.end_time)}`
+                          : formatTime(event.event_time)}
                       </div>
                       <div className="schedule-event-home">
                         {event.event_name || event.title}
@@ -354,17 +356,16 @@ export default function Home() {
                   <h4 className="selected-events-date">
                     {formatDisplayDate(selectedDateEvents.date)}
                   </h4>
-                  <button className="close-events-btn" onClick={() => setSelectedDateEvents(null)}>
-                    <FaTimes />
-                  </button>
                 </div>
                 <div className="selected-events-list">
                   {selectedDateEvents.events.map((event, index) => (
                     <div key={event.event_id || index} className="selected-event-item">
-                      {event.event_time && (
+                      {(event.start_time || event.event_time) && (
                         <div className="selected-event-time">
                           <FaClock className="selected-event-icon" />
-                          {formatTime(event.event_time)}
+                          {event.start_time && event.end_time
+                            ? `${formatTime(event.start_time)} – ${formatTime(event.end_time)}`
+                            : formatTime(event.event_time)}
                         </div>
                       )}
                       <div className="selected-event-title">{event.event_name || event.title}</div>

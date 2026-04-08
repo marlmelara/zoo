@@ -561,7 +561,7 @@ export default function CustomerDashboard() {
                                             </div>
                                             <p style={{ fontSize: '14px', color: 'var(--color-text-muted)', margin: '5px 0' }}>{event.description}</p>
                                             <p style={{ color: 'var(--color-secondary)', fontWeight: 600, fontSize: '14px' }}>
-                                                {new Date(event.event_date).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
+                                                {new Date(event.event_date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
                                             </p>
                                         </div>
                                         <div style={{ textAlign: 'right', fontSize: '13px' }}>
@@ -571,7 +571,7 @@ export default function CustomerDashboard() {
                                                 </p>
                                             )}
                                             {event.ticket_price_cents > 0 && (
-                                                <button className="glass-button" onClick={() => navigate('/checkout', { state: { eventTicket: { event_id: event.event_id, title: event.title, date: new Date(event.event_date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }), price_cents: event.ticket_price_cents, quantity: 1 } } })} style={{ background: 'var(--color-secondary)', padding: '6px 14px', fontSize: '0.8rem' }}>
+                                                <button className="glass-button" onClick={() => navigate('/checkout', { state: { eventTicket: { event_id: event.event_id, title: event.title, date: new Date(event.event_date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }), price_cents: event.ticket_price_cents, quantity: 1 } } })} style={{ background: 'var(--color-secondary)', padding: '6px 14px', fontSize: '0.8rem' }}>
                                                     ${(event.ticket_price_cents / 100).toFixed(2)} — Buy Ticket
                                                 </button>
                                             )}

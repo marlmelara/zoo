@@ -18,7 +18,7 @@ export default function Schedule() {
         today.setHours(0, 0, 0, 0);
         
         const todayEvents = data.filter(event => {
-          const eventDate = new Date(event.event_date);
+          const eventDate = new Date(event.event_date + 'T00:00:00');
           eventDate.setHours(0, 0, 0, 0);
           return eventDate.getTime() === today.getTime();
         });

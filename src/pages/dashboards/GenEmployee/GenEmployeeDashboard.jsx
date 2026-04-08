@@ -284,7 +284,7 @@ export default function GenEmployeeDashboard() {
                                             </div>
                                             <p style={{ fontSize: '14px', color: 'var(--color-text-muted)', margin: '5px 0' }}>{event.description}</p>
                                             <p style={{ color: 'var(--color-secondary)', fontWeight: 600, fontSize: '14px' }}>
-                                                {new Date(event.event_date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                                                {new Date(event.event_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
                                             </p>
                                         </div>
                                         <div style={{ textAlign: 'right', fontSize: '13px', color: 'var(--color-text-muted)' }}>

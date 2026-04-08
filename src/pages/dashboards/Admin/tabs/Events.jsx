@@ -254,7 +254,7 @@ export default function Events() {
       ) : (
         <div className="grid-cards">
           {events.map((event) => {
-            const isPast = new Date(event.event_date) < new Date(new Date().toDateString());
+            const isPast = new Date(event.event_date + 'T00:00:00') < new Date(new Date().toDateString());
             return (
               <div
                 key={event.event_id}
@@ -271,7 +271,7 @@ export default function Events() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
                   <Calendar size={14} color="var(--color-secondary)" />
                   <span style={{ fontSize: '0.9rem' }}>
-                    {new Date(event.event_date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                    {new Date(event.event_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
                   </span>
                 </div>
 
@@ -335,7 +335,7 @@ export default function Events() {
             <div style={{ marginBottom: '24px', paddingBottom: '16px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
               {selectedEvent.description && <p style={{ color: 'var(--color-text-muted)', marginBottom: '12px' }}>{selectedEvent.description}</p>}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '0.9rem' }}>
-                <div><Calendar size={14} style={{ marginRight: '6px' }} />{new Date(selectedEvent.event_date).toDateString()}</div>
+                <div><Calendar size={14} style={{ marginRight: '6px' }} />{new Date(selectedEvent.event_date + 'T00:00:00').toDateString()}</div>
                 {selectedEvent.start_time && <div><Clock size={14} style={{ marginRight: '6px' }} />{selectedEvent.start_time?.slice(0, 5)} - {selectedEvent.end_time?.slice(0, 5)}</div>}
                 {selectedEvent.venue_id && <div><MapPin size={14} style={{ marginRight: '6px' }} />{getVenueName(selectedEvent.venue_id)}</div>}
                 <div><Users size={14} style={{ marginRight: '6px' }} />{selectedEvent.actual_attendance || 0} / {selectedEvent.max_capacity}</div>
@@ -382,12 +382,12 @@ export default function Events() {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '8px' }}>
                 <select className="glass-input" value={assignmentForm.employee_id} onChange={(e) => setAssignmentForm({ employee_id: e.target.value, animal_id: '' })}>
                   <option value="">Select Staff...</option>
-                  {staff.map(s => <option key={s.employee_id} value={s.employee_id}>{s.first_name} {s.last_name}</option>)}
+                  {staff.filter(s => !assignments.some(a => a.employee_id === s.employee_id)).map(s => <option key={s.employee_id} value={s.employee_id}>{s.first_name} {s.last_name}</option>)}
                 </select>
                 <div style={{ textAlign: 'center', fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>OR</div>
                 <select className="glass-input" value={assignmentForm.animal_id} onChange={(e) => setAssignmentForm({ animal_id: e.target.value, employee_id: '' })}>
                   <option value="">Select Animal...</option>
-                  {animals.map(a => <option key={a.animal_id} value={a.animal_id}>{a.name} ({a.species_common_name})</option>)}
+                  {animals.filter(a => !assignments.some(asn => asn.animal_id === a.animal_id)).map(a => <option key={a.animal_id} value={a.animal_id}>{a.name} ({a.species_common_name})</option>)}
                 </select>
               </div>
               <button type="submit" disabled={!assignmentForm.employee_id && !assignmentForm.animal_id} className="glass-button" style={{ width: '100%', marginTop: '12px' }}>

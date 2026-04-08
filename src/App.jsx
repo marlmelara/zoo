@@ -17,6 +17,10 @@ import FoodShop from './pages/public/Shop/FoodShop';
 import Maps from './pages/public/Map/Maps';
 
 import Login from './pages/auth/Login';
+import CustomerLogin from './pages/auth/CustomerLogin';
+import SignUp from './pages/auth/SignUp';
+import ForgotPassword from './pages/auth/ForgotPassword';
+import ResetPassword from './pages/auth/ResetPassword';
 
 import Dashboard from './pages/dashboards/Admin/Dashboard';
 import AdminDashboard from './pages/dashboards/Admin/AdminDashboard';
@@ -70,6 +74,10 @@ function App() {
           {/* Public Routes */}
           <Route path="/" element={<Home />} />
           <Route path="/login" element={<Login />} />
+          <Route path="/account" element={<CustomerLogin />} />
+          <Route path="/signup" element={<SignUp />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/tickets" element={<PublicTickets />} />
           <Route path="/shop" element={<Shop />} />
           <Route path="/schedule" element={<Schedule />} />
@@ -91,7 +99,6 @@ function App() {
               <Route element={<RoleRoute allowed={['admin']} />}>
                 <Route path="/dashboard/admin" element={<AdminDashboard />} />
                 <Route path="/dashboard/staff" element={<Staff />} />
-                <Route path="/dashboard/tickets" element={<AdminTickets />} />
                 <Route path="/dashboard/animals" element={<Animals />} />
               </Route>
 

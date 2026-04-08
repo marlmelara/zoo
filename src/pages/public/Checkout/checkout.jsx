@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useLocation, useNavigate, Link } from 'react-router-dom';
 import {
-  FaShoppingCart, FaUser, FaChild, FaClock, FaTrash,
+  FaShoppingCart, FaUser, FaChild, FaTrash,
   FaLock, FaCreditCard, FaEnvelope, FaCheckCircle, FaHeart,
   FaTag, FaCrown, FaTimesCircle,
 } from 'react-icons/fa';
@@ -25,7 +25,6 @@ const TICKET_LABELS = {
   senior: { name: 'Senior (65+)',   icon: FaPersonCane },
 };
 const TAX_RATE = 0.0825;
-const CART_TIMEOUT_MINUTES = 15;
 
 export default function Checkout() {
   const location = useLocation();
@@ -52,10 +51,6 @@ export default function Checkout() {
   const [shopItems, setShopItems] = useState([]);
   const [foodItems, setFoodItems] = useState([]);
   const [foodQuantities, setFoodQuantities] = useState({});
-
-  // ── Cart timer ──
-  const [cartExpiry, setCartExpiry] = useState(null);
-  const [timeLeft, setTimeLeft] = useState(null);
 
   // ── Billing / Shipping ──
   const [sameAsBilling, setSameAsBilling] = useState(true);
@@ -175,47 +170,6 @@ export default function Checkout() {
     getShopItems(2).then(setFoodItems);
   }, [isDonation]);
 
-  // Cart timer — start when non-donation checkout loads
-  useEffect(() => {
-    if (isDonation || orderComplete) return;
-
-    const stored = localStorage.getItem('cartExpiresAt');
-    let expiry;
-
-    if (stored) {
-      expiry = new Date(stored);
-      if (expiry <= new Date()) {
-        // expired — clear cart
-        handleCartExpired();
-        return;
-      }
-    } else {
-      expiry = new Date(Date.now() + CART_TIMEOUT_MINUTES * 60 * 1000);
-      localStorage.setItem('cartExpiresAt', expiry.toISOString());
-    }
-
-    setCartExpiry(expiry);
-
-    const interval = setInterval(() => {
-      const remaining = expiry - new Date();
-      if (remaining <= 0) {
-        clearInterval(interval);
-        handleCartExpired();
-      } else {
-        setTimeLeft(remaining);
-      }
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [isDonation, orderComplete]);
-
-  const handleCartExpired = () => {
-    localStorage.removeItem('shopCart');
-    localStorage.removeItem('cartExpiresAt');
-    setTimeLeft(0);
-    alert('Your cart has expired. Please re-select your items.');
-    navigate('/tickets');
-  };
 
   // ══════════════════════════════════════
   // Handlers
@@ -538,16 +492,6 @@ export default function Checkout() {
   };
 
   // ══════════════════════════════════════
-  // Timer display
-  // ══════════════════════════════════════
-  const formatTimer = (ms) => {
-    if (!ms || ms <= 0) return '0:00';
-    const mins = Math.floor(ms / 60000);
-    const secs = Math.floor((ms % 60000) / 1000);
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
-
-  // ══════════════════════════════════════
   // Order complete screen
   // ══════════════════════════════════════
   if (orderComplete) {
@@ -624,11 +568,6 @@ export default function Checkout() {
           {/* Header */}
           <div className="checkout-header">
             <h1>{isDonation ? <><FaHeart style={{ color: '#ef4444' }} /> Make a Donation</> : <><FaShoppingCart /> Checkout</>}</h1>
-            {!isDonation && timeLeft != null && (
-              <div className={`cart-timer ${timeLeft < 120000 ? 'urgent' : ''}`}>
-                <FaClock /> Cart reserved for {formatTimer(timeLeft)}
-              </div>
-            )}
           </div>
 
           {/* Auth banner — only show if not logged in and not yet chosen */}

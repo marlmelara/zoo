@@ -5,6 +5,7 @@ import {
     LayoutDashboard, Cat, Users, Calendar,
     ShoppingBag, Shield, Stethoscope, Heart, Briefcase
 } from 'lucide-react';
+import logo from '../images/logo.png';
 
 export default function Layout() {
     const location = useLocation();
@@ -80,17 +81,12 @@ export default function Layout() {
                             gap: '10px',
                         }}
                     >
-                        <div
-                            style={{
-                                width: '40px',
-                                height: '40px',
-                                background: 'var(--color-primary)',
-                                borderRadius: '10px',
-                            }}
-                        />
-                        <h2 style={{ fontSize: '24px', margin: 0 }}>
-                            Zoo<span style={{ color: 'var(--color-primary)' }}>Manager</span>
-                        </h2>
+                        <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: '10px', textDecoration: 'none', color: 'white' }}>
+                            <img src={logo} alt="Home" style={{ width: '40px', height: '40px', objectFit: 'contain' }} />
+                            <h2 style={{ fontSize: '24px', margin: 0 }}>
+                                Coog<span style={{ color: 'var(--color-primary)' }}>Zoo</span>
+                            </h2>
+                        </Link>
                     </div>
 
                     <nav style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>

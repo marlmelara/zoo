@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../contexts/AuthContext';
 import { Lock } from 'lucide-react';
 import logo from '../../images/logo.png';
 
@@ -10,12 +11,23 @@ export default function CustomerLogin() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const navigate = useNavigate();
+  const { user, role } = useAuth();
+
+  // If already logged in as customer, redirect to dashboard
+  useEffect(() => {
+    if (user && role === 'customer') {
+      navigate('/dashboard/customer', { replace: true });
+    }
+  }, [user, role, navigate]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     try {
       setLoading(true);
+
+      // Sign out any existing session first (enforce single session)
+      if (user) await supabase.auth.signOut();
 
       const { data: authData, error: signInError } = await supabase.auth.signInWithPassword({ email, password });
       if (signInError) throw signInError;
@@ -45,6 +57,7 @@ export default function CustomerLogin() {
 
   return (
     <div style={{
+      position: 'relative',
       minHeight: '100vh',
       display: 'flex',
       flexDirection: 'column',
@@ -54,7 +67,12 @@ export default function CustomerLogin() {
       color: 'white',
       padding: '2rem',
     }}>
-      {/* Home logo button */}
+      {/* Small logo symbol — top left */}
+      <Link to="/" style={{ position: 'absolute', top: '24px', left: '24px' }}>
+        <img src={logo} alt="Home" style={{ width: '48px', height: '48px', objectFit: 'contain' }} />
+      </Link>
+
+      {/* Coog Zoo logo above panel */}
       <Link to="/" style={{ marginBottom: '24px' }}>
         <img src={logo} alt="Coog Zoo" style={{ maxWidth: '160px', height: 'auto' }} />
       </Link>

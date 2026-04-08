@@ -6,7 +6,7 @@ export async function getUpcomingEvents(limit = 6) {
 
   const result = await supabase
     .from('events')
-    .select('*')
+    .select('*, venues(venue_name, location)')
     .gte('event_date', today)
     .order('event_date', { ascending: true })
     .limit(limit);

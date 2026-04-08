@@ -120,7 +120,7 @@ export default function CustomerDashboard() {
         try {
             const { data, error } = await supabase
                 .from('events')
-                .select('*')
+                .select('*, venues(venue_name, location)')
                 .gte('event_date', new Date().toISOString().split('T')[0])
                 .order('event_date', { ascending: true });
 
@@ -159,13 +159,25 @@ export default function CustomerDashboard() {
         }
     }
 
+    // Check if membership is active (not expired)
+    const isMembershipActive = profile?.membership_type && profile?.membership_end && new Date(profile.membership_end) >= new Date();
+
     const membershipColor = (type) => {
         switch (type) {
             case 'premium': return '#f59e0b';
             case 'family': return '#3b82f6';
-            case 'individual': return '#10b981';
+            case 'explorer': return '#10b981';
             default: return 'var(--color-text-muted)';
         }
+    };
+
+    const formatTime = (timeString) => {
+        if (!timeString) return '';
+        const [hours, minutes] = timeString.split(':');
+        const hour = parseInt(hours);
+        const ampm = hour >= 12 ? 'PM' : 'AM';
+        const hour12 = hour % 12 || 12;
+        return `${hour12}:${minutes} ${ampm}`;
     };
 
     const ticketTypeLabel = (type) => {
@@ -187,7 +199,7 @@ export default function CustomerDashboard() {
                         Welcome back{profile ? `, ${profile.first_name}` : ''}!
                     </p>
                 </div>
-                {profile?.membership_type && (
+                {isMembershipActive && (
                     <div style={{
                         display: 'flex', alignItems: 'center', gap: '8px',
                         padding: '8px 16px', borderRadius: '20px',
@@ -283,7 +295,7 @@ export default function CustomerDashboard() {
                                         </div>
                                         <div>
                                             <h2 style={{ margin: 0 }}>{profile.first_name} {profile.last_name}</h2>
-                                            {profile.membership_type ? (
+                                            {isMembershipActive ? (
                                                 <span style={{
                                                     fontSize: '13px', padding: '4px 10px', borderRadius: '20px',
                                                     background: `${membershipColor(profile.membership_type)}22`,
@@ -343,7 +355,7 @@ export default function CustomerDashboard() {
                                 <h3 style={{ margin: '0 0 15px', display: 'flex', alignItems: 'center', gap: '10px' }}>
                                     <Star size={20} color={membershipColor(profile.membership_type)} /> Membership
                                 </h3>
-                                {profile.membership_type ? (
+                                {isMembershipActive ? (
                                     <div>
                                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '15px' }}>
                                             <div style={{ background: 'rgba(255,255,255,0.05)', padding: '15px', borderRadius: '10px' }}>
@@ -360,16 +372,16 @@ export default function CustomerDashboard() {
                                             </div>
                                             <div style={{ background: 'rgba(255,255,255,0.05)', padding: '15px', borderRadius: '10px' }}>
                                                 <p style={{ fontSize: '12px', color: 'var(--color-text-muted)', margin: '0 0 5px' }}>Expires</p>
-                                                <p style={{ fontWeight: 600, margin: 0, color: profile.membership_end && new Date(profile.membership_end) < new Date() ? '#ef4444' : 'inherit' }}>
+                                                <p style={{ fontWeight: 600, margin: 0 }}>
                                                     {profile.membership_end ? new Date(profile.membership_end).toLocaleDateString() : 'N/A'}
                                                 </p>
                                             </div>
                                         </div>
                                         {profile.membership_end && new Date(profile.membership_end) < new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) && (
-                                            <div style={{ marginTop: '15px', padding: '12px 16px', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                                <span style={{ fontSize: '0.85rem', color: '#fca5a5' }}>
+                                            <div style={{ marginTop: '15px', padding: '12px 16px', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                <span style={{ fontSize: '0.85rem', color: '#fcd34d' }}>
                                                     <RefreshCw size={14} style={{ marginRight: '6px', verticalAlign: 'middle' }} />
-                                                    {new Date(profile.membership_end) < new Date() ? 'Your membership has expired.' : 'Your membership expires soon.'}
+                                                    Your membership expires soon. Renew to keep your perks!
                                                 </span>
                                                 <button className="glass-button" onClick={() => navigate('/checkout', { state: { membershipRenewal: { type: profile.membership_type, customerId: profile.customer_id } } })} style={{ background: 'var(--color-secondary)', padding: '8px 16px', fontSize: '0.8rem' }}>
                                                     Renew Membership
@@ -407,7 +419,7 @@ export default function CustomerDashboard() {
                             <ShoppingCart size={14} /> Buy Tickets
                         </button>
                     </div>
-                    {profile?.membership_type && (
+                    {isMembershipActive && (
                         <div style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)', borderRadius: '10px', padding: '10px 16px', marginBottom: '15px', fontSize: '0.85rem', color: '#6ee7b7' }}>
                             <Star size={14} style={{ marginRight: '6px', verticalAlign: 'middle' }} />
                             As a <strong style={{ textTransform: 'capitalize' }}>{profile.membership_type}</strong> member, you get free general admission and discounted rates on event tickets!
@@ -560,9 +572,16 @@ export default function CustomerDashboard() {
                                                 <h3 style={{ margin: 0 }}>{event.title}</h3>
                                             </div>
                                             <p style={{ fontSize: '14px', color: 'var(--color-text-muted)', margin: '5px 0' }}>{event.description}</p>
-                                            <p style={{ color: 'var(--color-secondary)', fontWeight: 600, fontSize: '14px' }}>
+                                            <p style={{ color: 'var(--color-secondary)', fontWeight: 600, fontSize: '14px', margin: '5px 0' }}>
                                                 {new Date(event.event_date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
+                                                {event.start_time && ` · ${formatTime(event.start_time)}`}
+                                                {event.end_time && ` – ${formatTime(event.end_time)}`}
                                             </p>
+                                            {event.venues?.venue_name && (
+                                                <p style={{ fontSize: '13px', color: 'var(--color-text-muted)', margin: '3px 0 0', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                                    <MapPin size={13} /> {event.venues.venue_name}{event.venues.location ? ` — ${event.venues.location}` : ''}
+                                                </p>
+                                            )}
                                         </div>
                                         <div style={{ textAlign: 'right', fontSize: '13px' }}>
                                             {event.max_capacity && (
@@ -571,7 +590,7 @@ export default function CustomerDashboard() {
                                                 </p>
                                             )}
                                             {event.ticket_price_cents > 0 && (
-                                                <button className="glass-button" onClick={() => navigate('/checkout', { state: { eventTicket: { event_id: event.event_id, title: event.title, date: new Date(event.event_date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }), price_cents: event.ticket_price_cents, quantity: 1 } } })} style={{ background: 'var(--color-secondary)', padding: '6px 14px', fontSize: '0.8rem' }}>
+                                                <button className="glass-button" onClick={() => navigate('/checkout', { state: { eventTicket: { event_id: event.event_id, title: event.title, date: new Date(event.event_date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }), venue: event.venues?.venue_name || null, price_cents: event.ticket_price_cents, quantity: 1 } } })} style={{ background: 'var(--color-secondary)', padding: '6px 14px', fontSize: '0.8rem' }}>
                                                     ${(event.ticket_price_cents / 100).toFixed(2)} — Buy Ticket
                                                 </button>
                                             )}

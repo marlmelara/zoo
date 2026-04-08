@@ -50,6 +50,7 @@ export default function Login() {
 
     return (
         <div style={{
+            position: 'relative',
             height: '100vh',
             display: 'flex',
             alignItems: 'center',
@@ -57,6 +58,12 @@ export default function Login() {
             background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
             color: 'white'
         }}>
+            <Link to="/" style={{ position: 'absolute', top: '30px', left: '30px', display: 'flex', alignItems: 'center', gap: '10px', textDecoration: 'none', color: 'white' }}>
+                <div style={{ width: '40px', height: '40px', background: 'var(--color-primary)', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px' }}>
+                    🦁
+                </div>
+                <span style={{ fontWeight: 700, fontSize: '18px' }}>Houston Zoo</span>
+            </Link>
             <div className="glass-panel" style={{ padding: '40px', width: '100%', maxWidth: '400px', textAlign: 'center' }}>
                 <div style={{ background: 'var(--color-primary)', width: '60px', height: '60px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
                     <Lock size={30} color="white" />

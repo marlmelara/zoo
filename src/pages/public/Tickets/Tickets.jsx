@@ -330,6 +330,12 @@ export default function Tickets() {
                               {formatTime(event.start_time)} – {formatTime(event.end_time)}
                             </span>
                           )}
+                          {event.venues?.venue_name && (
+                            <span>
+                              <FaMapMarkerAlt style={{ marginRight: '4px', verticalAlign: 'middle' }} />
+                              {event.venues.venue_name}
+                            </span>
+                          )}
                         </div>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -345,6 +351,7 @@ export default function Tickets() {
                                 event_id: event.event_id,
                                 title: event.title || event.event_name,
                                 date: new Date(event.event_date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }),
+                                venue: event.venues?.venue_name || null,
                                 price_cents: event.ticket_price_cents,
                                 quantity: 1,
                               }

@@ -1,59 +1,105 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getShopItems } from '../../../api/inventory';
+import { FaShoppingCart, FaGift, FaUtensils, FaArrowLeft } from 'react-icons/fa';
+import ShopCartPanel, { useShopCart } from '../../../components/ShopCart';
 
 const shopSections = [
   {
     title: 'Gift Shop',
     description: 'Zoo-themed merchandise, plush animals, mugs, shirts, and souvenirs.',
     path: '/shop/gifts',
+    icon: FaGift,
+    color: '#10b981',
   },
   {
-    title: 'Food Shop',
+    title: 'Food & Snacks',
     description: 'Quick bites, drinks, family meal combos, and seasonal snacks.',
     path: '/shop/food',
+    icon: FaUtensils,
+    color: '#f59e0b',
   },
 ];
 
 export default function Shop() {
   const navigate = useNavigate();
+  const [cartOpen, setCartOpen] = useState(false);
+  const { cartItems, totalItems, totalCents, removeItem, updateQuantity, clearCart } = useShopCart();
+
   return (
-    <div style={{  textAlign: 'center', color: 'white', padding: '40px' }}>
-      <section style={{ marginBottom: '40px' }}>
-        <h1 style={{ fontSize: '42px', marginBottom: '12px' }}>Gift Shop & Food Shop</h1>
-        <p style={{ color: 'var(--color-text-muted)', textAlign: 'center' }}>
+    <div style={{ color: 'white', minHeight: '100vh', background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)' }}>
+      {/* Top bar */}
+      <div style={{
+        padding: '16px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+        borderBottom: '1px solid rgba(255,255,255,0.1)',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <button onClick={() => navigate('/')} className="glass-button" style={{ padding: '8px 14px', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <FaArrowLeft size={12} /> Home
+          </button>
+        </div>
+        <button onClick={() => setCartOpen(true)} className="glass-button" style={{
+          padding: '10px 18px', background: totalItems > 0 ? 'var(--color-primary)' : 'rgba(255,255,255,0.1)',
+          display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px',
+        }}>
+          <FaShoppingCart /> Cart {totalItems > 0 && `(${totalItems})`}
+        </button>
+      </div>
+
+      <div style={{ padding: '40px 24px', maxWidth: '800px', margin: '0 auto', textAlign: 'center' }}>
+        <h1 style={{ fontSize: '42px', marginBottom: '12px' }}>Zoo Shop</h1>
+        <p style={{ color: 'var(--color-text-muted)', marginBottom: '40px' }}>
           Browse zoo souvenirs, gifts, food, and snacks during your visit.
         </p>
-      </section>
 
-      <section
-        style={{
+        <div style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 2fr))',
-          gap: '60px',
-        }}
-      >
-        {shopSections.map((section) => (
-          <div
-            key={section.title}
-            className="glass-panel"
-            style={{ padding: '24px', borderRadius: '32px' , minHeight: '320px'}}
-          >
-            <h2 style={{ marginTop: 0 }}>{section.title}</h2>
-            <p style={{ color: 'var(--color-text-muted)' }}>{section.description}</p>
-            <button className="glass-button" style={{ marginTop: '192px' }} onClick={() => navigate(section.path)}>
-              Browse
-            </button>
-          </div>
-        ))}
-      </section>
-      <button
-        className="glass-button"
-        onClick={() => navigate('/')}
-        style={{ position: 'absolute', top: '20px', left: '20px' }}
-      >
-        Home
-      </button>
+          gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+          gap: '24px',
+        }}>
+          {shopSections.map(section => {
+            const Icon = section.icon;
+            return (
+              <div
+                key={section.title}
+                className="glass-panel"
+                onClick={() => navigate(section.path)}
+                style={{
+                  padding: '40px 30px', borderRadius: '20px', cursor: 'pointer',
+                  transition: 'transform 0.2s ease, border-color 0.2s ease',
+                  textAlign: 'center',
+                }}
+              >
+                <div style={{
+                  width: '70px', height: '70px', borderRadius: '50%',
+                  background: `${section.color}22`, display: 'flex',
+                  alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px',
+                }}>
+                  <Icon size={30} color={section.color} />
+                </div>
+                <h2 style={{ marginTop: 0, marginBottom: '10px' }}>{section.title}</h2>
+                <p style={{ color: 'var(--color-text-muted)', marginBottom: '20px' }}>{section.description}</p>
+                <button className="glass-button" style={{
+                  background: section.color, padding: '12px 28px', fontSize: '15px',
+                }}>
+                  Browse
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Cart Panel */}
+      <ShopCartPanel
+        isOpen={cartOpen}
+        onClose={() => setCartOpen(false)}
+        cartItems={cartItems}
+        totalItems={totalItems}
+        totalCents={totalCents}
+        removeItem={removeItem}
+        updateQuantity={updateQuantity}
+        clearCart={clearCart}
+      />
     </div>
   );
 }

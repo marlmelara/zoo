@@ -297,6 +297,9 @@ export default function Home() {
                       </div>
                       <div className="schedule-event-home">
                         {event.event_name || event.title}
+                        {event.venues?.venue_name && (
+                          <span className="schedule-venue-home"> @ {event.venues.venue_name}</span>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -372,10 +375,10 @@ export default function Home() {
                       {event.description && (
                         <div className="selected-event-description">{event.description}</div>
                       )}
-                      {event.venue && (
+                      {event.venues?.venue_name && (
                         <div className="selected-event-location">
                           <FaMapMarkerAlt className="selected-event-icon" />
-                          {event.venue}
+                          {event.venues.venue_name}{event.venues.location ? ` — ${event.venues.location}` : ''}
                         </div>
                       )}
                     </div>

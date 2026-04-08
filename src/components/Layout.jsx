@@ -1,5 +1,5 @@
 import React from 'react';
-import { Link, useLocation, Outlet } from 'react-router-dom';
+import { Link, useLocation, useNavigate, Outlet } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import {
     LayoutDashboard, Cat, Users, Calendar,
@@ -8,7 +8,14 @@ import {
 
 export default function Layout() {
     const location = useLocation();
+    const navigate = useNavigate();
     const { user, role, signOut } = useAuth();
+
+    const handleSignOut = async () => {
+        const isCustomer = role === 'customer';
+        await signOut();
+        navigate(isCustomer ? '/account' : '/login', { replace: true });
+    };
 
     // Build nav items based on role
     const getNavItems = () => {
@@ -156,7 +163,7 @@ export default function Layout() {
                         {role || 'Staff'}
                     </p>
                     <button
-                        onClick={signOut}
+                        onClick={handleSignOut}
                         style={{
                             marginTop: '10px',
                             background: 'none',

@@ -32,8 +32,8 @@ export default function Checkout() {
   const navigate = useNavigate();
   const { user, role, customerId } = useAuth();
 
-  // ── Determine checkout mode from route state ──
-  const ticketData    = location.state?.ticketData    || null;
+  // ── Determine checkout mode from route state (mutable so items can be removed) ──
+  const [ticketData, setTicketData] = useState(location.state?.ticketData || null);
   const donationData  = location.state?.donationData  || null;
   const isDonation    = !!donationData;
 
@@ -77,7 +77,20 @@ export default function Checkout() {
   const [orderTransaction, setOrderTransaction] = useState(null);
 
   // ── Event ticket data (for event-specific tickets) ──
-  const eventTicket = location.state?.eventTicket || null; // { event_id, title, date, price_cents, quantity }
+  const [eventTicket, setEventTicket] = useState(location.state?.eventTicket || null);
+
+  // ── Remove item handlers ──
+  const removeTickets = () => setTicketData(null);
+  const removeEventTicket = () => setEventTicket(null);
+  const removeShopItem = (itemId) => {
+    setShopItems(prev => prev.filter(i => i.item_id !== itemId));
+    const savedCart = JSON.parse(localStorage.getItem('shopCart') || '{}');
+    delete savedCart[itemId];
+    localStorage.setItem('shopCart', JSON.stringify(savedCart));
+  };
+  const removeFoodItem = (itemId) => {
+    setFoodQuantities(prev => { const next = { ...prev }; delete next[itemId]; return next; });
+  };
 
   // ══════════════════════════════════════
   // Effects
@@ -128,7 +141,7 @@ export default function Checkout() {
         if (data.is_member && data.membership_end) {
           const endDate = new Date(data.membership_end);
           if (endDate >= new Date()) {
-            const discountMap = { premium: 0.20, family: 0.15, individual: 0.10 };
+            const discountMap = { premium: 0.20, family: 0.15, explorer: 0.10 };
             setMemberDiscount(discountMap[data.membership_type] || 0.10);
           }
         }
@@ -140,15 +153,23 @@ export default function Checkout() {
   useEffect(() => {
     if (isDonation) return; // donations don't have cart items
     const savedCart = JSON.parse(localStorage.getItem('shopCart') || '{}');
-    const hasCartItems = Object.values(savedCart).some(q => q > 0);
+    const firstVal = Object.values(savedCart)[0];
 
-    if (hasCartItems) {
-      getShopItems(1).then(items => {
-        const cartItems = items
-          .filter(i => savedCart[i.item_id] > 0)
-          .map(i => ({ ...i, quantity: savedCart[i.item_id] }));
-        setShopItems(cartItems);
-      });
+    if (firstVal && typeof firstVal === 'object' && firstVal.item_id) {
+      // New format: { item_id: { item_id, item_name, price_cents, quantity, ... } }
+      const cartItems = Object.values(savedCart).filter(i => i.quantity > 0);
+      if (cartItems.length > 0) setShopItems(cartItems);
+    } else {
+      // Legacy format: { item_id: quantity }
+      const hasCartItems = Object.values(savedCart).some(q => q > 0);
+      if (hasCartItems) {
+        getShopItems(1).then(items => {
+          const cartItems = items
+            .filter(i => savedCart[i.item_id] > 0)
+            .map(i => ({ ...i, quantity: savedCart[i.item_id] }));
+          setShopItems(cartItems);
+        });
+      }
     }
 
     getShopItems(2).then(setFoodItems);
@@ -840,7 +861,10 @@ export default function Checkout() {
             {/* Admission tickets */}
             {ticketData && (
               <div className="summary-section">
-                <h3 className="summary-section-label">Admission Tickets</h3>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <h3 className="summary-section-label" style={{ margin: 0 }}>Admission Tickets</h3>
+                  <button onClick={removeTickets} style={{ background: 'none', border: 'none', color: '#f87171', cursor: 'pointer', padding: '2px', fontSize: '14px' }} title="Remove tickets"><FaTimesCircle /></button>
+                </div>
                 {ticketData.date && (
                   <div className="summary-meta">
                     {ticketData.date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
@@ -869,8 +893,11 @@ export default function Checkout() {
             {/* Event ticket */}
             {eventTicket && (
               <div className="summary-section">
-                <h3 className="summary-section-label">Event Ticket</h3>
-                <div className="summary-meta">{eventTicket.title} — {eventTicket.date}</div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <h3 className="summary-section-label" style={{ margin: 0 }}>Event Ticket</h3>
+                  <button onClick={removeEventTicket} style={{ background: 'none', border: 'none', color: '#f87171', cursor: 'pointer', padding: '2px', fontSize: '14px' }} title="Remove event ticket"><FaTimesCircle /></button>
+                </div>
+                <div className="summary-meta">{eventTicket.title} — {eventTicket.date}{eventTicket.venue ? ` @ ${eventTicket.venue}` : ''}</div>
                 <div className="summary-line">
                   <span><FaTag className="summary-icon" /> x{eventTicket.quantity || 1}</span>
                   <span>
@@ -890,7 +917,10 @@ export default function Checkout() {
                   const price = memberDiscount > 0 ? Math.round(item.price_cents * (1 - memberDiscount)) : item.price_cents;
                   return (
                     <div key={item.item_id} className="summary-line">
-                      <span>{item.item_name} x{item.quantity}</span>
+                      <span>
+                        <button onClick={() => removeShopItem(item.item_id)} style={{ background: 'none', border: 'none', color: '#f87171', cursor: 'pointer', padding: '0 6px 0 0', fontSize: '12px' }} title="Remove item"><FaTimesCircle /></button>
+                        {item.item_name} x{item.quantity}
+                      </span>
                       <span>
                         {memberDiscount > 0 && <span className="original-price">{fmt(item.price_cents * item.quantity)}</span>}
                         {fmt(price * item.quantity)}
@@ -910,7 +940,10 @@ export default function Checkout() {
                   const price = memberDiscount > 0 ? Math.round(item.price_cents * (1 - memberDiscount)) : item.price_cents;
                   return (
                     <div key={item.item_id} className="summary-line">
-                      <span>{item.item_name} x{qty}</span>
+                      <span>
+                        <button onClick={() => removeFoodItem(item.item_id)} style={{ background: 'none', border: 'none', color: '#f87171', cursor: 'pointer', padding: '0 6px 0 0', fontSize: '12px' }} title="Remove item"><FaTimesCircle /></button>
+                        {item.item_name} x{qty}
+                      </span>
                       <span>{fmt(price * qty)}</span>
                     </div>
                   );

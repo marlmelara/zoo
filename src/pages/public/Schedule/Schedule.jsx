@@ -22,13 +22,12 @@ export default function Schedule() {
           eventDate.setHours(0, 0, 0, 0);
           return eventDate.getTime() === today.getTime();
         });
-        
+
         // Sort by time
         const sortedEvents = [...todayEvents].sort((a, b) => {
-          if (a.event_time && b.event_time) {
-            return a.event_time.localeCompare(b.event_time);
-          }
-          return 0;
+          const timeA = a.start_time || a.event_time || '';
+          const timeB = b.start_time || b.event_time || '';
+          return timeA.localeCompare(timeB);
         });
         
         setEvents(sortedEvents);
@@ -106,15 +105,17 @@ export default function Schedule() {
             {events.map((event, index) => (
               <div key={event.event_id || index} className="schedule-row">
                 <div className="schedule-time-cell">
-                  {formatTime(event.event_time)}
+                  {event.start_time && event.end_time
+                    ? `${formatTime(event.start_time)} – ${formatTime(event.end_time)}`
+                    : formatTime(event.start_time || event.event_time)}
                 </div>
                 <div className="schedule-location-cell">
-                  @ {event.venue || 'Zoo Exhibit'}
+                  @ {event.venues?.venue_name || 'Zoo Exhibit'}
                 </div>
                 <div className="schedule-event-cell">
-                  <div className="event-title">{event.event_name}</div>
+                  <div className="event-title">{event.title || event.event_name}</div>
                   <div className="event-description">
-                    {event.event_description || 'Join us to learn more about our amazing animals!'}
+                    {event.description || event.event_description || 'Join us to learn more about our amazing animals!'}
                   </div>
                 </div>
               </div>

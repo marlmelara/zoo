@@ -385,7 +385,19 @@ export default function CustomerDashboard() {
                                                     <RefreshCw size={14} style={{ marginRight: '6px', verticalAlign: 'middle' }} />
                                                     Your membership expires soon. Renew to keep your perks!
                                                 </span>
-                                                <button className="glass-button" onClick={() => navigate('/checkout', { state: { membershipRenewal: { type: profile.membership_type, customerId: profile.customer_id } } })} style={{ background: 'var(--color-secondary)', padding: '8px 16px', fontSize: '0.8rem' }}>
+                                                <button className="glass-button" onClick={() => {
+                                                    const discountMap = { explorer: 0.10, family: 0.15, premium: 0.20 };
+                                                    const priceMap = { explorer: 8999, family: 14999, premium: 24999 };
+                                                    const cart = JSON.parse(localStorage.getItem('zooCart') || '{"admission":null,"events":{},"shop":{},"membership":null}');
+                                                    cart.membership = {
+                                                        plan_name: profile.membership_type,
+                                                        price_cents: priceMap[profile.membership_type] || 8999,
+                                                        discount_rate: discountMap[profile.membership_type] || 0.10,
+                                                        duration_days: 365,
+                                                    };
+                                                    localStorage.setItem('zooCart', JSON.stringify(cart));
+                                                    navigate('/checkout');
+                                                }} style={{ background: 'var(--color-secondary)', padding: '8px 16px', fontSize: '0.8rem' }}>
                                                     Renew Membership
                                                 </button>
                                             </div>

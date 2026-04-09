@@ -36,10 +36,11 @@ export default function Checkout() {
   const { user, role, customerId } = useAuth();
 
   // ── Load cart from unified localStorage ──
-  const initialCart = readZooCart() || { admission: null, events: {}, shop: {} };
+  const initialCart = readZooCart() || { admission: null, events: {}, shop: {}, membership: null };
   const [ticketData, setTicketData] = useState(initialCart.admission);
   const [eventTickets, setEventTickets] = useState(initialCart.events || {});
   const [shopItems, setShopItems] = useState(Object.values(initialCart.shop || {}));
+  const [membershipPlan, setMembershipPlan] = useState(initialCart.membership || null);
   const donationData = location.state?.donationData || null;
   const isDonation = !!donationData;
 
@@ -81,6 +82,7 @@ export default function Checkout() {
   const removeShopItem = (itemId) => {
     setShopItems(prev => prev.filter(i => i.item_id !== itemId));
   };
+  const removeMembership = () => setMembershipPlan(null);
 
   // ══════════════════════════════════════
   // Effects
@@ -222,11 +224,14 @@ export default function Checkout() {
 
   const donationAmountCents = donationData ? Math.round(parseFloat(donationData.amount) * 100) : 0;
 
+  const membershipCents = membershipPlan?.price_cents || 0;
+
   const subtotalCents = isDonation
     ? donationAmountCents
-    : calcTicketSubtotal() + calcEventTicketSubtotal() + calcShopSubtotal();
+    : calcTicketSubtotal() + calcEventTicketSubtotal() + calcShopSubtotal() + membershipCents;
 
-  const taxCents = isDonation ? 0 : Math.round(subtotalCents * TAX_RATE);
+  const taxableCents = calcTicketSubtotal() + calcEventTicketSubtotal() + calcShopSubtotal();
+  const taxCents = isDonation ? 0 : Math.round(taxableCents * TAX_RATE);
   const totalCents = subtotalCents + taxCents;
 
   const fmt = (cents) => `$${(cents / 100).toFixed(2)}`;
@@ -359,6 +364,23 @@ export default function Checkout() {
         }
       }
 
+      // 5b. Process membership purchase
+      if (membershipPlan && customerId) {
+        const startDate = new Date();
+        const endDate = new Date();
+        endDate.setDate(endDate.getDate() + (membershipPlan.duration_days || 365));
+        const { error: memErr } = await supabase
+          .from('customers')
+          .update({
+            is_member: true,
+            membership_type: membershipPlan.plan_name,
+            membership_start: startDate.toISOString().split('T')[0],
+            membership_end: endDate.toISOString().split('T')[0],
+          })
+          .eq('customer_id', customerId);
+        if (memErr) throw memErr;
+      }
+
       // 6. Save billing/shipping to customer profile if logged in
       if (customerId) {
         await supabase.from('customers').update({
@@ -396,6 +418,9 @@ export default function Checkout() {
       for (const item of shopItems) {
         const price = memberDiscount > 0 ? Math.round(item.price_cents * (1 - memberDiscount)) : item.price_cents;
         receiptItems.push({ description: item.item_name, quantity: item.quantity, unitPriceCents: price });
+      }
+      if (membershipPlan) {
+        receiptItems.push({ description: `${membershipPlan.plan_name.charAt(0).toUpperCase() + membershipPlan.plan_name.slice(1)} Membership (Annual)`, quantity: 1, unitPriceCents: membershipPlan.price_cents });
       }
       if (isDonation) {
         receiptItems.push({ description: `Donation — ${donationData.fund}`, quantity: 1, unitPriceCents: donationAmountCents });
@@ -477,7 +502,7 @@ export default function Checkout() {
   // ══════════════════════════════════════
   // No items guard (non-donation)
   // ══════════════════════════════════════
-  const hasCartItems = ticketData || eventTicketList.length > 0 || shopItems.length > 0;
+  const hasCartItems = ticketData || eventTicketList.length > 0 || shopItems.length > 0 || membershipPlan;
   if (!isDonation && !hasCartItems) {
     return (
       <div className="checkout-page">
@@ -819,6 +844,21 @@ export default function Checkout() {
                     </div>
                   );
                 })}
+              </div>
+            )}
+
+            {/* Membership */}
+            {membershipPlan && (
+              <div className="summary-section">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <h3 className="summary-section-label" style={{ margin: 0 }}>Membership</h3>
+                  <button onClick={removeMembership} style={{ background: 'none', border: 'none', color: '#f87171', cursor: 'pointer', padding: '2px', fontSize: '14px' }} title="Remove membership"><FaTimesCircle /></button>
+                </div>
+                <div className="summary-line">
+                  <span><FaCrown className="summary-icon" /> {membershipPlan.plan_name.charAt(0).toUpperCase() + membershipPlan.plan_name.slice(1)} Plan (Annual)</span>
+                  <span>{fmt(membershipPlan.price_cents)}</span>
+                </div>
+                <div className="summary-note">{Math.round((membershipPlan.discount_rate || 0) * 100)}% discount on future purchases</div>
               </div>
             )}
 

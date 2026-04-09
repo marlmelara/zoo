@@ -126,6 +126,27 @@ export default function Tickets() {
     setCartOpen(true);
   };
 
+  // Membership plans
+  const MEMBERSHIP_PLANS = [
+    { type: 'explorer', name: 'Explorer', price_cents: 8999, discount: 0.10, duration_days: 365, featured: false },
+    { type: 'family', name: 'Family', price_cents: 14999, discount: 0.15, duration_days: 365, featured: true },
+    { type: 'premium', name: 'Premium', price_cents: 24999, discount: 0.20, duration_days: 365, featured: false },
+  ];
+
+  const handleSelectMembership = (plan) => {
+    if (!user) {
+      navigate('/account');
+      return;
+    }
+    cartHook.setMembership({
+      plan_name: plan.type,
+      price_cents: plan.price_cents,
+      discount_rate: plan.discount,
+      duration_days: plan.duration_days,
+    });
+    setCartOpen(true);
+  };
+
   const calendarDays = generateCalendarDays();
   const weekDays = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
 
@@ -201,20 +222,50 @@ export default function Tickets() {
             </div>
           </div>
 
-          {/* Membership Option */}
+          {/* Membership Plans */}
           <div className="glass-panel membership-card">
             <div className="membership-header">
-              <h2 className="membership-title">Annual Membership</h2>
-              <div className="membership-badge">Best Value</div>
+              <h2 className="membership-title">Annual Membership Plans</h2>
             </div>
-            <p className="membership-description">Unlimited visits plus member-exclusive benefits, free parking, and access to special events.</p>
-            <div className="membership-pricing">
-              <span className="membership-price">$89.99</span>
-              <span className="membership-period">/ year</span>
+            <p className="membership-description">Unlimited visits, free parking, and discounts on tickets and shop items.</p>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', margin: '16px 0' }}>
+              {MEMBERSHIP_PLANS.map(plan => {
+                const isSelected = cartHook.cart.membership?.plan_name === plan.type;
+                const isCurrentPlan = membershipType === plan.type;
+                return (
+                  <div key={plan.type} style={{
+                    background: plan.featured ? 'rgba(16,185,129,0.1)' : 'rgba(255,255,255,0.05)',
+                    border: isSelected ? '2px solid var(--color-primary)' : plan.featured ? '2px solid rgba(16,185,129,0.4)' : '1px solid rgba(255,255,255,0.1)',
+                    borderRadius: '12px', padding: '16px', textAlign: 'center', position: 'relative',
+                  }}>
+                    {plan.featured && (
+                      <div style={{ position: 'absolute', top: '-10px', left: '50%', transform: 'translateX(-50%)', background: 'var(--color-primary)', color: 'white', padding: '2px 12px', borderRadius: '10px', fontSize: '11px', fontWeight: 700 }}>Best Value</div>
+                    )}
+                    <h3 style={{ margin: '8px 0 4px', fontSize: '1.1rem', textTransform: 'capitalize' }}>{plan.name}</h3>
+                    <div style={{ fontSize: '12px', color: 'var(--color-text-muted)', marginBottom: '8px' }}>{Math.round(plan.discount * 100)}% off all purchases</div>
+                    <div style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--color-primary)' }}>
+                      ${(plan.price_cents / 100).toFixed(2)}
+                      <span style={{ fontSize: '0.8rem', fontWeight: 400, color: 'var(--color-text-muted)' }}>/yr</span>
+                    </div>
+                    {isCurrentPlan ? (
+                      <div style={{ marginTop: '12px', padding: '10px', background: 'rgba(16,185,129,0.15)', borderRadius: '8px', fontSize: '0.8rem', color: '#6ee7b7', fontWeight: 600 }}>
+                        Current Plan
+                      </div>
+                    ) : (
+                      <button
+                        className="glass-button"
+                        onClick={() => handleSelectMembership(plan)}
+                        style={{ marginTop: '12px', width: '100%', padding: '10px', background: isSelected ? 'var(--color-secondary)' : plan.featured ? 'var(--color-primary)' : 'rgba(255,255,255,0.1)', fontSize: '0.85rem' }}
+                      >
+                        {isSelected ? 'In Cart' : 'Select Plan'}
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
             </div>
-            <button className="glass-button membership-button" onClick={() => navigate('/account')}>Become a Member</button>
             <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginTop: '10px', textAlign: 'center' }}>
-              You must be signed in or create an account to purchase a membership. Membership discounts (10–20% off) apply to future ticket and shop purchases.
+              {user ? 'Select a plan and proceed to checkout.' : 'You must be signed in or create an account to purchase a membership.'} Membership discounts (10-20% off) apply to future ticket and shop purchases.
             </p>
           </div>
 

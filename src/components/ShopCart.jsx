@@ -33,13 +33,13 @@ function readCart() {
         Object.values(parsed).forEach(i => { if (i.quantity > 0) shop[i.item_id] = i; });
       }
       localStorage.removeItem('shopCart');
-      const cart = { admission: null, events: {}, shop };
+      const cart = { admission: null, events: {}, shop, membership: null };
       localStorage.setItem('zooCart', JSON.stringify(cart));
       return cart;
     }
   } catch {}
 
-  return { admission: null, events: {}, shop: {} };
+  return { admission: null, events: {}, shop: {}, membership: null };
 }
 
 function writeCart(cart) {
@@ -111,7 +111,11 @@ export function useZooCart() {
     update({ ...cart, shop });
   };
 
-  const clearCart = () => update({ admission: null, events: {}, shop: {} });
+  // — Membership —
+  const setMembership = (plan) => update({ ...cart, membership: plan });
+  const clearMembership = () => update({ ...cart, membership: null });
+
+  const clearCart = () => update({ admission: null, events: {}, shop: {}, membership: null });
 
   // — Computed totals —
   const admissionCount = cart.admission
@@ -129,8 +133,10 @@ export function useZooCart() {
   const shopCount = shopItems.reduce((s, i) => s + i.quantity, 0);
   const shopCents = shopItems.reduce((s, i) => s + i.price_cents * i.quantity, 0);
 
-  const totalItems = admissionCount + eventCount + shopCount;
-  const totalCents = admissionCents + eventCents + shopCents;
+  const membershipCents = cart.membership?.price_cents || 0;
+
+  const totalItems = admissionCount + eventCount + shopCount + (cart.membership ? 1 : 0);
+  const totalCents = admissionCents + eventCents + shopCents + membershipCents;
 
   return {
     cart, totalItems, totalCents,
@@ -140,6 +146,8 @@ export function useZooCart() {
     addEvent, removeEvent, updateEventQty, eventItems, eventCount, eventCents,
     // shop
     addShopItem, removeShopItem, updateShopQty, shopItems, shopCount, shopCents,
+    // membership
+    setMembership, clearMembership, membershipCents,
     // global
     clearCart,
   };
@@ -158,6 +166,8 @@ export default function ShopCartPanel({
   eventItems, removeEvent, updateEventQty,
   // shop
   shopItems, removeShopItem, updateShopQty,
+  // membership
+  clearMembership,
   // global
   clearCart,
 }) {
@@ -312,6 +322,33 @@ export default function ShopCartPanel({
                       </div>
                     </div>
                   ))}
+                </div>
+              )}
+
+              {/* ── Membership ── */}
+              {cart.membership && (
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                    <h4 style={{ margin: 0, fontSize: '13px', textTransform: 'uppercase', color: 'var(--color-text-muted)', letterSpacing: '0.5px' }}>
+                      <FaTicketAlt style={{ marginRight: '6px' }} />Membership
+                    </h4>
+                    <button onClick={clearMembership} style={{ background: 'none', border: 'none', color: '#f87171', cursor: 'pointer', fontSize: '11px' }}>
+                      <FaTrash size={10} /> Remove
+                    </button>
+                  </div>
+                  <div style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', padding: '12px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div>
+                        <div style={{ fontWeight: 600, fontSize: '14px', textTransform: 'capitalize' }}>{cart.membership.plan_name} Plan</div>
+                        <div style={{ fontSize: '12px', color: 'var(--color-text-muted)', marginTop: '2px' }}>
+                          Annual - {Math.round(cart.membership.discount_rate * 100)}% discount on all purchases
+                        </div>
+                      </div>
+                      <span style={{ fontWeight: 600, color: 'var(--color-primary)', fontSize: '14px' }}>
+                        {fmt(cart.membership.price_cents)}
+                      </span>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>

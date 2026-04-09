@@ -17,6 +17,10 @@ export default function SignUp() {
     confirmPassword: '',
     phone: '',
     dateOfBirth: '',
+    address: '',
+    city: '',
+    state: 'Texas',
+    zipCode: '',
   });
 
   const handleChange = (e) => {
@@ -66,6 +70,10 @@ export default function SignUp() {
           phone: form.phone || null,
           date_of_birth: form.dateOfBirth || null,
           is_member: false,
+          address: form.address || null,
+          city: form.city || null,
+          state: form.state || null,
+          zip_code: form.zipCode || null,
         }]);
 
       if (customerError) throw customerError;
@@ -228,6 +236,61 @@ export default function SignUp() {
           </div>
 
           <div>
+            <label style={labelStyle}>Street Address <span style={{ color: 'var(--color-text-muted)', fontWeight: 'normal' }}>(optional)</span></label>
+            <input
+              type="text"
+              name="address"
+              className="glass-input"
+              value={form.address}
+              onChange={handleChange}
+              placeholder="Street address"
+              style={inputStyle}
+            />
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+            <div>
+              <label style={labelStyle}>City <span style={{ color: 'var(--color-text-muted)', fontWeight: 'normal' }}>(optional)</span></label>
+              <input
+                type="text"
+                name="city"
+                className="glass-input"
+                value={form.city}
+                onChange={handleChange}
+                placeholder="City"
+                style={inputStyle}
+              />
+            </div>
+            <div>
+              <label style={labelStyle}>State <span style={{ color: 'var(--color-text-muted)', fontWeight: 'normal' }}>(optional)</span></label>
+              <select
+                name="state"
+                className="glass-input"
+                value={form.state}
+                onChange={handleChange}
+                style={inputStyle}
+              >
+                {US_STATES.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+            <div>
+              <label style={labelStyle}>Zip Code <span style={{ color: 'var(--color-text-muted)', fontWeight: 'normal' }}>(optional)</span></label>
+              <input
+                type="text"
+                name="zipCode"
+                className="glass-input"
+                value={form.zipCode}
+                onChange={handleChange}
+                placeholder="Zip code"
+                style={inputStyle}
+              />
+            </div>
+          </div>
+
+          <div>
             <label style={labelStyle}>Password <span style={{ color: '#ef4444' }}>*</span></label>
             <input
               type="password"
@@ -296,3 +359,14 @@ const inputStyle = {
   width: '100%',
   boxSizing: 'border-box',
 };
+
+const US_STATES = [
+  'Alabama','Alaska','Arizona','Arkansas','California','Colorado','Connecticut',
+  'Delaware','Florida','Georgia','Hawaii','Idaho','Illinois','Indiana','Iowa',
+  'Kansas','Kentucky','Louisiana','Maine','Maryland','Massachusetts','Michigan',
+  'Minnesota','Mississippi','Missouri','Montana','Nebraska','Nevada','New Hampshire',
+  'New Jersey','New Mexico','New York','North Carolina','North Dakota','Ohio',
+  'Oklahoma','Oregon','Pennsylvania','Rhode Island','South Carolina','South Dakota',
+  'Tennessee','Texas','Utah','Vermont','Virginia','Washington','West Virginia',
+  'Wisconsin','Wyoming',
+];

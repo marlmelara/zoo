@@ -7,7 +7,6 @@ import {
 } from 'react-icons/fa';
 import { FaPersonCane } from 'react-icons/fa6';
 import { useAuth } from '../../../contexts/AuthContext';
-import { getShopItems } from '../../../api/inventory';
 import { createTransaction, createSaleItems } from '../../../api/transactions';
 import { createReceipt } from '../../../api/receipts';
 import { supabase } from '../../../lib/supabase';
@@ -26,31 +25,34 @@ const TICKET_LABELS = {
 };
 const TAX_RATE = 0.0825;
 
+function readZooCart() {
+  try { return JSON.parse(localStorage.getItem('zooCart') || 'null'); }
+  catch { return null; }
+}
+
 export default function Checkout() {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, role, customerId } = useAuth();
 
-  // ── Determine checkout mode from route state (mutable so items can be removed) ──
-  const [ticketData, setTicketData] = useState(location.state?.ticketData || null);
-  const donationData  = location.state?.donationData  || null;
-  const isDonation    = !!donationData;
+  // ── Load cart from unified localStorage ──
+  const initialCart = readZooCart() || { admission: null, events: {}, shop: {} };
+  const [ticketData, setTicketData] = useState(initialCart.admission);
+  const [eventTickets, setEventTickets] = useState(initialCart.events || {});
+  const [shopItems, setShopItems] = useState(Object.values(initialCart.shop || {}));
+  const donationData = location.state?.donationData || null;
+  const isDonation = !!donationData;
 
   // ── Customer data (loaded if logged in) ──
   const [customer, setCustomer] = useState(null);
   const [memberDiscount, setMemberDiscount] = useState(0);
 
   // ── Auth mode on checkout ──
-  const [authMode, setAuthMode] = useState(user ? 'logged-in' : null); // null | 'guest' | 'logged-in'
+  const [authMode, setAuthMode] = useState(user ? 'logged-in' : null);
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [loginError, setLoginError] = useState('');
   const [loginLoading, setLoginLoading] = useState(false);
-
-  // ── Shop items (gift + food from localStorage cart) ──
-  const [shopItems, setShopItems] = useState([]);
-  const [foodItems, setFoodItems] = useState([]);
-  const [foodQuantities, setFoodQuantities] = useState({});
 
   // ── Billing / Shipping ──
   const [sameAsBilling, setSameAsBilling] = useState(true);
@@ -71,20 +73,13 @@ export default function Checkout() {
   const [orderComplete, setOrderComplete] = useState(false);
   const [orderTransaction, setOrderTransaction] = useState(null);
 
-  // ── Event ticket data (for event-specific tickets) ──
-  const [eventTicket, setEventTicket] = useState(location.state?.eventTicket || null);
-
   // ── Remove item handlers ──
   const removeTickets = () => setTicketData(null);
-  const removeEventTicket = () => setEventTicket(null);
+  const removeEventTicket = (eventId) => {
+    setEventTickets(prev => { const next = { ...prev }; delete next[eventId]; return next; });
+  };
   const removeShopItem = (itemId) => {
     setShopItems(prev => prev.filter(i => i.item_id !== itemId));
-    const savedCart = JSON.parse(localStorage.getItem('shopCart') || '{}');
-    delete savedCart[itemId];
-    localStorage.setItem('shopCart', JSON.stringify(savedCart));
-  };
-  const removeFoodItem = (itemId) => {
-    setFoodQuantities(prev => { const next = { ...prev }; delete next[itemId]; return next; });
   };
 
   // ══════════════════════════════════════
@@ -144,31 +139,6 @@ export default function Checkout() {
     })();
   }, [user, customerId]);
 
-  // Load shop items from localStorage cart
-  useEffect(() => {
-    if (isDonation) return; // donations don't have cart items
-    const savedCart = JSON.parse(localStorage.getItem('shopCart') || '{}');
-    const firstVal = Object.values(savedCart)[0];
-
-    if (firstVal && typeof firstVal === 'object' && firstVal.item_id) {
-      // New format: { item_id: { item_id, item_name, price_cents, quantity, ... } }
-      const cartItems = Object.values(savedCart).filter(i => i.quantity > 0);
-      if (cartItems.length > 0) setShopItems(cartItems);
-    } else {
-      // Legacy format: { item_id: quantity }
-      const hasCartItems = Object.values(savedCart).some(q => q > 0);
-      if (hasCartItems) {
-        getShopItems(1).then(items => {
-          const cartItems = items
-            .filter(i => savedCart[i.item_id] > 0)
-            .map(i => ({ ...i, quantity: savedCart[i.item_id] }));
-          setShopItems(cartItems);
-        });
-      }
-    }
-
-    getShopItems(2).then(setFoodItems);
-  }, [isDonation]);
 
 
   // ══════════════════════════════════════
@@ -190,13 +160,6 @@ export default function Checkout() {
     } finally {
       setLoginLoading(false);
     }
-  };
-
-  const handleFoodQty = (itemId, delta) => {
-    setFoodQuantities(prev => ({
-      ...prev,
-      [itemId]: Math.max(0, (prev[itemId] || 0) + delta),
-    }));
   };
 
   const handleBillingChange = (e) => {
@@ -240,12 +203,15 @@ export default function Checkout() {
     return total;
   }, [ticketData, memberDiscount]);
 
+  const eventTicketList = Object.values(eventTickets);
+
   const calcEventTicketSubtotal = useCallback(() => {
-    if (!eventTicket) return 0;
-    const base = eventTicket.price_cents || 0;
-    const discounted = memberDiscount > 0 ? Math.round(base * (1 - memberDiscount)) : base;
-    return discounted * (eventTicket.quantity || 1);
-  }, [eventTicket, memberDiscount]);
+    return eventTicketList.reduce((sum, evt) => {
+      const base = evt.price_cents || 0;
+      const discounted = memberDiscount > 0 ? Math.round(base * (1 - memberDiscount)) : base;
+      return sum + discounted * (evt.quantity || 1);
+    }, 0);
+  }, [eventTickets, memberDiscount]);
 
   const calcShopSubtotal = useCallback(() => {
     return shopItems.reduce((sum, i) => {
@@ -254,20 +220,11 @@ export default function Checkout() {
     }, 0);
   }, [shopItems, memberDiscount]);
 
-  const calcFoodSubtotal = useCallback(() => {
-    return foodItems.reduce((sum, i) => {
-      const qty = foodQuantities[i.item_id] || 0;
-      if (qty === 0) return sum;
-      const price = memberDiscount > 0 ? Math.round(i.price_cents * (1 - memberDiscount)) : i.price_cents;
-      return sum + price * qty;
-    }, 0);
-  }, [foodItems, foodQuantities, memberDiscount]);
-
   const donationAmountCents = donationData ? Math.round(parseFloat(donationData.amount) * 100) : 0;
 
   const subtotalCents = isDonation
     ? donationAmountCents
-    : calcTicketSubtotal() + calcEventTicketSubtotal() + calcShopSubtotal() + calcFoodSubtotal();
+    : calcTicketSubtotal() + calcEventTicketSubtotal() + calcShopSubtotal();
 
   const taxCents = isDonation ? 0 : Math.round(subtotalCents * TAX_RATE);
   const totalCents = subtotalCents + taxCents;
@@ -349,18 +306,20 @@ export default function Checkout() {
       }
 
       // 4. Create event tickets
-      if (eventTicket) {
-        const base = eventTicket.price_cents;
-        const price = memberDiscount > 0 ? Math.round(base * (1 - memberDiscount)) : base;
+      if (eventTicketList.length > 0) {
         const eventTicketRows = [];
-        for (let i = 0; i < (eventTicket.quantity || 1); i++) {
-          eventTicketRows.push({
-            customer_id: customerId || null,
-            type: 'event',
-            price_cents: price,
-            transaction_id: transaction.transaction_id,
-            event_id: eventTicket.event_id,
-          });
+        for (const evt of eventTicketList) {
+          const base = evt.price_cents;
+          const price = memberDiscount > 0 ? Math.round(base * (1 - memberDiscount)) : base;
+          for (let i = 0; i < (evt.quantity || 1); i++) {
+            eventTicketRows.push({
+              customer_id: customerId || null,
+              type: 'event',
+              price_cents: price,
+              transaction_id: transaction.transaction_id,
+              event_id: evt.event_id,
+            });
+          }
         }
         const { error: evtErr } = await supabase.from('tickets').insert(eventTicketRows);
         if (evtErr) throw evtErr;
@@ -375,18 +334,6 @@ export default function Checkout() {
           transaction_id: transaction.transaction_id,
           item_id: item.item_id,
           quantity: item.quantity,
-          price_at_sale_cents: price,
-        });
-      }
-
-      for (const item of foodItems) {
-        const qty = foodQuantities[item.item_id] || 0;
-        if (qty <= 0) continue;
-        const price = memberDiscount > 0 ? Math.round(item.price_cents * (1 - memberDiscount)) : item.price_cents;
-        allPurchasedItems.push({
-          transaction_id: transaction.transaction_id,
-          item_id: item.item_id,
-          quantity: qty,
           price_at_sale_cents: price,
         });
       }
@@ -441,20 +388,14 @@ export default function Checkout() {
           receiptItems.push({ description: `${TICKET_LABELS[type].name} Ticket`, quantity: qty, unitPriceCents: price });
         }
       }
-      if (eventTicket) {
-        const base = eventTicket.price_cents;
+      for (const evt of eventTicketList) {
+        const base = evt.price_cents;
         const price = memberDiscount > 0 ? Math.round(base * (1 - memberDiscount)) : base;
-        receiptItems.push({ description: `Event: ${eventTicket.title}`, quantity: eventTicket.quantity || 1, unitPriceCents: price });
+        receiptItems.push({ description: `Event: ${evt.title}`, quantity: evt.quantity || 1, unitPriceCents: price });
       }
       for (const item of shopItems) {
         const price = memberDiscount > 0 ? Math.round(item.price_cents * (1 - memberDiscount)) : item.price_cents;
         receiptItems.push({ description: item.item_name, quantity: item.quantity, unitPriceCents: price });
-      }
-      for (const item of foodItems) {
-        const qty = foodQuantities[item.item_id] || 0;
-        if (qty <= 0) continue;
-        const price = memberDiscount > 0 ? Math.round(item.price_cents * (1 - memberDiscount)) : item.price_cents;
-        receiptItems.push({ description: item.item_name, quantity: qty, unitPriceCents: price });
       }
       if (isDonation) {
         receiptItems.push({ description: `Donation — ${donationData.fund}`, quantity: 1, unitPriceCents: donationAmountCents });
@@ -477,8 +418,7 @@ export default function Checkout() {
       }
 
       // 8. Cleanup
-      localStorage.removeItem('shopCart');
-      localStorage.removeItem('cartExpiresAt');
+      localStorage.removeItem('zooCart');
 
       setOrderTransaction(transaction);
       setOrderComplete(true);
@@ -537,7 +477,8 @@ export default function Checkout() {
   // ══════════════════════════════════════
   // No items guard (non-donation)
   // ══════════════════════════════════════
-  if (!isDonation && !ticketData && !eventTicket) {
+  const hasCartItems = ticketData || eventTicketList.length > 0 || shopItems.length > 0;
+  if (!isDonation && !hasCartItems) {
     return (
       <div className="checkout-page">
         <div className="checkout-wrapper">
@@ -806,7 +747,9 @@ export default function Checkout() {
                 </div>
                 {ticketData.date && (
                   <div className="summary-meta">
-                    {ticketData.date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+                    {typeof ticketData.date === 'string'
+                      ? ticketData.date
+                      : ticketData.date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
                     {ticketData.time && ` at ${ticketData.time}`}
                   </div>
                 )}
@@ -829,21 +772,30 @@ export default function Checkout() {
               </div>
             )}
 
-            {/* Event ticket */}
-            {eventTicket && (
+            {/* Event tickets */}
+            {eventTicketList.length > 0 && (
               <div className="summary-section">
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <h3 className="summary-section-label" style={{ margin: 0 }}>Event Ticket</h3>
-                  <button onClick={removeEventTicket} style={{ background: 'none', border: 'none', color: '#f87171', cursor: 'pointer', padding: '2px', fontSize: '14px' }} title="Remove event ticket"><FaTimesCircle /></button>
-                </div>
-                <div className="summary-meta">{eventTicket.title} — {eventTicket.date}{eventTicket.venue ? ` @ ${eventTicket.venue}` : ''}</div>
-                <div className="summary-line">
-                  <span><FaTag className="summary-icon" /> x{eventTicket.quantity || 1}</span>
-                  <span>
-                    {memberDiscount > 0 && <span className="original-price">{fmt(eventTicket.price_cents * (eventTicket.quantity || 1))}</span>}
-                    {fmt(calcEventTicketSubtotal())}
-                  </span>
-                </div>
+                <h3 className="summary-section-label">Event Tickets</h3>
+                {eventTicketList.map(evt => {
+                  const base = evt.price_cents;
+                  const price = memberDiscount > 0 ? Math.round(base * (1 - memberDiscount)) : base;
+                  const qty = evt.quantity || 1;
+                  return (
+                    <div key={evt.event_id}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                        <div className="summary-meta" style={{ margin: 0 }}>{evt.title} — {evt.date}{evt.venue ? ` @ ${evt.venue}` : ''}</div>
+                        <button onClick={() => removeEventTicket(evt.event_id)} style={{ background: 'none', border: 'none', color: '#f87171', cursor: 'pointer', padding: '2px', fontSize: '14px' }} title="Remove event ticket"><FaTimesCircle /></button>
+                      </div>
+                      <div className="summary-line">
+                        <span><FaTag className="summary-icon" /> x{qty}</span>
+                        <span>
+                          {memberDiscount > 0 && <span className="original-price">{fmt(base * qty)}</span>}
+                          {fmt(price * qty)}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
                 <div className="summary-note">Includes zoo admission</div>
               </div>
             )}
@@ -868,48 +820,6 @@ export default function Checkout() {
                   );
                 })}
               </div>
-            )}
-
-            {/* Food items */}
-            {foodItems.filter(i => (foodQuantities[i.item_id] || 0) > 0).length > 0 && (
-              <div className="summary-section">
-                <h3 className="summary-section-label">Food & Snacks</h3>
-                {foodItems.filter(i => (foodQuantities[i.item_id] || 0) > 0).map(item => {
-                  const qty = foodQuantities[item.item_id];
-                  const price = memberDiscount > 0 ? Math.round(item.price_cents * (1 - memberDiscount)) : item.price_cents;
-                  return (
-                    <div key={item.item_id} className="summary-line">
-                      <span>
-                        <button onClick={() => removeFoodItem(item.item_id)} style={{ background: 'none', border: 'none', color: '#f87171', cursor: 'pointer', padding: '0 6px 0 0', fontSize: '12px' }} title="Remove item"><FaTimesCircle /></button>
-                        {item.item_name} x{qty}
-                      </span>
-                      <span>{fmt(price * qty)}</span>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-
-            {/* Add food inline (non-donation) */}
-            {!isDonation && foodItems.length > 0 && (
-              <details className="food-add-section">
-                <summary className="food-add-toggle">Add food & snacks</summary>
-                <div className="food-add-grid">
-                  {foodItems.map(item => (
-                    <div key={item.item_id} className="food-add-item">
-                      <div className="food-add-info">
-                        <span className="food-add-name">{item.item_name}</span>
-                        <span className="food-add-price">{fmt(item.price_cents)}</span>
-                      </div>
-                      <div className="food-add-controls">
-                        <button onClick={() => handleFoodQty(item.item_id, -1)} className="qty-btn">−</button>
-                        <span className="qty-display">{foodQuantities[item.item_id] || 0}</span>
-                        <button onClick={() => handleFoodQty(item.item_id, 1)} className="qty-btn">+</button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </details>
             )}
 
             {/* Totals */}

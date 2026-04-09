@@ -268,7 +268,9 @@ export default function CustomerDashboard() {
                                 </div>
                                 <div>
                                     <label style={{ fontSize: '12px', color: 'var(--color-text-muted)', display: 'block', marginBottom: '5px' }}>State</label>
-                                    <input className="glass-input" value={editForm.state || ''} onChange={e => setEditForm({ ...editForm, state: e.target.value })} />
+                                    <select className="glass-input" value={editForm.state || 'Texas'} onChange={e => setEditForm({ ...editForm, state: e.target.value })} style={{ padding: '12px', width: '100%', boxSizing: 'border-box' }}>
+                                        {US_STATES.map(s => <option key={s} value={s}>{s}</option>)}
+                                    </select>
                                 </div>
                                 <div>
                                     <label style={{ fontSize: '12px', color: 'var(--color-text-muted)', display: 'block', marginBottom: '5px' }}>Zip Code</label>
@@ -335,7 +337,7 @@ export default function CustomerDashboard() {
                                             <p style={{ fontSize: '12px', color: 'var(--color-text-muted)', margin: 0 }}>Address</p>
                                         </div>
                                         <p style={{ fontWeight: 600, margin: 0 }}>
-                                            {profile.address ? `${profile.address}, ${profile.city}, ${profile.state} ${profile.zip_code}` : 'Not set'}
+                                            {profile.address ? [profile.address, profile.city, profile.state, profile.zip_code].filter(Boolean).join(', ') : 'Not set'}
                                         </p>
                                     </div>
                                     <div style={{ background: 'rgba(255,255,255,0.05)', padding: '15px', borderRadius: '10px' }}>
@@ -590,8 +592,22 @@ export default function CustomerDashboard() {
                                                 </p>
                                             )}
                                             {event.ticket_price_cents > 0 && (
-                                                <button className="glass-button" onClick={() => navigate('/checkout', { state: { eventTicket: { event_id: event.event_id, title: event.title, date: new Date(event.event_date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }), venue: event.venues?.venue_name || null, price_cents: event.ticket_price_cents, quantity: 1 } } })} style={{ background: 'var(--color-secondary)', padding: '6px 14px', fontSize: '0.8rem' }}>
-                                                    ${(event.ticket_price_cents / 100).toFixed(2)} — Buy Ticket
+                                                <button className="glass-button" onClick={() => {
+                                                    const cart = JSON.parse(localStorage.getItem('zooCart') || '{"admission":null,"events":{},"shop":{}}');
+                                                    const eid = event.event_id;
+                                                    const existing = cart.events[eid];
+                                                    cart.events[eid] = {
+                                                        event_id: eid,
+                                                        title: event.title,
+                                                        date: new Date(event.event_date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }),
+                                                        venue: event.venues?.venue_name || null,
+                                                        price_cents: event.ticket_price_cents,
+                                                        quantity: existing ? existing.quantity + 1 : 1,
+                                                    };
+                                                    localStorage.setItem('zooCart', JSON.stringify(cart));
+                                                    navigate('/checkout');
+                                                }} style={{ background: 'var(--color-secondary)', padding: '6px 14px', fontSize: '0.8rem' }}>
+                                                    ${(event.ticket_price_cents / 100).toFixed(2)} — Add to Cart
                                                 </button>
                                             )}
                                         </div>
@@ -605,3 +621,14 @@ export default function CustomerDashboard() {
         </div>
     );
 }
+
+const US_STATES = [
+  'Alabama','Alaska','Arizona','Arkansas','California','Colorado','Connecticut',
+  'Delaware','Florida','Georgia','Hawaii','Idaho','Illinois','Indiana','Iowa',
+  'Kansas','Kentucky','Louisiana','Maine','Maryland','Massachusetts','Michigan',
+  'Minnesota','Mississippi','Missouri','Montana','Nebraska','Nevada','New Hampshire',
+  'New Jersey','New Mexico','New York','North Carolina','North Dakota','Ohio',
+  'Oklahoma','Oregon','Pennsylvania','Rhode Island','South Carolina','South Dakota',
+  'Tennessee','Texas','Utah','Vermont','Virginia','Washington','West Virginia',
+  'Wisconsin','Wyoming',
+];

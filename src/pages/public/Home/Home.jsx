@@ -248,7 +248,7 @@ export default function Home() {
       <section className="info-bar">
         <div className="container">
           <div className="info-grid">
-            <a href="/hours" className="info-card">
+            <a className="info-card">
               <FaClock className="info-icon" size={50} />
               <p className="info-label">Today's Hours</p>
               <p className="info-value">9am - 5pm</p>

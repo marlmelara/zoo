@@ -4,7 +4,7 @@ import './map.css';
 import map from '../../../images/map.png';
 import pdf from '../../../images/map.pdf';
 import logo from '../../../images/logo.png';
-import { FaMapMarkerAlt, FaPhone, FaEnvelope } from 'react-icons/fa';
+import { FaMapMarkerAlt, FaPhone, FaEnvelope, FaArrowLeft } from 'react-icons/fa';
 
 export default function Maps() {
   const navigate = useNavigate();
@@ -20,13 +20,21 @@ export default function Maps() {
 
   return (
     <div className="map-page-wrapper">
-      <button
-        className="glass-button"
-        onClick={() => navigate('/')}
-        style={{ position: 'absolute', top: '20px', left: '20px', zIndex: 1000 }}
-      >
-        Home
-      </button>
+      <div style={{ padding: '16px 24px' }}>
+          <button 
+            onClick={() => navigate('/')} 
+            className="glass-button" 
+            style={{ 
+            padding: '8px 14px', 
+            fontSize: '14px', 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: '6px' 
+              }}
+            >
+            <FaArrowLeft size={12} /> Home
+          </button>
+      </div>
       
       <div className="map-container">
         <h1 className="map-title">Zoo Map</h1>

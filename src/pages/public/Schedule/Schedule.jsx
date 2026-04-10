@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FaClock, FaMapMarkerAlt } from 'react-icons/fa';
+import { FaClock, FaMapMarkerAlt, FaPhone, FaEnvelope } from 'react-icons/fa';
 import { getUpcomingEvents } from '../../../api/public';
+import logo from '../../../images/logo.png';
 import './schedule.css'; 
 
 export default function Schedule() {
@@ -13,7 +14,6 @@ export default function Schedule() {
     const fetchEvents = async () => {
       try {
         const data = await getUpcomingEvents();
-        // Filter events for today
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         
@@ -23,7 +23,6 @@ export default function Schedule() {
           return eventDate.getTime() === today.getTime();
         });
 
-        // Sort by time
         const sortedEvents = [...todayEvents].sort((a, b) => {
           const timeA = a.start_time || a.event_time || '';
           const timeB = b.start_time || b.event_time || '';
@@ -130,6 +129,49 @@ export default function Schedule() {
           </p>
         </div>
       </div>
+
+      {/* Footer */}
+      <footer className="footer">
+        <div className="footer-container">
+          <div className="footer-main">
+            <div className="footer-section footer-brand">
+              <div className="footer-logo">
+                <img src={logo} style={{ maxWidth: '200px', width: '100%', height: 'auto' }} alt="Coog Zoo" />
+              </div>
+              <p className="footer-description">
+                Discover amazing wildlife, attend exciting events, and support animal conservation at Coog Zoo.
+              </p>
+            </div>
+
+            <div className="footer-section">
+              <h3 className="footer-title">Contact Us</h3>
+              <div className="footer-contact-info">
+                <div className="contact-item">
+                  <FaMapMarkerAlt className="contact-icon" />
+                  <div>
+                    <p>4302 University Dr</p>
+                    <p>Houston, TX 77004</p>
+                  </div>
+                </div>
+                <div className="contact-item">
+                  <FaPhone className="contact-icon" />
+                  <a href="tel:5555555555">555-555-5555</a>
+                </div>
+                <div className="contact-item">
+                  <FaEnvelope className="contact-icon" />
+                  <a href="mailto:info@coogzoo.org">info@coogzoo.org</a>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="footer-bottom">
+            <div className="footer-bottom-content">
+              <p>&copy; {new Date().getFullYear()} Coog Zoo. All rights reserved.</p>
+            </div>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }

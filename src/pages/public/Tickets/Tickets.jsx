@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FaCalendarAlt, FaUser, FaChild, FaMapMarkerAlt, FaPhone, FaEnvelope, FaMinus, FaPlus, FaClock, FaTicketAlt, FaShoppingCart, FaStar } from 'react-icons/fa';
+import { FaCalendarAlt, FaUser, FaChild, FaMapMarkerAlt, FaPhone, FaEnvelope, FaMinus, FaPlus, FaClock, FaTicketAlt, FaShoppingCart, FaStar, FaArrowLeft } from 'react-icons/fa';
 import { FaPersonCane } from "react-icons/fa6";
 import { useAuth } from '../../../contexts/AuthContext';
 import { supabase } from '../../../lib/supabase';
@@ -152,6 +152,21 @@ export default function Tickets() {
 
   return (
     <div className="tickets-page">
+      <div style={{ padding: '16px 24px' }}>
+        <button 
+          onClick={() => navigate('/')} 
+          className="glass-button" 
+          style={{ 
+            padding: '8px 14px', 
+            fontSize: '14px', 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: '6px' 
+          }}
+        >
+          <FaArrowLeft size={12} /> Home
+      </button>
+      </div>
       <div className="tickets-container">
         {/* Left Column */}
         <div className="tickets-left">

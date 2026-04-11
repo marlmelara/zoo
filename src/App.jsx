@@ -15,6 +15,7 @@ import Checkout from './pages/public/Checkout/checkout';
 import GiftShop from './pages/public/Shop/GiftShop';
 import FoodShop from './pages/public/Shop/FoodShop';
 import Maps from './pages/public/Map/Maps';
+import AnimalGallery from './pages/public/Animals/animals';
 
 import Login from './pages/auth/Login';
 import CustomerLogin from './pages/auth/CustomerLogin';
@@ -85,6 +86,7 @@ function App() {
           <Route path="/donations" element={<Donations />} />
           <Route path="/checkout" element={<Checkout />} />
           <Route path="/map" element={<Maps />} />
+          <Route path="/animals" element={<AnimalGallery />} />
 
           <Route path="/shop/gifts" element={<GiftShop />} />
           <Route path="/shop/food" element={<FoodShop />} />

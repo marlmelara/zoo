@@ -11,6 +11,7 @@ import Schedule from './pages/public/Schedule/Schedule';
 import Calendar from './pages/public/Events/Calendar';
 import Donations from './pages/public/Donations/Donations';
 import Checkout from './pages/public/Checkout/checkout';
+import Membership from './pages/public/Membership/Membership';
 
 import GiftShop from './pages/public/Shop/GiftShop';
 import FoodShop from './pages/public/Shop/FoodShop';
@@ -83,6 +84,7 @@ function App() {
           <Route path="/shop" element={<Shop />} />
           <Route path="/schedule" element={<Schedule />} />
           <Route path="/calendar" element={<Calendar />} />
+          <Route path="/membership" element={<Membership />} />
           <Route path="/donations" element={<Donations />} />
           <Route path="/checkout" element={<Checkout />} />
           <Route path="/map" element={<Maps />} />

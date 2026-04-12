@@ -31,6 +31,8 @@ function readZooCart() {
 }
 
 export default function Checkout() {
+  document.title = 'Checkout - Coog Zoo';
+
   const location = useLocation();
   const navigate = useNavigate();
   const { user, role, customerId } = useAuth();

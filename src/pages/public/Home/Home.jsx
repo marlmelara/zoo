@@ -15,6 +15,8 @@ import 'swiper/css/navigation';
 import 'swiper/css/effect-fade';
 
 export default function Home() {
+  document.title = 'Welcome to Coog Zoo!';
+
   const [todaySchedule, setTodaySchedule] = useState([]);
   const [loading, setLoading] = useState(true);
   const [eventsByDate, setEventsByDate] = useState({});
@@ -189,6 +191,7 @@ export default function Home() {
       {/* Navigation Bar */}
       <nav className="navbar">
         <div className="navbar-container">
+          <a href="/membership" className="navbar-link">ඞ Membership</a>
           <a href="/tickets" className="navbar-link">🎟️ Buy Tickets</a>
           <a href="/calendar" className="navbar-link">📅 Events</a>
           <a href="/shop" className="navbar-link">🛍️ Shop</a>

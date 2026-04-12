@@ -5,6 +5,8 @@ import { getUpcomingEvents } from '../../../api/public';
 import './calendar.css';
 
 export default function Events() {
+  document.title = 'Events Calendar - Coog Zoo';
+
   const navigate = useNavigate();
   const [events, setEvents] = useState([]);
   const [filteredEvents, setFilteredEvents] = useState([]);

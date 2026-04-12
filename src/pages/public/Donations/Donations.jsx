@@ -9,6 +9,8 @@ const TABS = [
 ];
 
 export default function Donations() {
+  document.title = 'Donations - Coog Zoo';
+
   const navigate = useNavigate();
   const [active, setActive] = useState('general');
   const [form, setForm] = useState({

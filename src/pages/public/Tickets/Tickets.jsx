@@ -11,6 +11,8 @@ import './tickets.css';
 let dayTime = new Date();
 
 export default function Tickets() {
+  document.title = 'Tickets - Coog Zoo';
+
   const navigate = useNavigate();
   const { user, role, customerId } = useAuth();
   const cartHook = useZooCart();
@@ -33,6 +35,19 @@ export default function Tickets() {
         }
       });
   }, [user, customerId]);
+
+  useEffect(() => {
+    const saved = localStorage.getItem('selectedMembership');
+    if (saved) {
+      const plan = JSON.parse(saved);
+      cartHook.setMembership({
+        plan_name: plan.type,
+        price_cents: plan.price_cents,
+        discount_rate: plan.discount,
+        duration_days: plan.duration_days,
+      });
+    }
+  }, []);
 
   const [selectedDate, setSelectedDate] = useState(null);
   const [selectedTime, setSelectedTime] = useState(null);
@@ -133,7 +148,22 @@ export default function Tickets() {
     { type: 'premium', name: 'Premium', price_cents: 24999, discount: 0.20, duration_days: 365, featured: false },
   ];
 
+  useEffect(() => {
+    if (cartHook.cart.membership) {
+      const matchingPlan = MEMBERSHIP_PLANS.find(
+        (p) => p.type === cartHook.cart.membership.plan_name
+      );
+
+      if (matchingPlan) {
+        localStorage.setItem('selectedMembership', JSON.stringify(matchingPlan));
+      }
+    } else {
+      localStorage.removeItem('selectedMembership');
+    }
+  }, [cartHook.cart.membership]);
+
   const handleSelectMembership = (plan) => {
+    localStorage.setItem('selectedMembership', JSON.stringify(plan));
     if (!user) {
       navigate('/account');
       return;
@@ -241,6 +271,9 @@ export default function Tickets() {
           <div className="glass-panel membership-card">
             <div className="membership-header">
               <h2 className="membership-title">Annual Membership Plans</h2>
+              <button className="glass-button" onClick={() => navigate('/membership')} style={{ marginLeft: 'auto' }}>
+                Learn More
+              </button>
             </div>
             <p className="membership-description">Unlimited visits, free parking, and discounts on tickets and shop items.</p>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', margin: '16px 0' }}>

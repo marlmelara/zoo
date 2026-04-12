@@ -6,6 +6,8 @@ import logo from '../../../images/logo.png';
 import './schedule.css'; 
 
 export default function Schedule() {
+  document.title = 'Event Schedule - Coog Zoo';
+  
   const navigate = useNavigate();
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);

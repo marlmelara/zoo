@@ -10,6 +10,8 @@ export default function GiftShop() {
   const [cartOpen, setCartOpen] = useState(false);
   const cartHook = useZooCart();
 
+  document.title = 'Gift Shop - Coog Zoo';
+
   useEffect(() => { getShopItems(1).then(setItems); }, []);
 
   return (

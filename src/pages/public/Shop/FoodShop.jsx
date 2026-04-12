@@ -10,6 +10,8 @@ export default function FoodShop() {
   const [cartOpen, setCartOpen] = useState(false);
   const cartHook = useZooCart();
 
+  document.title = 'Food - Coog Zoo';
+
   useEffect(() => { getShopItems(2).then(setItems); }, []);
 
   return (

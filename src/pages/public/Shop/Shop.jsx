@@ -13,6 +13,8 @@ export default function Shop() {
   const [cartOpen, setCartOpen] = useState(false);
   const cartHook = useZooCart();
 
+  document.title = 'Shop Home - Coog Zoo';
+
   return (
     <div style={{ color: 'white', minHeight: '100vh', background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)' }}>
       <div style={{ padding: '16px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>

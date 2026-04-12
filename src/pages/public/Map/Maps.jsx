@@ -9,6 +9,9 @@ import { FaMapMarkerAlt, FaPhone, FaEnvelope, FaArrowLeft } from 'react-icons/fa
 export default function Maps() {
   const navigate = useNavigate();
   
+  document.title = 'Zoo Grounds Map - Coog Zoo';
+  
+  
   const handleDownload = () => {
     const link = document.createElement('a');
     link.href = pdf;

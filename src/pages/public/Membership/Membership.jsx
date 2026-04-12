@@ -8,7 +8,7 @@ import { useZooCart } from '../../../components/ShopCart';
 
 const plans = [
   { type: 'explorer', name: 'Explorer', price_cents: 8999, discount: 0.10, duration_days: 365, featured: false,
-    description: 'Basic Member Tier.',
+    description: 'Basic Member Tier',
     perks: ['Unlimited general admission', 'Free parking', '10% off gift shop'] },
   { type: 'family', name: 'Family', price_cents: 14999, discount: 0.15, duration_days: 365, featured: true,
     description: 'Moderate Member Tier',

@@ -162,9 +162,9 @@ export default function Home() {
   const slides = [
     {
       image: '/images/elephant2.jpg',
-      title: 'Stop by the Zoo!',
-      subtitle: 'Experience over 20+ species from around the world',
-      buttons: [{ text: 'Buy Tickets', link: '/tickets', variant: 'primary' }]
+      title: 'Stop by the Zoo',
+      subtitle: 'Experience over 20+ species from around the world!',
+      buttons: [{ text: 'Meet Our Animals', link: '/animals', variant: 'primary' }]
     },
     {
       image: '/images/giraffe.jpg',
@@ -181,7 +181,7 @@ export default function Home() {
     {
       image: '/images/penguin.jpg',
       title: 'Lunch with the Zoo Keepers!',
-      subtitle: 'Learn more about how you can support the zoo!',
+      subtitle: 'Learn more about how you can support the zoo',
       buttons: [{ text: 'RSVP for the lunch!', link: '/tickets', variant: 'secondary' }]
     }
   ];
@@ -191,10 +191,9 @@ export default function Home() {
       {/* Navigation Bar */}
       <nav className="navbar">
         <div className="navbar-container">
-          <a href="/membership" className="navbar-link">ඞ Membership</a>
           <a href="/tickets" className="navbar-link">🎟️ Buy Tickets</a>
-          <a href="/calendar" className="navbar-link">📅 Events</a>
           <a href="/shop" className="navbar-link">🛍️ Shop</a>
+          <a href="/membership" className="navbar-link"> 🦁 Membership</a>
           <a href="/account" className="navbar-link">🔑 Customer Login</a>
           <a href="/login" className="navbar-link">🏢 Staff Portal</a>
         </div>

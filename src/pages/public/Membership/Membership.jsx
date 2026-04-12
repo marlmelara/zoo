@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Link } from 'react-router-dom';
 import { FaCheck, FaStar, FaUsers, FaParking, FaTicketAlt, FaGift } from 'react-icons/fa';
 import logo from '../../../images/logo.png';
-import './membership.css';
+import './Membership.css';
 import { useZooCart } from '../../../components/ShopCart';
 
 const plans = [

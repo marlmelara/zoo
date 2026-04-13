@@ -587,7 +587,7 @@ export default function Checkout() {
           {user && customer && (
             <div className="glass-panel auth-logged-in">
               <p>Welcome back, <strong>{customer.first_name || 'Member'}</strong>!
-                {memberDiscount > 0 && (
+                {!isDonation && memberDiscount > 0 && (
                   <span className="member-badge">
                     <FaCrown /> {Math.round(memberDiscount * 100)}% member discount applied
                   </span>
@@ -876,7 +876,7 @@ export default function Checkout() {
                   </div>
                 </>
               )}
-              {memberDiscount > 0 && (
+              {!isDonation && memberDiscount > 0 && (
                 <div className="summary-line discount-line">
                   <span><FaCrown /> Member Discount ({Math.round(memberDiscount * 100)}%)</span>
                   <span>Applied</span>

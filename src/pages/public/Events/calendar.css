@@ -1,3 +1,9 @@
+/* Events Page */
+.events-page {
+  min-height: 100vh;
+  background: var(--color-bg);
+}
+
 .events-header-nav {
   max-width: 1000px;
   margin: 0 auto;
@@ -17,29 +23,38 @@
 }
 
 .events-container {
-  max-width: 900px;
+  max-width: 1000px;
   margin: 0 auto;
-  padding: 0 2rem;
+  padding: 0 2rem 4rem;
 }
 
 /* Hero Section */
 .events-hero {
   text-align: center;
-  margin-bottom: 3rem;
-  padding: 2rem 0 1rem;
+  margin-bottom: 1rem;
+  padding: 1rem 0 0.5rem;
 }
 
 .events-title {
   font-size: 2rem;
   font-weight: 700;
   margin-bottom: 0.75rem;
-  color: white; 
-  background-clip: text;
+  color: white;
 }
 
 .events-subtitle {
   font-size: 1rem;
   color: var(--color-text-muted);
+}
+
+/* Results Count */
+.results-count {
+  text-align: center;
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+  margin-bottom: 1.5rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--glass-border);
 }
 
 /* Event Month Section */
@@ -62,6 +77,7 @@
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
+  width: 100%;
 }
 
 /* Event Item */
@@ -70,6 +86,8 @@
   gap: 1.5rem;
   padding: 1.5rem;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .event-item:hover {
@@ -107,6 +125,7 @@
 /* Event Details */
 .event-details {
   flex: 1;
+  min-width: 0;
 }
 
 .event-item-title {
@@ -114,8 +133,10 @@
   font-weight: 600;
   margin-bottom: 0.75rem;
   color: var(--color-text);
+  word-break: break-word;
 }
 
+/* Event Meta */
 .event-meta {
   display: flex;
   flex-wrap: wrap;
@@ -126,24 +147,139 @@
 .event-meta-item {
   display: flex;
   align-items: center;
-  gap: 0.4rem;
+  gap: 0.5rem;
   font-size: 0.8rem;
   color: var(--color-text-muted);
 }
 
+.meta-icon {
+  color: var(--color-primary);
+  font-size: 0.75rem;
+}
+
+/* Event Description */
 .event-description {
   font-size: 0.9rem;
   color: var(--color-text-muted);
   line-height: 1.5;
   margin-bottom: 0.5rem;
+  word-break: break-word;
 }
 
+/* Event Capacity */
 .event-capacity {
   font-size: 0.75rem;
   color: var(--color-text-muted);
   margin-top: 0.5rem;
   padding-top: 0.5rem;
   border-top: 1px solid var(--glass-border);
+  margin-bottom: 0.5rem;
+}
+
+/* Ticket Status */
+.ticket-status {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--glass-border);
+  font-size: 0.85rem;
+  font-weight: 500;
+  width: 100%;
+}
+
+.ticket-status.available {
+  color: #10b981;
+}
+
+.ticket-status.low {
+  color: #f59e0b;
+}
+
+.ticket-status.sold_out {
+  color: #ef4444;
+}
+
+.ticket-status.unlimited {
+  color: #10b981;
+}
+
+.status-icon {
+  font-size: 0.8rem;
+}
+
+.ticket-status span,
+.ticket-status svg {
+  display: inline-flex;
+  align-items: center;
+}
+
+/* Event Ticket Button */
+.event-ticket-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+  padding: 0.6rem 1.2rem;
+  background: rgba(16, 185, 129, 0.1);
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--color-primary);
+  transition: all 0.3s ease;
+  width: fit-content;
+  cursor: pointer;
+}
+
+.event-ticket-button:hover {
+  background: var(--color-primary);
+  color: white;
+  gap: 1rem;
+  transform: translateX(4px);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+}
+
+.event-ticket-button .ticket-icon {
+  transition: transform 0.3s ease;
+}
+
+.event-ticket-button:hover .ticket-icon {
+  transform: scale(1.1);
+}
+
+.ticket-icon {
+  font-size: 0.75rem;
+}
+
+/* Sold Out Message */
+.sold-out-message {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+  padding: 0.6rem 1.2rem;
+  background: rgba(239, 68, 68, 0.1);
+  border-radius: 8px;
+  font-size: 0.85rem;
+  color: #ef4444;
+  width: fit-content;
+}
+
+/* Clickable Event */
+.clickable-event {
+  cursor: pointer;
+}
+
+.clickable-event:hover .event-ticket-button {
+  background: var(--color-primary);
+  color: white;
+  gap: 0.75rem;
+}
+
+.sold-out-event {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 /* Loading & Empty States */
@@ -163,10 +299,115 @@
   margin-top: 0.5rem;
 }
 
+/* Footer */
+.footer {
+  background-color: #1a2a3a;
+  width: 100%;
+  margin-top: 4rem;
+}
+
+.footer-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem 2rem 0;
+}
+
+.footer-main {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 2rem;
+  margin-bottom: 2rem;
+}
+
+.footer-brand {
+  max-width: 300px;
+}
+
+.footer-logo {
+  margin-bottom: 1rem;
+}
+
+.footer-description {
+  line-height: 1.6;
+  color: #cccccc;
+  font-size: 0.9rem;
+}
+
+.footer-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin-bottom: 1.25rem;
+  color: #ffffff;
+  position: relative;
+  padding-bottom: 0.5rem;
+}
+
+.footer-title::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 40px;
+  height: 2px;
+  background-color: #ff6b35;
+}
+
+.footer-contact-info {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.contact-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.contact-icon {
+  color: #ff6b35;
+  margin-top: 0.2rem;
+  flex-shrink: 0;
+}
+
+.contact-item a {
+  color: #cccccc;
+  text-decoration: none;
+  transition: color 0.3s ease;
+}
+
+.contact-item a:hover {
+  color: #ff6b35;
+}
+
+.contact-item p {
+  color: #cccccc;
+  margin: 0;
+}
+
+.footer-bottom {
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 1.5rem 0;
+}
+
+.footer-bottom-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+  font-size: 0.85rem;
+  color: #999999;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
   .events-header-nav {
     padding: 1rem 1rem 0;
+    flex-direction: column;
+    gap: 0.75rem;
   }
   
   .events-container {
@@ -218,98 +459,45 @@
   .event-description {
     font-size: 0.8rem;
   }
-}
-
-/* Filter Buttons */
-.filter-buttons-container {
-  display: flex;
-  justify-content: center;
-  gap: 1rem;
-  margin-bottom: 2rem;
-  flex-wrap: wrap;
-}
-
-.filter-button {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.75rem 1.5rem;
-  font-size: 0.9rem;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid var(--glass-border);
-  border-radius: 8px;
-  color: var(--color-text-muted);
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.filter-button:hover {
-  background: rgba(16, 185, 129, 0.2);
-  transform: translateY(-2px);
-  border-color: var(--color-primary);
-}
-
-.filter-button.active {
-  background: var(--color-primary);
-  border-color: var(--color-primary);
-  color: white;
-}
-
-.filter-icon {
-  font-size: 0.9rem;
-}
-
-/* Results Count */
-.results-count {
-  text-align: center;
-  font-size: 0.85rem;
-  color: var(--color-text-muted);
-  margin-bottom: 2rem;
-  padding-bottom: 1rem;
-  border-bottom: 1px solid var(--glass-border);
-}
-
-/* Event Header with Member Badge */
-.event-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-  margin-bottom: 0.75rem;
-}
-
-.member-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  background: linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(245, 158, 11, 0.1));
-  border: 1px solid #f59e0b;
-  padding: 0.25rem 0.75rem;
-  border-radius: 20px;
-  font-size: 0.7rem;
-  font-weight: 500;
-  color: #f59e0b;
-  white-space: nowrap;
-}
-
-/* Responsive adjustments */
-@media (max-width: 768px) {
-  .filter-buttons-container {
-    gap: 0.75rem;
+  
+  .event-ticket-button {
+    width: 100%;
+    justify-content: center;
   }
   
-  .filter-button {
-    padding: 0.5rem 1rem;
-    font-size: 0.8rem;
+  .sold-out-message {
+    width: 100%;
+    justify-content: center;
   }
   
-  .event-header {
+  .footer-container {
+    padding: 1.5rem 1.5rem 0;
+  }
+  
+  .footer-main {
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+  }
+  
+  .footer-brand {
+    max-width: 100%;
+  }
+  
+  .footer-bottom-content {
     flex-direction: column;
-    align-items: flex-start;
+    text-align: center;
   }
   
-  .member-badge {
-    font-size: 0.65rem;
+  .footer-title::after {
+    left: 50%;
+    transform: translateX(-50%);
+  }
+  
+  .footer-title {
+    text-align: center;
+  }
+  
+  .contact-item {
+    justify-content: center;
   }
 }

@@ -101,3 +101,32 @@ export async function getRecentTransactions(limit = 10) {
 
   return handleSupabaseResult(result);
 }
+
+/* ── Update tickets sold for an event ── */
+export async function incrementEventTicketsSold(eventId, quantity) {
+  // First, get the current event data
+  const { data: event, error: fetchError } = await supabase
+    .from('events')
+    .select('tickets_sold, max_capacity')
+    .eq('event_id', eventId)
+    .single();
+
+  if (fetchError) return handleSupabaseResult({ error: fetchError }, null);
+
+  const newTicketsSold = (event.tickets_sold || 0) + quantity;
+
+  // Check if we're exceeding capacity
+  if (event.max_capacity && newTicketsSold > event.max_capacity) {
+    return handleSupabaseResult({ 
+      error: { message: `Cannot sell more than ${event.max_capacity} tickets for this event` } 
+    }, null);
+  }
+
+  // Update the tickets_sold count
+  const result = await supabase
+    .from('events')
+    .update({ tickets_sold: newTicketsSold })
+    .eq('event_id', eventId);
+
+  return handleSupabaseResult(result);
+}

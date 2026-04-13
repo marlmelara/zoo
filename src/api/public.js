@@ -1,12 +1,20 @@
 import { supabase } from '../lib/supabase';
 import { handleSupabaseResult } from '../utils/apiHandler';
 
-export async function getUpcomingEvents(limit = 6) {
+export async function getUpcomingEvents(limit = 100) {
   const today = new Date().toISOString().split('T')[0];
 
   const result = await supabase
     .from('events')
-    .select('*, venues(venue_name, location)')
+    .select(`
+      *,
+      tickets:tickets(count),
+      venues:venue_id (
+        venue_id,
+        venue_name,
+        location
+      )
+    `)
     .gte('event_date', today)
     .order('event_date', { ascending: true })
     .limit(limit);

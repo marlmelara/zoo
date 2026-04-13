@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FaCalendarAlt, FaStar, FaTicketAlt } from 'react-icons/fa';
+import { FaCalendarAlt, FaTicketAlt, FaCheckCircle, FaExclamationTriangle, FaMapMarkerAlt, FaClock, FaPhone, FaEnvelope } from 'react-icons/fa';
 import { getUpcomingEvents } from '../../../api/public';
+import logo from '../../../images/logo.png';
 import './calendar.css';
 
 export default function Events() {
@@ -9,9 +10,7 @@ export default function Events() {
 
   const navigate = useNavigate();
   const [events, setEvents] = useState([]);
-  const [filteredEvents, setFilteredEvents] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [activeFilter, setActiveFilter] = useState('all'); // 'all' or 'members'
 
   useEffect(() => {
     const fetchEvents = async () => {
@@ -19,7 +18,6 @@ export default function Events() {
         const data = await getUpcomingEvents(100);
         console.log('Raw events from DB:', data);
         setEvents(data);
-        setFilteredEvents(data);
         setLoading(false);
       } catch (error) {
         console.error('Error fetching events:', error);
@@ -29,22 +27,21 @@ export default function Events() {
     fetchEvents();
   }, []);
 
-  // Filter events when activeFilter changes
-  useEffect(() => {
-    if (activeFilter === 'members') {
-      // Filter events that are for members only
-      const memberEvents = events.filter(event => event.is_member_only === true);
-      setFilteredEvents(memberEvents);
-    } else {
-      setFilteredEvents(events);
+  const formatTime = (timeString) => {
+    if (!timeString) return '';
+    try {
+      const [hours, minutes] = timeString.split(':');
+      const hour = parseInt(hours);
+      const ampm = hour >= 12 ? 'PM' : 'AM';
+      const hour12 = hour % 12 || 12;
+      return `${hour12}:${minutes} ${ampm}`;
+    } catch {
+      return timeString;
     }
-  }, [activeFilter, events]);
+  };
 
-
-  const parseDate = (dateString) => {
-    if (!dateString) return new Date();
-    const [year, month, day] = dateString.split('-');
-    return new Date(year, month - 1, day);
+  const getEventTime = (event) => {
+    return event.event_time || event.start_time || event.time;
   };
 
   const formatEventDate = (dateString) => {
@@ -70,9 +67,45 @@ export default function Events() {
     };
   };
 
+  const handleEventClick = (event) => {
+    const ticketStatus = getTicketStatus(event);
+    if (ticketStatus.status === 'sold_out') return;
+    
+    navigate('/tickets', {
+      state: {
+        preselectedEvent: {
+          id: event.event_id,
+          title: event.title,
+          date: event.event_date,
+          venue: event.venues?.venue_name
+        }
+      }
+    });
+  };
+
+  const getTicketStatus = (event) => {
+    const maxCapacity = event.max_capacity;
+    const ticketsSold = event.tickets_sold || 0;
+    const remaining = maxCapacity - ticketsSold;
+    
+    if (!maxCapacity || maxCapacity === 0) {
+      return { status: 'unlimited', text: 'Tickets Available', color: '#10b981', icon: FaCheckCircle };
+    }
+    
+    if (remaining <= 0) {
+      return { status: 'sold_out', text: 'Sold Out', color: '#ef4444', icon: FaExclamationTriangle };
+    }
+    
+    if (remaining <= 10) {
+      return { status: 'low', text: `Only ${remaining} left!`, color: '#f59e0b', icon: FaExclamationTriangle };
+    }
+    
+    return { status: 'available', text: `${remaining} tickets left`, color: '#10b981', icon: FaCheckCircle };
+  };
+
   const groupEventsByMonth = () => {
     const grouped = {};
-    filteredEvents.forEach(event => {
+    events.forEach(event => {
       if (!event.event_date) return;
       
       const [year, month] = event.event_date.split('-');
@@ -98,7 +131,7 @@ export default function Events() {
   const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
   return (
-    <div className="events-page" style = {{minHeight: "100vh", paddingBottom: "4rem"}}>
+    <div className="events-page">
       <div className="events-header-nav">
         <button className="back-button-events glass-button" onClick={() => navigate('/')}>
           ← Home
@@ -113,34 +146,15 @@ export default function Events() {
           </p>
         </div>
 
-        {/* Filter Buttons */}
-        <div className="filter-buttons-container">
-          <button 
-            className={`filter-button glass-button ${activeFilter === 'all' ? 'active' : ''}`}
-            onClick={() => setActiveFilter('all')}
-          >
-            <FaTicketAlt className="filter-icon" />
-            All Events
-          </button>
-          <button 
-            className={`filter-button glass-button ${activeFilter === 'members' ? 'active' : ''}`}
-            onClick={() => setActiveFilter('members')}
-          >
-            <FaStar className="filter-icon" />
-            Members Only
-          </button>
-        </div>
-
-        {/* Results Count */}
         <div className="results-count">
-          Showing {filteredEvents.length} {filteredEvents.length === 1 ? 'event' : 'events'}
+          Showing {events.length} {events.length === 1 ? 'event' : 'events'}
         </div>
 
         {loading ? (
           <div className="loading-state">Loading events...</div>
-        ) : filteredEvents.length === 0 ? (
+        ) : events.length === 0 ? (
           <div className="empty-state">
-            <p>No {activeFilter === 'members' ? 'members-only' : ''} events scheduled.</p>
+            <p>No events scheduled.</p>
             <p className="empty-subtitle">Check back soon for exciting events!</p>
           </div>
         ) : (
@@ -156,37 +170,64 @@ export default function Events() {
                 <div className="events-list">
                   {monthEvents.map((event, index) => {
                     const dateInfo = formatEventDate(event.event_date);
+                    const ticketStatus = getTicketStatus(event);
+                    const StatusIcon = ticketStatus.icon;
+                    const isSoldOut = ticketStatus.status === 'sold_out';
+                    const eventTime = getEventTime(event);
+                    
                     return (
-                      <div key={event.event_id || index} className="event-item glass-panel">
+                      <div 
+                        key={event.event_id || index} 
+                        className={`event-item glass-panel ${isSoldOut ? 'sold-out-event' : 'clickable-event'}`}
+                        onClick={() => handleEventClick(event)}
+                        style={isSoldOut ? { cursor: 'not-allowed', opacity: 0.7 } : {}}
+                      >
                         <div className="event-date-card">
                           <span className="event-date-month">{dateInfo.month}</span>
                           <span className="event-date-day">{dateInfo.day}</span>
                         </div>
                         
                         <div className="event-details">
-                          <div className="event-header">
-                            <h3 className="event-item-title">{event.title}</h3>
-                            {event.is_member_only && (
-                              <span className="member-badge">
-                                <FaStar /> Members Only
-                              </span>
-                            )}
-                          </div>
+                          <h3 className="event-item-title">{event.title}</h3>
                           
                           <div className="event-meta">
                             <div className="event-meta-item">
-                              <FaCalendarAlt className="meta-icon" style = {{ color: "var(--color-primary)", fontSize: "0.75rem"}} />
+                              <FaCalendarAlt className="meta-icon" />
                               <span>{dateInfo.full}</span>
                             </div>
+                            {eventTime && (
+                              <div className="event-meta-item">
+                                <FaClock className="meta-icon" />
+                                <span>{formatTime(eventTime)}</span>
+                              </div>
+                            )}
+                            {event.venues?.venue_name && (
+                              <div className="event-meta-item">
+                                <FaMapMarkerAlt className="meta-icon" />
+                                <span>{event.venues.venue_name}</span>
+                              </div>
+                            )}
                           </div>
                           
                           {event.description && (
                             <p className="event-description">{event.description}</p>
                           )}
                           
-                          {event.max_capacity && (
-                            <div className="event-capacity">
-                              🎟️ Max Capacity: {event.max_capacity} guests
+                          <div className={`ticket-status ${ticketStatus.status}`}>
+                            <StatusIcon className="status-icon" />
+                            <span style={{ color: ticketStatus.color }}>{ticketStatus.text}</span>
+                          </div>
+                          
+                          {!isSoldOut && (
+                            <div className="event-ticket-button">
+                              <FaTicketAlt className="ticket-icon" /> Get Tickets →
+                            </div>
+                          )}
+                          
+                          {isSoldOut && (
+                            <div className="sold-out-message">
+                              <FaExclamationTriangle className="sold-out-icon" />
+                              Sold Out - Check back for future dates
                             </div>
                           )}
                         </div>
@@ -199,6 +240,49 @@ export default function Events() {
           })
         )}
       </div>
+
+      {/* Footer */}
+      <footer className="footer">
+        <div className="footer-container">
+          <div className="footer-main">
+            <div className="footer-section footer-brand">
+              <div className="footer-logo">
+                <img src={logo} style={{ maxWidth: '200px', width: '100%', height: 'auto' }} alt="Coog Zoo" />
+              </div>
+              <p className="footer-description">
+                Discover amazing wildlife, attend exciting events, and support animal conservation at Coog Zoo.
+              </p>
+            </div>
+
+            <div className="footer-section">
+              <h3 className="footer-title">Contact Us</h3>
+              <div className="footer-contact-info">
+                <div className="contact-item">
+                  <FaMapMarkerAlt className="contact-icon" />
+                  <div>
+                    <p>4302 University Dr</p>
+                    <p>Houston, TX 77004</p>
+                  </div>
+                </div>
+                <div className="contact-item">
+                  <FaPhone className="contact-icon" />
+                  <a href="tel:5555555555">555-555-5555</a>
+                </div>
+                <div className="contact-item">
+                  <FaEnvelope className="contact-icon" />
+                  <a href="mailto:info@coogzoo.org">info@coogzoo.org</a>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="footer-bottom">
+            <div className="footer-bottom-content">
+              <p>&copy; {new Date().getFullYear()} Coog Zoo. All rights reserved.</p>
+            </div>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }

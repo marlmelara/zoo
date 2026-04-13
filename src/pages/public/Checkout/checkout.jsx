@@ -10,6 +10,7 @@ import { useAuth } from '../../../contexts/AuthContext';
 import { createTransaction, createSaleItems } from '../../../api/transactions';
 import { createReceipt } from '../../../api/receipts';
 import { supabase } from '../../../lib/supabase';
+import { incrementEventTicketsSold } from '../../../api/transactions';
 import './checkout.css';
 
 // ── Constants ──
@@ -318,7 +319,9 @@ export default function Checkout() {
         for (const evt of eventTicketList) {
           const base = evt.price_cents;
           const price = memberDiscount > 0 ? Math.round(base * (1 - memberDiscount)) : base;
-          for (let i = 0; i < (evt.quantity || 1); i++) {
+          const quantity = evt.quantity || 1;
+          
+          for (let i = 0; i < quantity; i++) {
             eventTicketRows.push({
               customer_id: customerId || null,
               type: 'event',
@@ -327,6 +330,9 @@ export default function Checkout() {
               event_id: evt.event_id,
             });
           }
+          
+          // Update tickets_sold count for this event
+          await incrementEventTicketsSold(evt.event_id, quantity);
         }
         const { error: evtErr } = await supabase.from('tickets').insert(eventTicketRows);
         if (evtErr) throw evtErr;

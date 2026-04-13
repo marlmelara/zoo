@@ -17,15 +17,25 @@ import 'swiper/css/effect-fade';
 export default function Home() {
   document.title = 'Welcome to Coog Zoo!';
 
-  const [todaySchedule, setTodaySchedule] = useState([]);
-  const [loading, setLoading] = useState(true);
+  // Static daily schedule for Today's Schedule section
+  const staticDailySchedule = [
+  { id: 1, time: '09:30:00', endTime: '10:00:00', title: 'Birds of the World', venue: 'Birds of the World' },
+  { id: 2, time: '10:00:00', endTime: '10:30:00', title: 'African Safari Talk', venue: 'Animals of Africa' },
+  { id: 3, time: '10:30:00', endTime: '11:00:00', title: 'Big Cats Feeding', venue: 'Big Cats Zone' },
+  { id: 4, time: '11:00:00', endTime: '11:30:00', title: 'Galápagos Giants', venue: 'Galápagos Island' },
+  { id: 5, time: '11:30:00', endTime: '12:00:00', title: 'Primate Playtime', venue: 'World of Primates' }
+];
+
+  // State for calendar 
   const [eventsByDate, setEventsByDate] = useState({});
   const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
   const [selectedDateEvents, setSelectedDateEvents] = useState(null);
+  const [calendarLoading, setCalendarLoading] = useState(true);
 
+  // Fetch events for calendar from database
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchCalendarEvents = async () => {
       try {
         const events = await getUpcomingEvents(100);
         
@@ -40,32 +50,18 @@ export default function Home() {
           eventsMap[dateKey].push(event);
         });
         setEventsByDate(eventsMap);
-        
-        const todayUTC = new Date();
-        const todayDate = new Date(Date.UTC(todayUTC.getFullYear(), todayUTC.getMonth(), todayUTC.getDate()));
-        const todayKey = todayDate.toDateString();
-        const todaysEvents = eventsMap[todayKey] || [];
-        
-        const sortedEvents = [...todaysEvents].sort((a, b) => {
-          if (a.event_time && b.event_time) {
-            return a.event_time.localeCompare(b.event_time);
-          }
-          return 0;
-        });
-        
-        setTodaySchedule(sortedEvents);
+        setCalendarLoading(false);
       } catch (error) {
-        console.error('Error fetching data:', error);
-      } finally {
-        setLoading(false);
+        console.error('Error fetching calendar events:', error);
+        setCalendarLoading(false);
       }
     };
 
-    fetchData();
+    fetchCalendarEvents();
   }, []);
 
   const formatTime = (timeString) => {
-    if (!timeString) return 'Time TBD';
+    if (!timeString) return 'TBD';
     try {
       const [hours, minutes] = timeString.split(':');
       const hour = parseInt(hours);
@@ -86,6 +82,12 @@ export default function Home() {
     });
   };
 
+  // Sort events by time for homepage display 
+  const sortedEvents = [...staticDailySchedule].sort((a, b) => {
+    return a.time.localeCompare(b.time);
+  });
+
+  // Calendar functions
   const generateCalendarDays = () => {
     const firstDay = new Date(Date.UTC(currentYear, currentMonth, 1));
     const lastDay = new Date(Date.UTC(currentYear, currentMonth + 1, 0));
@@ -121,9 +123,7 @@ export default function Home() {
     const year = date.getUTCFullYear();
     const month = date.getUTCMonth();
     const day = date.getUTCDate();
-    
     const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-  
     return `${monthNames[month]} ${day}, ${year}`;
   };
 
@@ -282,31 +282,21 @@ export default function Home() {
                 Schedule updated each morning before we open at 9 a.m.
               </div>
               
-              {loading ? (
-                <div className="loading-schedule">Loading schedule...</div>
-              ) : todaySchedule.length === 0 ? (
-                <div className="no-schedule">
-                  <p>No events scheduled for today.</p>
-                </div>
-              ) : (
-                <div className="schedule-table-home">
-                  {todaySchedule.map((event, index) => (
-                    <div key={event.event_id || index} className="schedule-row-home">
-                      <div className="schedule-time-home">
-                        {event.start_time && event.end_time
-                          ? `${formatTime(event.start_time)} – ${formatTime(event.end_time)}`
-                          : formatTime(event.event_time)}
-                      </div>
-                      <div className="schedule-event-home">
-                        {event.event_name || event.title}
-                        {event.venues?.venue_name && (
-                          <span className="schedule-venue-home"> @ {event.venues.venue_name}</span>
-                        )}
-                      </div>
+              <div className="schedule-table-home">
+                {sortedEvents.map((event) => (
+                  <div key={event.id} className="schedule-row-home">
+                    <div className="schedule-time-home">
+                      {event.endTime
+                        ? `${formatTime(event.time)} – ${formatTime(event.endTime)}`
+                        : formatTime(event.time)}
                     </div>
-                  ))}
-                </div>
-              )}
+                    <div className="schedule-event-home">
+                      {event.title}
+                      <span className="schedule-venue-home"> @ {event.venue}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
               
               <div className="schedule-footer-home">
                 <a href="/schedule" className="view-full-link">View Full Schedule →</a>
@@ -388,8 +378,8 @@ export default function Home() {
                 </div>
               </div>
             )}
-          </div> {/* This closes the home-right-column div */}
-        </div> {/* This closes the home-two-columns div */}
+          </div>
+        </div>
 
         {/* Support Wildlife Section */}
         <section className="content-section">

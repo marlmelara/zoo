@@ -146,26 +146,6 @@
   line-height: 1.4;
 }
 
-/* Loading and Empty States */
-.loading-state,
-.empty-state {
-  text-align: center;
-  padding: 3rem;
-  border: 1px solid var(--glass-border);
-  border-radius: 8px;
-  margin-bottom: 2rem;
-}
-
-.empty-state p {
-  color: var(--color-text-muted);
-  margin-bottom: 0.5rem;
-}
-
-.empty-subtitle {
-  font-size: 0.85rem;
-  opacity: 0.7;
-}
-
 /* Note Section */
 .note-section {
   margin-top: 2rem;

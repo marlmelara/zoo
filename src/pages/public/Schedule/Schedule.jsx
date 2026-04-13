@@ -1,7 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FaClock, FaMapMarkerAlt, FaPhone, FaEnvelope } from 'react-icons/fa';
-import { getUpcomingEvents } from '../../../api/public';
 import logo from '../../../images/logo.png';
 import './schedule.css'; 
 
@@ -9,38 +8,98 @@ export default function Schedule() {
   document.title = 'Event Schedule - Coog Zoo';
   
   const navigate = useNavigate();
-  const [events, setEvents] = useState([]);
-  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const fetchEvents = async () => {
-      try {
-        const data = await getUpcomingEvents();
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        
-        const todayEvents = data.filter(event => {
-          const eventDate = new Date(event.event_date + 'T00:00:00');
-          eventDate.setHours(0, 0, 0, 0);
-          return eventDate.getTime() === today.getTime();
-        });
-
-        const sortedEvents = [...todayEvents].sort((a, b) => {
-          const timeA = a.start_time || a.event_time || '';
-          const timeB = b.start_time || b.event_time || '';
-          return timeA.localeCompare(timeB);
-        });
-        
-        setEvents(sortedEvents);
-        setLoading(false);
-      } catch (error) {
-        console.error('Error fetching events:', error);
-        setLoading(false);
-      }
-    };
-
-    fetchEvents();
-  }, []);
+  // Static daily schedule - same for every day
+  const dailySchedule = [
+    {
+      id: 1,
+      time: '09:30:00',
+      endTime: '10:00:00',
+      location: 'Birds of the World',
+      title: 'Birds of the World',
+      description: 'Fly by the Birds of the World exhibit to learn more about one of our beautiful avian friends!'
+    },
+    {
+      id: 2,
+      time: '10:00:00',
+      endTime: '10:30:00',
+      location: 'Animals of Africa',
+      title: 'African Safari Talk',
+      description: 'Join us to learn about the magnificent animals that call the African savanna home!'
+    },
+    {
+      id: 3,
+      time: '10:30:00',
+      endTime: '11:00:00',
+      location: 'Big Cats Zone',
+      title: 'Big Cats Feeding',
+      description: 'Watch our majestic lions and tigers during feeding time!'
+    },
+    {
+      id: 4,
+      time: '11:00:00',
+      endTime: '11:30:00',
+      location: 'Galápagos Island',
+      title: 'Galápagos Giants',
+      description: 'Meet our giant tortoises and learn about the unique wildlife of the Galápagos Islands!'
+    },
+    {
+      id: 5,
+      time: '11:30:00',
+      endTime: '12:00:00',
+      location: 'World of Primates',
+      title: 'Primate Playtime',
+      description: 'Watch our playful primates swing, climb, and interact during enrichment time!'
+    },
+    {
+      id: 6,
+      time: '13:00:00',
+      endTime: '13:30:00',
+      location: 'Elephants of Asia',
+      title: 'Elephant Encounter',
+      description: 'Meet our Asian elephants and learn about conservation efforts to protect these gentle giants!'
+    },
+    {
+      id: 7,
+      time: '14:00:00',
+      endTime: '14:30:00',
+      location: 'Reptile Lair',
+      title: 'Reptile Rendezvous',
+      description: 'Get up close with snakes, lizards, and turtles in our Reptile Lair!'
+    },
+    {
+      id: 8,
+      time: '14:30:00',
+      endTime: '15:00:00',
+      location: 'Animals of Africa',
+      title: 'Giraffe Feeding',
+      description: 'Feed our gentle giraffes and learn about these amazing animals!'
+    },
+    {
+      id: 9,
+      time: '15:00:00',
+      endTime: '15:30:00',
+      location: 'Children\'s Zoo',
+      title: 'Goat Yard',
+      description: 'Visit and pet our friendly goats at the Children\'s Zoo petting yard!'
+    },
+    {
+      id: 10,
+      time: '15:30:00',
+      endTime: '16:00:00',
+      location: 'Birds of the World',
+      title: 'Bird Show',
+      description: 'Watch our amazing birds soar and show off their natural behaviors!'
+    },
+    {
+      id: 11,
+      time: '16:00:00',
+      endTime: '16:30:00',
+      location: 'Big Cats Zone',
+      title: 'Big Cats Evening Enrichment',
+      description: 'See our big cats become active as the day cools down!'
+    }
+  ];
 
   const formatTime = (timeString) => {
     if (!timeString) return 'TBD';
@@ -63,6 +122,11 @@ export default function Schedule() {
       day: 'numeric' 
     }).toUpperCase();
   };
+
+  // Sort events by time
+  const sortedEvents = [...dailySchedule].sort((a, b) => {
+    return a.time.localeCompare(b.time);
+  });
 
   return (
     <div className="schedule-page">
@@ -92,37 +156,26 @@ export default function Schedule() {
         </div>
 
         {/* Schedule Table */}
-        {loading ? (
-          <div className="loading-state">
-            <p>Loading schedule...</p>
-          </div>
-        ) : events.length === 0 ? (
-          <div className="empty-state">
-            <p>No scheduled events for today.</p>
-            <p className="empty-subtitle">Check back tomorrow for exciting animal encounters!</p>
-          </div>
-        ) : (
-          <div className="schedule-table">
-            {events.map((event, index) => (
-              <div key={event.event_id || index} className="schedule-row">
-                <div className="schedule-time-cell">
-                  {event.start_time && event.end_time
-                    ? `${formatTime(event.start_time)} – ${formatTime(event.end_time)}`
-                    : formatTime(event.start_time || event.event_time)}
-                </div>
-                <div className="schedule-location-cell">
-                  @ {event.venues?.venue_name || 'Zoo Exhibit'}
-                </div>
-                <div className="schedule-event-cell">
-                  <div className="event-title">{event.title || event.event_name}</div>
-                  <div className="event-description">
-                    {event.description || event.event_description || 'Join us to learn more about our amazing animals!'}
-                  </div>
+        <div className="schedule-table">
+          {sortedEvents.map((event) => (
+            <div key={event.id} className="schedule-row">
+              <div className="schedule-time-cell">
+                {event.endTime
+                  ? `${formatTime(event.time)} – ${formatTime(event.endTime)}`
+                  : formatTime(event.time)}
+              </div>
+              <div className="schedule-location-cell">
+                @ {event.location}
+              </div>
+              <div className="schedule-event-cell">
+                <div className="event-title">{event.title}</div>
+                <div className="event-description">
+                  {event.description}
                 </div>
               </div>
-            ))}
-          </div>
-        )}
+            </div>
+          ))}
+        </div>
 
         {/* Note Section */}
         <div className="note-section">

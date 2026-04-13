@@ -4,13 +4,13 @@ import { useAuth } from '../../../contexts/AuthContext';
 import { supabase } from '../../../lib/supabase';
 import {
     User, Ticket, Heart, Calendar, MapPin, Phone, Mail,
-    Star, Gift, ShoppingCart, RefreshCw
+    Star, Gift, ShoppingCart, RefreshCw, Clock, Package, Trash2, AlertTriangle
 } from 'lucide-react';
 
-const TABS = ['My Profile', 'My Tickets', 'My Donations', 'Upcoming Events'];
+const TABS = ['My Profile', 'My Purchases', 'My Tickets', 'My Donations', 'Events'];
 
 export default function CustomerDashboard() {
-    const { user, customerId } = useAuth();
+    const { user, customerId, signOut } = useAuth();
     const navigate = useNavigate();
     const [activeTab, setActiveTab] = useState('My Profile');
 
@@ -26,8 +26,24 @@ export default function CustomerDashboard() {
     const [events, setEvents] = useState([]);
     const [eventsLoading, setEventsLoading] = useState(true);
 
+    const [purchases, setPurchases] = useState([]);
+    const [purchasesLoading, setPurchasesLoading] = useState(true);
+
     const [editing, setEditing] = useState(false);
     const [editForm, setEditForm] = useState({});
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+    const [deleting, setDeleting] = useState(false);
+
+    // ── Filters ──
+    const [purchaseDateFrom, setPurchaseDateFrom] = useState('');
+    const [purchaseDateTo, setPurchaseDateTo] = useState('');
+    const [ticketDateFrom, setTicketDateFrom] = useState('');
+    const [ticketDateTo, setTicketDateTo] = useState('');
+    const [donationDateFrom, setDonationDateFrom] = useState('');
+    const [donationDateTo, setDonationDateTo] = useState('');
+    const [eventsFilter, setEventsFilter] = useState('upcoming');
+    const [eventsDateFrom, setEventsDateFrom] = useState('');
+    const [eventsDateTo, setEventsDateTo] = useState('');
 
     useEffect(() => {
         if (!user?.id) return;
@@ -35,6 +51,7 @@ export default function CustomerDashboard() {
         fetchTickets();
         fetchDonations();
         fetchEvents();
+        fetchPurchases();
     }, [user?.id]);
 
     async function fetchProfile() {
@@ -67,7 +84,7 @@ export default function CustomerDashboard() {
 
             const { data, error } = await supabase
                 .from('tickets')
-                .select('*, events(title, event_date)')
+                .select('*, events(title, event_date, description, start_time, end_time, venues(venue_name, location)), transactions(transaction_date)')
                 .eq('customer_id', custData.customer_id)
                 .order('ticket_id', { ascending: false });
 
@@ -121,8 +138,7 @@ export default function CustomerDashboard() {
             const { data, error } = await supabase
                 .from('events')
                 .select('*, venues(venue_name, location)')
-                .gte('event_date', new Date().toISOString().split('T')[0])
-                .order('event_date', { ascending: true });
+                .order('event_date', { ascending: false });
 
             if (error) throw error;
             setEvents(data || []);
@@ -130,6 +146,55 @@ export default function CustomerDashboard() {
             console.error('Error fetching events:', err);
         } finally {
             setEventsLoading(false);
+        }
+    }
+
+    async function fetchPurchases() {
+        try {
+            const { data: custData } = await supabase
+                .from('customers')
+                .select('customer_id')
+                .eq('user_id', user.id)
+                .single();
+
+            if (!custData) { setPurchasesLoading(false); return; }
+
+            // Get all non-donation transactions with their receipts
+            const { data, error } = await supabase
+                .from('transactions')
+                .select('*, receipts(*)')
+                .eq('customer_id', custData.customer_id)
+                .eq('is_donation', false)
+                .order('transaction_date', { ascending: false });
+
+            if (error) throw error;
+            setPurchases(data || []);
+        } catch (err) {
+            console.error('Error fetching purchases:', err);
+        } finally {
+            setPurchasesLoading(false);
+        }
+    }
+
+    async function handleDeleteAccount() {
+        try {
+            setDeleting(true);
+            // Delete customer record from DB
+            if (customerId) {
+                // Delete related records first
+                await supabase.from('tickets').delete().eq('customer_id', customerId);
+                await supabase.from('donations').update({ customer_id: null }).eq('customer_id', customerId);
+                await supabase.from('transactions').update({ customer_id: null }).eq('customer_id', customerId);
+                await supabase.from('customers').delete().eq('customer_id', customerId);
+            }
+            // Sign out and redirect home
+            await signOut();
+            navigate('/');
+        } catch (err) {
+            console.error('Error deleting account:', err);
+            alert('Failed to delete account: ' + err.message);
+        } finally {
+            setDeleting(false);
         }
     }
 
@@ -268,7 +333,8 @@ export default function CustomerDashboard() {
                                 </div>
                                 <div>
                                     <label style={{ fontSize: '12px', color: 'var(--color-text-muted)', display: 'block', marginBottom: '5px' }}>State</label>
-                                    <select className="glass-input" value={editForm.state || 'Texas'} onChange={e => setEditForm({ ...editForm, state: e.target.value })} style={{ padding: '12px', width: '100%', boxSizing: 'border-box' }}>
+                                    <select className="glass-input" value={editForm.state || ''} onChange={e => setEditForm({ ...editForm, state: e.target.value })} style={{ padding: '12px', width: '100%', boxSizing: 'border-box' }}>
+                                        <option value="">Select a state</option>
                                         {US_STATES.map(s => <option key={s} value={s}>{s}</option>)}
                                     </select>
                                 </div>
@@ -352,6 +418,21 @@ export default function CustomerDashboard() {
                                 </div>
                             </div>
 
+                            {/* Profile Completion Prompt */}
+                            {(!profile.phone || !profile.address || !profile.date_of_birth) && (
+                                <div style={{ marginBottom: '20px', padding: '16px 20px', background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.3)', borderRadius: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <div>
+                                        <p style={{ margin: '0 0 4px', fontWeight: 600, fontSize: '0.9rem' }}>Complete your profile</p>
+                                        <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
+                                            Add your {[!profile.phone && 'phone number', !profile.date_of_birth && 'date of birth', !profile.address && 'address'].filter(Boolean).join(', ')} for faster checkout.
+                                        </p>
+                                    </div>
+                                    <button className="glass-button" onClick={() => setEditing(true)} style={{ padding: '8px 16px', fontSize: '0.8rem', background: 'rgba(59,130,246,0.25)', flexShrink: 0 }}>
+                                        Edit Profile
+                                    </button>
+                                </div>
+                            )}
+
                             {/* Membership Card */}
                             <div className="glass-panel" style={{ padding: '25px' }}>
                                 <h3 style={{ margin: '0 0 15px', display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -417,6 +498,138 @@ export default function CustomerDashboard() {
                                     </div>
                                 )}
                             </div>
+
+                            {/* Delete Account */}
+                            <div style={{ marginTop: '30px', padding: '20px', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '12px', background: 'rgba(239,68,68,0.05)' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <div>
+                                        <h4 style={{ margin: '0 0 4px', color: '#f87171', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                            <AlertTriangle size={16} /> Delete Account
+                                        </h4>
+                                        <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
+                                            Permanently delete your account and all associated data. This action cannot be undone.
+                                        </p>
+                                    </div>
+                                    <button className="glass-button" onClick={() => setShowDeleteConfirm(true)} style={{ background: 'rgba(239,68,68,0.2)', border: '1px solid rgba(239,68,68,0.4)', color: '#f87171', padding: '8px 16px', fontSize: '0.8rem', flexShrink: 0 }}>
+                                        <Trash2 size={14} style={{ marginRight: '6px', verticalAlign: 'middle' }} /> Delete Account
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Delete Confirmation Modal */}
+                            {showDeleteConfirm && (
+                                <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.7)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }} onClick={() => setShowDeleteConfirm(false)}>
+                                    <div className="glass-panel" onClick={e => e.stopPropagation()} style={{ padding: '30px', maxWidth: '440px', width: '100%', textAlign: 'center' }}>
+                                        <AlertTriangle size={48} color="#ef4444" style={{ marginBottom: '16px' }} />
+                                        <h2 style={{ margin: '0 0 8px' }}>Are you sure?</h2>
+                                        <p style={{ color: 'var(--color-text-muted)', fontSize: '0.9rem', marginBottom: '24px' }}>
+                                            This will permanently delete your account, purchase history, and all associated data. This action <strong style={{ color: '#f87171' }}>cannot be undone</strong>.
+                                        </p>
+                                        <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+                                            <button className="glass-button" onClick={() => setShowDeleteConfirm(false)} style={{ padding: '10px 24px', background: 'rgba(255,255,255,0.1)' }}>
+                                                Cancel
+                                            </button>
+                                            <button className="glass-button" onClick={handleDeleteAccount} disabled={deleting} style={{ padding: '10px 24px', background: '#ef4444', color: 'white' }}>
+                                                {deleting ? 'Deleting...' : 'Yes, Delete My Account'}
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* ═══════════ MY PURCHASES TAB ═══════════ */}
+            {activeTab === 'My Purchases' && (
+                <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+                        <h2 style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: 0 }}>
+                            <Package size={24} /> My Purchases
+                        </h2>
+                        <button className="glass-button" onClick={() => navigate('/tickets')} style={{ background: 'var(--color-secondary)', padding: '8px 18px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <ShoppingCart size={14} /> Shop Now
+                        </button>
+                    </div>
+                    {/* Date Range Filter */}
+                    {purchases.length > 0 && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '15px', flexWrap: 'wrap' }}>
+                            <span style={{ fontSize: '13px', color: 'var(--color-text-muted)' }}>Filter by date:</span>
+                            <input type="date" className="glass-input" value={purchaseDateFrom} onChange={e => setPurchaseDateFrom(e.target.value)} style={{ padding: '6px 10px', fontSize: '13px', width: 'auto' }} />
+                            <span style={{ color: 'var(--color-text-muted)' }}>to</span>
+                            <input type="date" className="glass-input" value={purchaseDateTo} onChange={e => setPurchaseDateTo(e.target.value)} style={{ padding: '6px 10px', fontSize: '13px', width: 'auto' }} />
+                            {(purchaseDateFrom || purchaseDateTo) && (
+                                <button className="glass-button" onClick={() => { setPurchaseDateFrom(''); setPurchaseDateTo(''); }} style={{ padding: '6px 12px', fontSize: '12px' }}>Clear</button>
+                            )}
+                        </div>
+                    )}
+                    {purchasesLoading ? <p>Loading purchases...</p> : purchases.length === 0 ? (
+                        <div className="glass-panel" style={{ padding: '40px', textAlign: 'center', color: 'var(--color-text-muted)' }}>
+                            <Package size={48} style={{ marginBottom: '15px', opacity: 0.3 }} />
+                            <p>No purchases yet.</p>
+                            <p style={{ fontSize: '13px', marginBottom: '15px' }}>Your order history and itemized receipts will appear here.</p>
+                            <button className="glass-button" onClick={() => navigate('/tickets')} style={{ background: 'var(--color-primary)', padding: '10px 24px' }}>
+                                Browse Tickets & Shop
+                            </button>
+                        </div>
+                    ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                            {purchases.filter(txn => {
+                                const d = new Date(txn.transaction_date);
+                                if (purchaseDateFrom && d < new Date(purchaseDateFrom + 'T00:00:00')) return false;
+                                if (purchaseDateTo && d > new Date(purchaseDateTo + 'T23:59:59')) return false;
+                                return true;
+                            }).map(txn => {
+                                const receipt = txn.receipts?.[0] || null;
+                                const lineItems = receipt?.line_items || [];
+                                return (
+                                    <div key={txn.transaction_id} className="glass-panel" style={{ padding: '20px' }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: lineItems.length > 0 ? '12px' : 0 }}>
+                                            <div>
+                                                <h3 style={{ margin: '0 0 4px', fontSize: '1rem' }}>
+                                                    Order #{txn.transaction_id}
+                                                </h3>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: 'var(--color-text-muted)' }}>
+                                                    <Clock size={12} />
+                                                    {new Date(txn.transaction_date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
+                                                    {' at '}
+                                                    {new Date(txn.transaction_date).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}
+                                                </div>
+                                            </div>
+                                            <p style={{ fontWeight: 'bold', fontSize: '18px', margin: 0, color: 'var(--color-primary)' }}>
+                                                ${(txn.total_amount_cents / 100).toFixed(2)}
+                                            </p>
+                                        </div>
+                                        {lineItems.length > 0 && (
+                                            <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', padding: '12px' }}>
+                                                {lineItems.map((item, idx) => (
+                                                    <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 0', borderBottom: idx < lineItems.length - 1 ? '1px solid rgba(255,255,255,0.06)' : 'none' }}>
+                                                        <span style={{ fontSize: '13px' }}>
+                                                            {item.description} <span style={{ color: 'var(--color-text-muted)' }}>x{item.quantity}</span>
+                                                        </span>
+                                                        <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-primary)' }}>
+                                                            ${((item.unitPriceCents * item.quantity) / 100).toFixed(2)}
+                                                        </span>
+                                                    </div>
+                                                ))}
+                                                {receipt && (
+                                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '8px', paddingTop: '8px', borderTop: '1px solid rgba(255,255,255,0.1)', fontSize: '12px', color: 'var(--color-text-muted)' }}>
+                                                        <span>Subtotal: ${(receipt.subtotal_cents / 100).toFixed(2)}</span>
+                                                        <span>Tax: ${(receipt.tax_cents / 100).toFixed(2)}</span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                            <div style={{ background: 'rgba(255,255,255,0.05)', padding: '15px', borderRadius: '10px', textAlign: 'right' }}>
+                                <span style={{ color: 'var(--color-text-muted)', marginRight: '15px' }}>Total Spent:</span>
+                                <span style={{ fontWeight: 'bold', fontSize: '20px', color: 'var(--color-primary)' }}>
+                                    ${(purchases.reduce((sum, t) => sum + t.total_amount_cents, 0) / 100).toFixed(2)}
+                                </span>
+                            </div>
                         </div>
                     )}
                 </div>
@@ -439,6 +652,18 @@ export default function CustomerDashboard() {
                             As a <strong style={{ textTransform: 'capitalize' }}>{profile.membership_type}</strong> member, you get free general admission and discounted rates on event tickets!
                         </div>
                     )}
+                    {/* Date Range Filter */}
+                    {tickets.length > 0 && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '15px', flexWrap: 'wrap' }}>
+                            <span style={{ fontSize: '13px', color: 'var(--color-text-muted)' }}>Filter by date:</span>
+                            <input type="date" className="glass-input" value={ticketDateFrom} onChange={e => setTicketDateFrom(e.target.value)} style={{ padding: '6px 10px', fontSize: '13px', width: 'auto' }} />
+                            <span style={{ color: 'var(--color-text-muted)' }}>to</span>
+                            <input type="date" className="glass-input" value={ticketDateTo} onChange={e => setTicketDateTo(e.target.value)} style={{ padding: '6px 10px', fontSize: '13px', width: 'auto' }} />
+                            {(ticketDateFrom || ticketDateTo) && (
+                                <button className="glass-button" onClick={() => { setTicketDateFrom(''); setTicketDateTo(''); }} style={{ padding: '6px 12px', fontSize: '12px' }}>Clear</button>
+                            )}
+                        </div>
+                    )}
                     {ticketsLoading ? <p>Loading tickets...</p> : tickets.length === 0 ? (
                         <div className="glass-panel" style={{ padding: '40px', textAlign: 'center', color: 'var(--color-text-muted)' }}>
                             <Ticket size={48} style={{ marginBottom: '15px', opacity: 0.3 }} />
@@ -450,35 +675,65 @@ export default function CustomerDashboard() {
                         </div>
                     ) : (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                            {tickets.map(ticket => (
+                            {tickets.filter(ticket => {
+                                const d = ticket.transactions?.transaction_date ? new Date(ticket.transactions.transaction_date) : null;
+                                if (!d) return true;
+                                if (ticketDateFrom && d < new Date(ticketDateFrom + 'T00:00:00')) return false;
+                                if (ticketDateTo && d > new Date(ticketDateTo + 'T23:59:59')) return false;
+                                return true;
+                            }).map(ticket => {
+                                const isEvent = ticket.type === 'event' && ticket.events;
+                                const purchaseDate = ticket.transactions?.transaction_date;
+                                return (
                                 <div key={ticket.ticket_id} className="glass-panel" style={{ padding: '20px' }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
+                                        <div style={{ display: 'flex', alignItems: 'start', gap: '15px', flex: 1 }}>
                                             <div style={{
                                                 width: '45px', height: '45px', borderRadius: '10px',
-                                                background: 'rgba(16, 185, 129, 0.2)', display: 'flex',
-                                                alignItems: 'center', justifyContent: 'center'
+                                                background: isEvent ? 'rgba(245,158,11,0.2)' : 'rgba(16, 185, 129, 0.2)',
+                                                display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
                                             }}>
-                                                <Ticket size={22} color="var(--color-primary)" />
+                                                {isEvent ? <Calendar size={22} color="#f59e0b" /> : <Ticket size={22} color="var(--color-primary)" />}
                                             </div>
-                                            <div>
-                                                <h3 style={{ margin: '0 0 3px' }}>
-                                                    {ticket.events?.title || 'General Admission'}
+                                            <div style={{ flex: 1 }}>
+                                                <h3 style={{ margin: '0 0 4px' }}>
+                                                    {isEvent ? ticket.events.title : 'General Admission'}
                                                 </h3>
                                                 <span style={{
-                                                    fontSize: '12px', padding: '2px 8px', borderRadius: '10px',
-                                                    background: 'rgba(255,255,255,0.1)', textTransform: 'capitalize'
+                                                    fontSize: '11px', padding: '2px 8px', borderRadius: '10px',
+                                                    background: isEvent ? 'rgba(245,158,11,0.15)' : 'rgba(255,255,255,0.1)',
+                                                    color: isEvent ? '#fbbf24' : 'inherit',
+                                                    textTransform: 'capitalize'
                                                 }}>
-                                                    {ticketTypeLabel(ticket.type)}
+                                                    {isEvent ? 'Event' : ticketTypeLabel(ticket.type)}
                                                 </span>
-                                                {ticket.events?.event_date && (
-                                                    <span style={{ fontSize: '12px', color: 'var(--color-text-muted)', marginLeft: '10px' }}>
-                                                        {new Date(ticket.events.event_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                                                    </span>
+                                                {isEvent && (
+                                                    <div style={{ marginTop: '8px' }}>
+                                                        {ticket.events.description && (
+                                                            <p style={{ fontSize: '13px', color: 'var(--color-text-muted)', margin: '0 0 4px' }}>{ticket.events.description}</p>
+                                                        )}
+                                                        <p style={{ fontSize: '13px', color: 'var(--color-secondary)', fontWeight: 600, margin: '0 0 3px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                                            <Clock size={12} />
+                                                            {new Date(ticket.events.event_date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
+                                                            {ticket.events.start_time && ` · ${formatTime(ticket.events.start_time)}`}
+                                                            {ticket.events.end_time && ` – ${formatTime(ticket.events.end_time)}`}
+                                                        </p>
+                                                        {ticket.events.venues?.venue_name && (
+                                                            <p style={{ fontSize: '12px', color: 'var(--color-text-muted)', margin: '0', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                                                <MapPin size={12} /> {ticket.events.venues.venue_name}{ticket.events.venues.location ? ` — ${ticket.events.venues.location}` : ''}
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                )}
+                                                {purchaseDate && (
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '12px', color: 'var(--color-text-muted)', marginTop: '6px' }}>
+                                                        <Clock size={11} />
+                                                        Purchased {new Date(purchaseDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} at {new Date(purchaseDate).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}
+                                                    </div>
                                                 )}
                                             </div>
                                         </div>
-                                        <div style={{ textAlign: 'right' }}>
+                                        <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: '12px' }}>
                                             <p style={{ fontWeight: 'bold', fontSize: '18px', margin: 0, color: 'var(--color-primary)' }}>
                                                 ${(ticket.price_cents / 100).toFixed(2)}
                                             </p>
@@ -488,7 +743,8 @@ export default function CustomerDashboard() {
                                         </div>
                                     </div>
                                 </div>
-                            ))}
+                                );
+                            })}
                             <div style={{ background: 'rgba(255,255,255,0.05)', padding: '15px', borderRadius: '10px', textAlign: 'right' }}>
                                 <span style={{ color: 'var(--color-text-muted)', marginRight: '15px' }}>Total Spent:</span>
                                 <span style={{ fontWeight: 'bold', fontSize: '20px', color: 'var(--color-primary)' }}>
@@ -511,6 +767,18 @@ export default function CustomerDashboard() {
                             <Heart size={14} /> Make a Donation
                         </button>
                     </div>
+                    {/* Date Range Filter */}
+                    {donations.length > 0 && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '15px', flexWrap: 'wrap' }}>
+                            <span style={{ fontSize: '13px', color: 'var(--color-text-muted)' }}>Filter by date:</span>
+                            <input type="date" className="glass-input" value={donationDateFrom} onChange={e => setDonationDateFrom(e.target.value)} style={{ padding: '6px 10px', fontSize: '13px', width: 'auto' }} />
+                            <span style={{ color: 'var(--color-text-muted)' }}>to</span>
+                            <input type="date" className="glass-input" value={donationDateTo} onChange={e => setDonationDateTo(e.target.value)} style={{ padding: '6px 10px', fontSize: '13px', width: 'auto' }} />
+                            {(donationDateFrom || donationDateTo) && (
+                                <button className="glass-button" onClick={() => { setDonationDateFrom(''); setDonationDateTo(''); }} style={{ padding: '6px 12px', fontSize: '12px' }}>Clear</button>
+                            )}
+                        </div>
+                    )}
                     {donationsLoading ? <p>Loading donations...</p> : donations.length === 0 ? (
                         <div className="glass-panel" style={{ padding: '40px', textAlign: 'center', color: 'var(--color-text-muted)' }}>
                             <Heart size={48} style={{ marginBottom: '15px', opacity: 0.3 }} />
@@ -522,7 +790,13 @@ export default function CustomerDashboard() {
                         </div>
                     ) : (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                            {donations.map(donation => (
+                            {donations.filter(donation => {
+                                const d = donation.donation_date ? new Date(donation.donation_date) : null;
+                                if (!d) return true;
+                                if (donationDateFrom && d < new Date(donationDateFrom + 'T00:00:00')) return false;
+                                if (donationDateTo && d > new Date(donationDateTo + 'T23:59:59')) return false;
+                                return true;
+                            }).map(donation => (
                                 <div key={donation.donation_id} className="glass-panel" style={{ padding: '20px' }}>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
@@ -535,11 +809,12 @@ export default function CustomerDashboard() {
                                             </div>
                                             <div>
                                                 <h3 style={{ margin: '0 0 3px' }}>Donation</h3>
-                                                <span style={{ fontSize: '13px', color: 'var(--color-text-muted)' }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: 'var(--color-text-muted)' }}>
+                                                    <Clock size={12} />
                                                     {donation.donation_date
-                                                        ? new Date(donation.donation_date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+                                                        ? `${new Date(donation.donation_date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })} at ${new Date(donation.donation_date).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}`
                                                         : 'Date not recorded'}
-                                                </span>
+                                                </div>
                                             </div>
                                         </div>
                                         <p style={{ fontWeight: 'bold', fontSize: '18px', margin: 0, color: '#ef4444' }}>
@@ -559,73 +834,128 @@ export default function CustomerDashboard() {
                 </div>
             )}
 
-            {/* ═══════════ UPCOMING EVENTS TAB ═══════════ */}
-            {activeTab === 'Upcoming Events' && (
+            {/* ═══════════ EVENTS TAB ═══════════ */}
+            {activeTab === 'Events' && (
                 <div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
                         <h2 style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: 0 }}>
-                            <Calendar size={24} /> Upcoming Events
+                            <Calendar size={24} /> Events
                         </h2>
                         <button className="glass-button" onClick={() => navigate('/tickets')} style={{ background: 'var(--color-secondary)', padding: '8px 18px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
                             <Ticket size={14} /> Buy Event Tickets
                         </button>
                     </div>
+                    {/* Upcoming / All Toggle + Date Range */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '15px', flexWrap: 'wrap' }}>
+                        <div style={{ display: 'flex', borderRadius: '8px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.15)' }}>
+                            {['upcoming', 'all'].map(f => (
+                                <button key={f} className="glass-button" onClick={() => setEventsFilter(f)} style={{
+                                    padding: '6px 16px', fontSize: '13px', borderRadius: 0,
+                                    background: eventsFilter === f ? 'var(--color-primary)' : 'rgba(255,255,255,0.05)',
+                                    fontWeight: eventsFilter === f ? 700 : 400,
+                                    textTransform: 'capitalize',
+                                }}>
+                                    {f === 'upcoming' ? 'Upcoming' : 'All Events'}
+                                </button>
+                            ))}
+                        </div>
+                        <span style={{ fontSize: '13px', color: 'var(--color-text-muted)', marginLeft: '6px' }}>Date range:</span>
+                        <input type="date" className="glass-input" value={eventsDateFrom} onChange={e => setEventsDateFrom(e.target.value)} style={{ padding: '6px 10px', fontSize: '13px', width: 'auto' }} />
+                        <span style={{ color: 'var(--color-text-muted)' }}>to</span>
+                        <input type="date" className="glass-input" value={eventsDateTo} onChange={e => setEventsDateTo(e.target.value)} style={{ padding: '6px 10px', fontSize: '13px', width: 'auto' }} />
+                        {(eventsDateFrom || eventsDateTo) && (
+                            <button className="glass-button" onClick={() => { setEventsDateFrom(''); setEventsDateTo(''); }} style={{ padding: '6px 12px', fontSize: '12px' }}>Clear</button>
+                        )}
+                    </div>
                     {eventsLoading ? <p>Loading events...</p> : events.length === 0 ? (
                         <div className="glass-panel" style={{ padding: '40px', textAlign: 'center', color: 'var(--color-text-muted)' }}>
                             <Calendar size={48} style={{ marginBottom: '15px', opacity: 0.3 }} />
-                            <p>No upcoming events at this time.</p>
+                            <p>No events at this time.</p>
                         </div>
                     ) : (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                            {events.map(event => (
-                                <div key={event.event_id} className="glass-panel" style={{ padding: '20px' }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
-                                        <div>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '5px' }}>
-                                                <Calendar color="var(--color-secondary)" size={20} />
-                                                <h3 style={{ margin: 0 }}>{event.title}</h3>
+                            {events.filter(event => {
+                                const eventDate = new Date(event.event_date + 'T00:00:00');
+                                const today = new Date(); today.setHours(0, 0, 0, 0);
+                                if (eventsFilter === 'upcoming' && eventDate < today) return false;
+                                if (eventsDateFrom && eventDate < new Date(eventsDateFrom + 'T00:00:00')) return false;
+                                if (eventsDateTo && eventDate > new Date(eventsDateTo + 'T23:59:59')) return false;
+                                return true;
+                            }).map(event => {
+                                const eventDate = new Date(event.event_date + 'T00:00:00');
+                                const today = new Date(); today.setHours(0, 0, 0, 0);
+                                const isPast = eventDate < today;
+                                return (
+                                    <div key={event.event_id} className="glass-panel" style={{ padding: '20px', opacity: isPast ? 0.65 : 1 }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
+                                            <div style={{ flex: 1 }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '5px', flexWrap: 'wrap' }}>
+                                                    <Calendar color={isPast ? 'var(--color-text-muted)' : 'var(--color-secondary)'} size={20} />
+                                                    <h3 style={{ margin: 0 }}>{event.title}</h3>
+                                                    <span style={{
+                                                        fontSize: '11px', padding: '2px 10px', borderRadius: '10px', fontWeight: 600,
+                                                        background: isPast ? 'rgba(255,255,255,0.08)' : 'rgba(16,185,129,0.15)',
+                                                        color: isPast ? 'var(--color-text-muted)' : '#6ee7b7',
+                                                    }}>
+                                                        {isPast ? 'Past' : 'Upcoming'}
+                                                    </span>
+                                                </div>
+                                                {event.description && (
+                                                    <p style={{ fontSize: '14px', color: 'var(--color-text-muted)', margin: '5px 0' }}>{event.description}</p>
+                                                )}
+                                                <p style={{ color: isPast ? 'var(--color-text-muted)' : 'var(--color-secondary)', fontWeight: 600, fontSize: '14px', margin: '5px 0', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                    <Clock size={13} />
+                                                    {eventDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
+                                                    {event.start_time && ` · ${formatTime(event.start_time)}`}
+                                                    {event.end_time && ` – ${formatTime(event.end_time)}`}
+                                                </p>
+                                                {event.venues?.venue_name && (
+                                                    <p style={{ fontSize: '13px', color: 'var(--color-text-muted)', margin: '3px 0 0', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                                        <MapPin size={13} /> {event.venues.venue_name}{event.venues.location ? ` — ${event.venues.location}` : ''}
+                                                    </p>
+                                                )}
+                                                {event.ticket_price_cents > 0 && (
+                                                    <p style={{ fontSize: '13px', color: 'var(--color-text-muted)', margin: '3px 0 0' }}>
+                                                        <Ticket size={12} style={{ marginRight: '4px', verticalAlign: 'middle' }} />
+                                                        ${(event.ticket_price_cents / 100).toFixed(2)} per ticket
+                                                    </p>
+                                                )}
                                             </div>
-                                            <p style={{ fontSize: '14px', color: 'var(--color-text-muted)', margin: '5px 0' }}>{event.description}</p>
-                                            <p style={{ color: 'var(--color-secondary)', fontWeight: 600, fontSize: '14px', margin: '5px 0' }}>
-                                                {new Date(event.event_date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
-                                                {event.start_time && ` · ${formatTime(event.start_time)}`}
-                                                {event.end_time && ` – ${formatTime(event.end_time)}`}
-                                            </p>
-                                            {event.venues?.venue_name && (
-                                                <p style={{ fontSize: '13px', color: 'var(--color-text-muted)', margin: '3px 0 0', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                                                    <MapPin size={13} /> {event.venues.venue_name}{event.venues.location ? ` — ${event.venues.location}` : ''}
-                                                </p>
-                                            )}
-                                        </div>
-                                        <div style={{ textAlign: 'right', fontSize: '13px' }}>
-                                            {event.max_capacity && (
-                                                <p style={{ margin: '0 0 8px', color: 'var(--color-text-muted)' }}>
-                                                    {event.max_capacity - (event.actual_attendance || 0)} spots left
-                                                </p>
-                                            )}
-                                            {event.ticket_price_cents > 0 && (
-                                                <button className="glass-button" onClick={() => {
-                                                    const cart = JSON.parse(localStorage.getItem('zooCart') || '{"admission":null,"events":{},"shop":{}}');
-                                                    const eid = event.event_id;
-                                                    const existing = cart.events[eid];
-                                                    cart.events[eid] = {
-                                                        event_id: eid,
-                                                        title: event.title,
-                                                        date: new Date(event.event_date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }),
-                                                        venue: event.venues?.venue_name || null,
-                                                        price_cents: event.ticket_price_cents,
-                                                        quantity: existing ? existing.quantity + 1 : 1,
-                                                    };
-                                                    localStorage.setItem('zooCart', JSON.stringify(cart));
-                                                    navigate('/checkout');
-                                                }} style={{ background: 'var(--color-secondary)', padding: '6px 14px', fontSize: '0.8rem' }}>
-                                                    ${(event.ticket_price_cents / 100).toFixed(2)} — Add to Cart
-                                                </button>
-                                            )}
+                                            <div style={{ textAlign: 'right', fontSize: '13px', flexShrink: 0, marginLeft: '12px' }}>
+                                                {!isPast && event.max_capacity && (
+                                                    <p style={{ margin: '0 0 8px', color: 'var(--color-text-muted)' }}>
+                                                        {event.max_capacity - (event.actual_attendance || 0)} spots left
+                                                    </p>
+                                                )}
+                                                {isPast && event.actual_attendance != null && (
+                                                    <p style={{ margin: '0 0 8px', color: 'var(--color-text-muted)' }}>
+                                                        {event.actual_attendance} attended
+                                                    </p>
+                                                )}
+                                                {!isPast && event.ticket_price_cents > 0 && (
+                                                    <button className="glass-button" onClick={() => {
+                                                        const cart = JSON.parse(localStorage.getItem('zooCart') || '{"admission":null,"events":{},"shop":{},"membership":null}');
+                                                        const eid = event.event_id;
+                                                        const existing = cart.events[eid];
+                                                        cart.events[eid] = {
+                                                            event_id: eid,
+                                                            title: event.title,
+                                                            date: eventDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }),
+                                                            venue: event.venues?.venue_name || null,
+                                                            price_cents: event.ticket_price_cents,
+                                                            quantity: existing ? existing.quantity + 1 : 1,
+                                                        };
+                                                        localStorage.setItem('zooCart', JSON.stringify(cart));
+                                                        navigate('/checkout');
+                                                    }} style={{ background: 'var(--color-secondary)', padding: '6px 14px', fontSize: '0.8rem' }}>
+                                                        ${(event.ticket_price_cents / 100).toFixed(2)} — Add to Cart
+                                                    </button>
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
-                            ))}
+                                );
+                            })}
                         </div>
                     )}
                 </div>

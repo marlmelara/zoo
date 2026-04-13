@@ -8,7 +8,6 @@ export default function SignUp() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [success, setSuccess] = useState(false);
   const [form, setForm] = useState({
     firstName: '',
     lastName: '',
@@ -19,7 +18,7 @@ export default function SignUp() {
     dateOfBirth: '',
     address: '',
     city: '',
-    state: 'Texas',
+    state: '',
     zipCode: '',
   });
 
@@ -78,17 +77,13 @@ export default function SignUp() {
 
       if (customerError) throw customerError;
 
-      // 3. Try to sign in — if email confirmation is required, show a message
+      // 3. Sign in automatically after account creation
       const { error: signInError } = await supabase.auth.signInWithPassword({
         email: form.email,
         password: form.password,
       });
 
-      if (signInError) {
-        // Email confirmation is likely required
-        setSuccess(true);
-        return;
-      }
+      if (signInError) throw signInError;
 
       navigate('/dashboard/customer');
     } catch (err) {
@@ -114,20 +109,6 @@ export default function SignUp() {
         <img src={logo} alt="Coog Zoo" style={{ maxWidth: '160px', height: 'auto' }} />
       </Link>
 
-      {success ? (
-        <div className="glass-panel" style={{ padding: '40px', width: '100%', maxWidth: '520px', textAlign: 'center' }}>
-          <div style={{ background: 'var(--color-primary)', width: '60px', height: '60px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
-            <UserPlus size={30} color="white" />
-          </div>
-          <h2 style={{ marginBottom: '8px' }}>Check Your Email</h2>
-          <p style={{ color: 'var(--color-text-muted)', marginBottom: '24px', fontSize: '0.9rem' }}>
-            Your account has been created! Please check your email to confirm your account before signing in.
-          </p>
-          <Link to="/account" className="glass-button" style={{ display: 'inline-block', padding: '14px 30px', background: 'var(--color-secondary)', fontSize: '16px', textDecoration: 'none' }}>
-            Go to Sign In
-          </Link>
-        </div>
-      ) : (
       <div className="glass-panel" style={{
         padding: '40px',
         width: '100%',
@@ -270,6 +251,7 @@ export default function SignUp() {
                 onChange={handleChange}
                 style={inputStyle}
               >
+                <option value="">Select a state</option>
                 {US_STATES.map(s => <option key={s} value={s}>{s}</option>)}
               </select>
             </div>
@@ -341,7 +323,6 @@ export default function SignUp() {
           </Link>
         </p>
       </div>
-      )}
     </div>
   );
 }

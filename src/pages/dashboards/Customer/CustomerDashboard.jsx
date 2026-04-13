@@ -34,6 +34,17 @@ export default function CustomerDashboard() {
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [deleting, setDeleting] = useState(false);
 
+    // ── Filters ──
+    const [purchaseDateFrom, setPurchaseDateFrom] = useState('');
+    const [purchaseDateTo, setPurchaseDateTo] = useState('');
+    const [ticketDateFrom, setTicketDateFrom] = useState('');
+    const [ticketDateTo, setTicketDateTo] = useState('');
+    const [donationDateFrom, setDonationDateFrom] = useState('');
+    const [donationDateTo, setDonationDateTo] = useState('');
+    const [eventsFilter, setEventsFilter] = useState('upcoming');
+    const [eventsDateFrom, setEventsDateFrom] = useState('');
+    const [eventsDateTo, setEventsDateTo] = useState('');
+
     useEffect(() => {
         if (!user?.id) return;
         fetchProfile();
@@ -73,7 +84,7 @@ export default function CustomerDashboard() {
 
             const { data, error } = await supabase
                 .from('tickets')
-                .select('*, events(title, event_date)')
+                .select('*, events(title, event_date, description, start_time, end_time, venues(venue_name, location)), transactions(transaction_date)')
                 .eq('customer_id', custData.customer_id)
                 .order('ticket_id', { ascending: false });
 
@@ -322,7 +333,8 @@ export default function CustomerDashboard() {
                                 </div>
                                 <div>
                                     <label style={{ fontSize: '12px', color: 'var(--color-text-muted)', display: 'block', marginBottom: '5px' }}>State</label>
-                                    <select className="glass-input" value={editForm.state || 'Texas'} onChange={e => setEditForm({ ...editForm, state: e.target.value })} style={{ padding: '12px', width: '100%', boxSizing: 'border-box' }}>
+                                    <select className="glass-input" value={editForm.state || ''} onChange={e => setEditForm({ ...editForm, state: e.target.value })} style={{ padding: '12px', width: '100%', boxSizing: 'border-box' }}>
+                                        <option value="">Select a state</option>
                                         {US_STATES.map(s => <option key={s} value={s}>{s}</option>)}
                                     </select>
                                 </div>
@@ -405,6 +417,21 @@ export default function CustomerDashboard() {
                                     </div>
                                 </div>
                             </div>
+
+                            {/* Profile Completion Prompt */}
+                            {(!profile.phone || !profile.address || !profile.date_of_birth) && (
+                                <div style={{ marginBottom: '20px', padding: '16px 20px', background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.3)', borderRadius: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <div>
+                                        <p style={{ margin: '0 0 4px', fontWeight: 600, fontSize: '0.9rem' }}>Complete your profile</p>
+                                        <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
+                                            Add your {[!profile.phone && 'phone number', !profile.date_of_birth && 'date of birth', !profile.address && 'address'].filter(Boolean).join(', ')} for faster checkout.
+                                        </p>
+                                    </div>
+                                    <button className="glass-button" onClick={() => setEditing(true)} style={{ padding: '8px 16px', fontSize: '0.8rem', background: 'rgba(59,130,246,0.25)', flexShrink: 0 }}>
+                                        Edit Profile
+                                    </button>
+                                </div>
+                            )}
 
                             {/* Membership Card */}
                             <div className="glass-panel" style={{ padding: '25px' }}>
@@ -525,6 +552,18 @@ export default function CustomerDashboard() {
                             <ShoppingCart size={14} /> Shop Now
                         </button>
                     </div>
+                    {/* Date Range Filter */}
+                    {purchases.length > 0 && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '15px', flexWrap: 'wrap' }}>
+                            <span style={{ fontSize: '13px', color: 'var(--color-text-muted)' }}>Filter by date:</span>
+                            <input type="date" className="glass-input" value={purchaseDateFrom} onChange={e => setPurchaseDateFrom(e.target.value)} style={{ padding: '6px 10px', fontSize: '13px', width: 'auto' }} />
+                            <span style={{ color: 'var(--color-text-muted)' }}>to</span>
+                            <input type="date" className="glass-input" value={purchaseDateTo} onChange={e => setPurchaseDateTo(e.target.value)} style={{ padding: '6px 10px', fontSize: '13px', width: 'auto' }} />
+                            {(purchaseDateFrom || purchaseDateTo) && (
+                                <button className="glass-button" onClick={() => { setPurchaseDateFrom(''); setPurchaseDateTo(''); }} style={{ padding: '6px 12px', fontSize: '12px' }}>Clear</button>
+                            )}
+                        </div>
+                    )}
                     {purchasesLoading ? <p>Loading purchases...</p> : purchases.length === 0 ? (
                         <div className="glass-panel" style={{ padding: '40px', textAlign: 'center', color: 'var(--color-text-muted)' }}>
                             <Package size={48} style={{ marginBottom: '15px', opacity: 0.3 }} />
@@ -536,7 +575,12 @@ export default function CustomerDashboard() {
                         </div>
                     ) : (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                            {purchases.map(txn => {
+                            {purchases.filter(txn => {
+                                const d = new Date(txn.transaction_date);
+                                if (purchaseDateFrom && d < new Date(purchaseDateFrom + 'T00:00:00')) return false;
+                                if (purchaseDateTo && d > new Date(purchaseDateTo + 'T23:59:59')) return false;
+                                return true;
+                            }).map(txn => {
                                 const receipt = txn.receipts?.[0] || null;
                                 const lineItems = receipt?.line_items || [];
                                 return (
@@ -608,6 +652,18 @@ export default function CustomerDashboard() {
                             As a <strong style={{ textTransform: 'capitalize' }}>{profile.membership_type}</strong> member, you get free general admission and discounted rates on event tickets!
                         </div>
                     )}
+                    {/* Date Range Filter */}
+                    {tickets.length > 0 && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '15px', flexWrap: 'wrap' }}>
+                            <span style={{ fontSize: '13px', color: 'var(--color-text-muted)' }}>Filter by date:</span>
+                            <input type="date" className="glass-input" value={ticketDateFrom} onChange={e => setTicketDateFrom(e.target.value)} style={{ padding: '6px 10px', fontSize: '13px', width: 'auto' }} />
+                            <span style={{ color: 'var(--color-text-muted)' }}>to</span>
+                            <input type="date" className="glass-input" value={ticketDateTo} onChange={e => setTicketDateTo(e.target.value)} style={{ padding: '6px 10px', fontSize: '13px', width: 'auto' }} />
+                            {(ticketDateFrom || ticketDateTo) && (
+                                <button className="glass-button" onClick={() => { setTicketDateFrom(''); setTicketDateTo(''); }} style={{ padding: '6px 12px', fontSize: '12px' }}>Clear</button>
+                            )}
+                        </div>
+                    )}
                     {ticketsLoading ? <p>Loading tickets...</p> : tickets.length === 0 ? (
                         <div className="glass-panel" style={{ padding: '40px', textAlign: 'center', color: 'var(--color-text-muted)' }}>
                             <Ticket size={48} style={{ marginBottom: '15px', opacity: 0.3 }} />
@@ -619,35 +675,65 @@ export default function CustomerDashboard() {
                         </div>
                     ) : (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                            {tickets.map(ticket => (
+                            {tickets.filter(ticket => {
+                                const d = ticket.transactions?.transaction_date ? new Date(ticket.transactions.transaction_date) : null;
+                                if (!d) return true;
+                                if (ticketDateFrom && d < new Date(ticketDateFrom + 'T00:00:00')) return false;
+                                if (ticketDateTo && d > new Date(ticketDateTo + 'T23:59:59')) return false;
+                                return true;
+                            }).map(ticket => {
+                                const isEvent = ticket.type === 'event' && ticket.events;
+                                const purchaseDate = ticket.transactions?.transaction_date;
+                                return (
                                 <div key={ticket.ticket_id} className="glass-panel" style={{ padding: '20px' }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
+                                        <div style={{ display: 'flex', alignItems: 'start', gap: '15px', flex: 1 }}>
                                             <div style={{
                                                 width: '45px', height: '45px', borderRadius: '10px',
-                                                background: 'rgba(16, 185, 129, 0.2)', display: 'flex',
-                                                alignItems: 'center', justifyContent: 'center'
+                                                background: isEvent ? 'rgba(245,158,11,0.2)' : 'rgba(16, 185, 129, 0.2)',
+                                                display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
                                             }}>
-                                                <Ticket size={22} color="var(--color-primary)" />
+                                                {isEvent ? <Calendar size={22} color="#f59e0b" /> : <Ticket size={22} color="var(--color-primary)" />}
                                             </div>
-                                            <div>
-                                                <h3 style={{ margin: '0 0 3px' }}>
-                                                    {ticket.events?.title || 'General Admission'}
+                                            <div style={{ flex: 1 }}>
+                                                <h3 style={{ margin: '0 0 4px' }}>
+                                                    {isEvent ? ticket.events.title : 'General Admission'}
                                                 </h3>
                                                 <span style={{
-                                                    fontSize: '12px', padding: '2px 8px', borderRadius: '10px',
-                                                    background: 'rgba(255,255,255,0.1)', textTransform: 'capitalize'
+                                                    fontSize: '11px', padding: '2px 8px', borderRadius: '10px',
+                                                    background: isEvent ? 'rgba(245,158,11,0.15)' : 'rgba(255,255,255,0.1)',
+                                                    color: isEvent ? '#fbbf24' : 'inherit',
+                                                    textTransform: 'capitalize'
                                                 }}>
-                                                    {ticketTypeLabel(ticket.type)}
+                                                    {isEvent ? 'Event' : ticketTypeLabel(ticket.type)}
                                                 </span>
-                                                {ticket.events?.event_date && (
-                                                    <span style={{ fontSize: '12px', color: 'var(--color-text-muted)', marginLeft: '10px' }}>
-                                                        {new Date(ticket.events.event_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                                                    </span>
+                                                {isEvent && (
+                                                    <div style={{ marginTop: '8px' }}>
+                                                        {ticket.events.description && (
+                                                            <p style={{ fontSize: '13px', color: 'var(--color-text-muted)', margin: '0 0 4px' }}>{ticket.events.description}</p>
+                                                        )}
+                                                        <p style={{ fontSize: '13px', color: 'var(--color-secondary)', fontWeight: 600, margin: '0 0 3px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                                            <Clock size={12} />
+                                                            {new Date(ticket.events.event_date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
+                                                            {ticket.events.start_time && ` · ${formatTime(ticket.events.start_time)}`}
+                                                            {ticket.events.end_time && ` – ${formatTime(ticket.events.end_time)}`}
+                                                        </p>
+                                                        {ticket.events.venues?.venue_name && (
+                                                            <p style={{ fontSize: '12px', color: 'var(--color-text-muted)', margin: '0', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                                                <MapPin size={12} /> {ticket.events.venues.venue_name}{ticket.events.venues.location ? ` — ${ticket.events.venues.location}` : ''}
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                )}
+                                                {purchaseDate && (
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '12px', color: 'var(--color-text-muted)', marginTop: '6px' }}>
+                                                        <Clock size={11} />
+                                                        Purchased {new Date(purchaseDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} at {new Date(purchaseDate).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}
+                                                    </div>
                                                 )}
                                             </div>
                                         </div>
-                                        <div style={{ textAlign: 'right' }}>
+                                        <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: '12px' }}>
                                             <p style={{ fontWeight: 'bold', fontSize: '18px', margin: 0, color: 'var(--color-primary)' }}>
                                                 ${(ticket.price_cents / 100).toFixed(2)}
                                             </p>
@@ -657,7 +743,8 @@ export default function CustomerDashboard() {
                                         </div>
                                     </div>
                                 </div>
-                            ))}
+                                );
+                            })}
                             <div style={{ background: 'rgba(255,255,255,0.05)', padding: '15px', borderRadius: '10px', textAlign: 'right' }}>
                                 <span style={{ color: 'var(--color-text-muted)', marginRight: '15px' }}>Total Spent:</span>
                                 <span style={{ fontWeight: 'bold', fontSize: '20px', color: 'var(--color-primary)' }}>
@@ -680,6 +767,18 @@ export default function CustomerDashboard() {
                             <Heart size={14} /> Make a Donation
                         </button>
                     </div>
+                    {/* Date Range Filter */}
+                    {donations.length > 0 && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '15px', flexWrap: 'wrap' }}>
+                            <span style={{ fontSize: '13px', color: 'var(--color-text-muted)' }}>Filter by date:</span>
+                            <input type="date" className="glass-input" value={donationDateFrom} onChange={e => setDonationDateFrom(e.target.value)} style={{ padding: '6px 10px', fontSize: '13px', width: 'auto' }} />
+                            <span style={{ color: 'var(--color-text-muted)' }}>to</span>
+                            <input type="date" className="glass-input" value={donationDateTo} onChange={e => setDonationDateTo(e.target.value)} style={{ padding: '6px 10px', fontSize: '13px', width: 'auto' }} />
+                            {(donationDateFrom || donationDateTo) && (
+                                <button className="glass-button" onClick={() => { setDonationDateFrom(''); setDonationDateTo(''); }} style={{ padding: '6px 12px', fontSize: '12px' }}>Clear</button>
+                            )}
+                        </div>
+                    )}
                     {donationsLoading ? <p>Loading donations...</p> : donations.length === 0 ? (
                         <div className="glass-panel" style={{ padding: '40px', textAlign: 'center', color: 'var(--color-text-muted)' }}>
                             <Heart size={48} style={{ marginBottom: '15px', opacity: 0.3 }} />
@@ -691,7 +790,13 @@ export default function CustomerDashboard() {
                         </div>
                     ) : (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                            {donations.map(donation => (
+                            {donations.filter(donation => {
+                                const d = donation.donation_date ? new Date(donation.donation_date) : null;
+                                if (!d) return true;
+                                if (donationDateFrom && d < new Date(donationDateFrom + 'T00:00:00')) return false;
+                                if (donationDateTo && d > new Date(donationDateTo + 'T23:59:59')) return false;
+                                return true;
+                            }).map(donation => (
                                 <div key={donation.donation_id} className="glass-panel" style={{ padding: '20px' }}>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
@@ -740,6 +845,28 @@ export default function CustomerDashboard() {
                             <Ticket size={14} /> Buy Event Tickets
                         </button>
                     </div>
+                    {/* Upcoming / All Toggle + Date Range */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '15px', flexWrap: 'wrap' }}>
+                        <div style={{ display: 'flex', borderRadius: '8px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.15)' }}>
+                            {['upcoming', 'all'].map(f => (
+                                <button key={f} className="glass-button" onClick={() => setEventsFilter(f)} style={{
+                                    padding: '6px 16px', fontSize: '13px', borderRadius: 0,
+                                    background: eventsFilter === f ? 'var(--color-primary)' : 'rgba(255,255,255,0.05)',
+                                    fontWeight: eventsFilter === f ? 700 : 400,
+                                    textTransform: 'capitalize',
+                                }}>
+                                    {f === 'upcoming' ? 'Upcoming' : 'All Events'}
+                                </button>
+                            ))}
+                        </div>
+                        <span style={{ fontSize: '13px', color: 'var(--color-text-muted)', marginLeft: '6px' }}>Date range:</span>
+                        <input type="date" className="glass-input" value={eventsDateFrom} onChange={e => setEventsDateFrom(e.target.value)} style={{ padding: '6px 10px', fontSize: '13px', width: 'auto' }} />
+                        <span style={{ color: 'var(--color-text-muted)' }}>to</span>
+                        <input type="date" className="glass-input" value={eventsDateTo} onChange={e => setEventsDateTo(e.target.value)} style={{ padding: '6px 10px', fontSize: '13px', width: 'auto' }} />
+                        {(eventsDateFrom || eventsDateTo) && (
+                            <button className="glass-button" onClick={() => { setEventsDateFrom(''); setEventsDateTo(''); }} style={{ padding: '6px 12px', fontSize: '12px' }}>Clear</button>
+                        )}
+                    </div>
                     {eventsLoading ? <p>Loading events...</p> : events.length === 0 ? (
                         <div className="glass-panel" style={{ padding: '40px', textAlign: 'center', color: 'var(--color-text-muted)' }}>
                             <Calendar size={48} style={{ marginBottom: '15px', opacity: 0.3 }} />
@@ -747,7 +874,14 @@ export default function CustomerDashboard() {
                         </div>
                     ) : (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                            {events.map(event => {
+                            {events.filter(event => {
+                                const eventDate = new Date(event.event_date + 'T00:00:00');
+                                const today = new Date(); today.setHours(0, 0, 0, 0);
+                                if (eventsFilter === 'upcoming' && eventDate < today) return false;
+                                if (eventsDateFrom && eventDate < new Date(eventsDateFrom + 'T00:00:00')) return false;
+                                if (eventsDateTo && eventDate > new Date(eventsDateTo + 'T23:59:59')) return false;
+                                return true;
+                            }).map(event => {
                                 const eventDate = new Date(event.event_date + 'T00:00:00');
                                 const today = new Date(); today.setHours(0, 0, 0, 0);
                                 const isPast = eventDate < today;

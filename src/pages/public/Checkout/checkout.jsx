@@ -62,11 +62,11 @@ export default function Checkout() {
   const [sameAsBilling, setSameAsBilling] = useState(true);
   const [billing, setBilling] = useState({
     firstName: '', lastName: '', email: '', confirmEmail: '',
-    street: '', city: '', state: 'Texas', zip: '', phone: '',
+    street: '', city: '', state: '', zip: '', phone: '',
   });
   const [shipping, setShipping] = useState({
     firstName: '', lastName: '',
-    street: '', city: '', state: 'Texas', zip: '', phone: '',
+    street: '', city: '', state: '', zip: '', phone: '',
   });
 
   // ── Payment ──
@@ -643,6 +643,7 @@ export default function Checkout() {
                       <div className="form-group">
                         <label>State <span className="req">*</span></label>
                         <select name="state" value={billing.state} onChange={handleBillingChange}>
+                          <option value="">Select a state</option>
                           {US_STATES.map(s => <option key={s} value={s}>{s}</option>)}
                         </select>
                       </div>
@@ -693,6 +694,7 @@ export default function Checkout() {
                         <div className="form-group">
                           <label>State <span className="req">*</span></label>
                           <select name="state" value={shipping.state} onChange={handleShippingChange}>
+                            <option value="">Select a state</option>
                             {US_STATES.map(s => <option key={s} value={s}>{s}</option>)}
                           </select>
                         </div>

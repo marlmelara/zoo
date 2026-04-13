@@ -5,6 +5,7 @@ import { FaCheck, FaStar, FaUsers, FaParking, FaTicketAlt, FaGift } from 'react-
 import logo from '../../../images/logo.png';
 import './Membership.css';
 import { useZooCart } from '../../../components/ShopCart';
+import { useAuth } from '../../../contexts/AuthContext';
 
 const plans = [
   { type: 'explorer', name: 'Explorer', price_cents: 8999, discount: 0.10, duration_days: 365, featured: false,
@@ -21,6 +22,7 @@ const plans = [
 export default function Membership() {
   const navigate = useNavigate();
   const cartHook = useZooCart();
+  const { user } = useAuth();
 
   const [selected, setSelected] = useState(() => {
     const saved = localStorage.getItem('selectedMembership');
@@ -40,6 +42,10 @@ export default function Membership() {
   }, [cartHook.cart.membership]);
 
   const handleChoosePlan = (plan) => {
+    if (!user) {
+      navigate('/account');
+      return;
+    }
     localStorage.setItem('selectedMembership', JSON.stringify(plan));
     cartHook.setMembership({
       plan_name: plan.type,

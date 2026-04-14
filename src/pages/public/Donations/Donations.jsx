@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import logo from '../../../images/logo.png';
-import './Donations.css';
+import './donations.css';
 
 const TABS = [
   { key: 'general', title: 'General Donations', image: '/images/donation-general.jpg' },

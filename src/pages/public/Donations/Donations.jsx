@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import logo from '../../../images/logo.png';
+import './Donations.css';
 
 const TABS = [
   { key: 'general', title: 'General Donations', image: '/images/donation-general.jpg' },
@@ -49,50 +50,32 @@ export default function Donations() {
   const activeTab = TABS.find((t) => t.key === active);
 
   return (
-    <div
-      style={{
-        color: 'white',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        minHeight: '100vh',
-        padding: '40px',
-      }}
-    >
-      <div style={{ textAlign: 'center', marginBottom: '24px' }}>
-        <Link
-          to="/"
-          style={{
-            textDecoration: 'none',
-            display: 'inline-block',
-          }}
-          aria-label="Go to homepage"
-        >
-          <img
-            src={logo}
-            alt="Coog Zoo"
-            style={{
-              maxWidth: '200px',
-              width: '100%',
-              height: 'auto',
-              cursor: 'pointer',
-            }}
-          />
-        </Link>
-      </div>
-      <section style={{ marginBottom: '20px' }}>
-        <h1 style={{ fontSize: '42px', marginBottom: '8px', textAlign: 'center' }}>Support Our Zoo!</h1>
-        <p style={{ fontSize: '20px', color: 'var(--color-text-muted)', maxWidth: '800px', textAlign: 'center' }}>
-          Our zoo relies on generous donors to help us care and protect these animals. You can support the zoo generally, help the animal's wellbeing, or
-          contribute to our conservation projects. We deeply appriciate your support - every gift makes a difference!
-        </p>
-      </section>
+    <div className="donations-page">
+      <nav className="donations-navbar">
+        <div className="donations-navbar-container">
+          <Link to="/" className="navbar-logo-link" aria-label="Go to homepage">
+            <img src={logo} alt="Coog Zoo" />
+          </Link>
+          <div className="donations-navbar-links">
+            <Link to="/tickets" className="donations-navbar-link">Buy Tickets</Link>
+            <Link to="/shop" className="donations-navbar-link">Shop</Link>
+            <Link to="/membership" className="donations-navbar-link">Membership</Link>
+            <Link to="/account" className="donations-navbar-link">Customer Login</Link>
+            <Link to="/login" className="donations-navbar-link">Staff Portal</Link>
+          </div>
+        </div>
+      </nav>
 
-      <div
-        className="glass-panel"
-        style={{ padding: '20px', borderRadius: '12px', maxWidth: '900px' }}
-      >
+      <div className="donations-page-inner">
+        <section className="intro">
+          <h1>Support Our Zoo!</h1>
+          <p>
+            Our zoo relies on generous donors to help us care and protect these animals. You can support the zoo generally, help the animal's wellbeing, or
+            contribute to our conservation projects. We deeply appreciate your support - every gift makes a difference!
+          </p>
+        </section>
+
+      <div className="glass-panel donations-panel">
         {/* Tabs */}
         <div style={{ display: 'flex', gap: '8px', marginBottom: '18px', justifyContent: 'center' }}>
           {TABS.map((tab) => (
@@ -108,8 +91,7 @@ export default function Donations() {
           ))}
         </div>
 
-        {/* Preset amounts moved next to amount input (inline) */}
-
+        
         {/* Centered image and description */}
         <div style={{ textAlign: 'center', marginBottom: '18px' }}>
           <div style={{ borderRadius: '12px', overflow: 'hidden', margin: '0 auto', maxWidth: '640px' }}>
@@ -120,7 +102,7 @@ export default function Donations() {
             />
           </div>
           <h3 style={{ marginTop: '12px' }}>{activeTab.title}</h3>
-          <p style={{ color: 'var(--color-text-muted)', maxWidth: '700px', margin: '8px auto 0' }}>
+          <p style={{ color: 'var(--zoo-text)', maxWidth: '700px', margin: '8px auto 0' }}>
             {active === 'general' && 'Support the zoo where it’s needed most — care, operations, and programs.'}
             {active === 'animal' && 'Help fund medical care, nutrition, and enrichment for our animals.'}
             {active === 'conservation' && 'Contribute to on-site and field conservation projects.'}
@@ -129,7 +111,7 @@ export default function Donations() {
 
         {/* Full-width form: donation amount only */}
         <form onSubmit={handleSubmit} style={{ display: 'grid', gap: '24px', fontSize: '18px' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(100px, 1fr))', gap: '14px', justifyContent: 'center', width: '100%', maxWidth: '560px', margin: '0 auto 12px' }}>
+          <div className="donation-presets">
             {presetAmounts.map((a) => {
               const isSelected = String(form.amount) === String(a);
               return (
@@ -137,14 +119,7 @@ export default function Donations() {
                   key={a}
                   type="button"
                   onClick={() => handlePreset(a)}
-                  className={isSelected ? 'glass-button' : 'glass-button glass-button-small'}
-                  style={{
-                    fontSize: '18px',
-                    padding: '16px 14px',
-                    minHeight: '64px',
-                    borderRadius: '10px',
-                    ...(isSelected ? { background: 'var(--color-accent, #2b8cff)', color: '#fff' } : {}),
-                  }}
+                  className={`donation-preset-button${isSelected ? ' active' : ''}`}
                 >
                   ${a}
                 </button>
@@ -152,7 +127,7 @@ export default function Donations() {
             })}
           </div>
 
-          <div style={{ display: 'grid', gap: '6px', minWidth: '220px', maxWidth: '420px', margin: '0 auto' }}>
+          <div className="donations-input-group">
             <input
               className="glass-input"
               type="text"
@@ -162,12 +137,11 @@ export default function Donations() {
               placeholder="other"
               value={form.amount}
               onChange={handleChange}
-              style={{ width: '100%', padding: '12px', MozAppearance: 'textfield', WebkitAppearance: 'none', appearance: 'none' }}
             />
           </div>
 
-          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-            <button type="submit" className="glass-button" style={{ width: '100%', padding: '14px' }}>
+          <div className="donations-submit">
+            <button type="submit">
               Donate {form.amount ? `$${form.amount}` : ''}
             </button>
           </div>
@@ -178,5 +152,6 @@ export default function Donations() {
         </form>
       </div>
     </div>
+  </div>
   );
 }

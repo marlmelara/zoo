@@ -1,84 +1,123 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
+import logo from '../../../images/logo.png';
 import './animals.css';
 
 // Import all animal images
-import amazonParrot from '../../../images/animals_amazon_parrot.jpg';
-import anaconda from '../../../images/animals_anaconda.jpg';
+import stVincentAmazonParrot from '../../../images/animals_amazon_parrot.jpg';
+import greenAnaconda from '../../../images/animals_anaconda.jpg';
 import blackMamba from '../../../images/animals_black_mamba.jpg';
 import blueMacaw from '../../../images/animals_blue_macaw.jpg';
-import bongo from '../../../images/animals_bongo.jpg';
+import easternBongo from '../../../images/animals_bongo.jpg';
 import bonnetheadShark from '../../../images/animals_bonnethead_shark.jpg';
-import chimp from '../../../images/animals_chimp.jpg';
+import chimpanzee from '../../../images/animals_chimp.jpg';
 import cougar from '../../../images/animals_cougar.jpg';
-import crane from '../../../images/animals_crane.jpg';
-import elephant from '../../../images/animals_elephant.jpg';
-import flamingo from '../../../images/animals_flamingo.jpg';
-import giraffe from '../../../images/animals_giraffe.jpg';
-import goat from '../../../images/animals_goat.jpeg';
+import whoopingCrane from '../../../images/animals_crane.jpg';
+import asianElephant from '../../../images/animals_elephant.jpg';
+import ChileanFlamingo from '../../../images/animals_flamingo.jpg';
+import masaiGiraffe from '../../../images/animals_giraffe.jpg';
+import domesticatedGoat from '../../../images/animals_goat.jpeg';
 import gorilla from '../../../images/animals_gorilla.jpg';
 import humboldtPenguin from '../../../images/animals_humboldt_penguin.jpg';
 import jaguar from '../../../images/animals_jaguar.jpg';
 import komodoDragon from '../../../images/animals_komodo_dragon.jpg';
-import lion from '../../../images/animals_lion.jpg';
+import africanLion from '../../../images/animals_lion.jpg';
 import ocelot from '../../../images/animals_ocelot.jpg';
 import orangutan from '../../../images/animals_orangutan.jpg';
 import ostrich from '../../../images/animals_ostrich.jpg';
-import paintedDog from '../../../images/animals_painted_dog.jpg';
-import rhinoceros from '../../../images/animals_rhinoceros.jpg';
-import riverOtter from '../../../images/animals_river_otter.jpg';
+import paintedAfricanDog from '../../../images/animals_painted_dog.jpg';
+import southerWhiteRhinoceros from '../../../images/animals_rhinoceros.jpg';
+import northAmericanRiverOtter from '../../../images/animals_river_otter.jpg';
 import siamang from '../../../images/animals_siamang.jpg';
-import tamarin from '../../../images/animals_tamarin.jpg';
-import toad from '../../../images/animals_toad.jpg';
-import tortoise from '../../../images/animals_tortoise.jpg';
-import zebra from '../../../images/animals_zebra.jpg';
+import goldenHeadLiontamarin from '../../../images/animals_tamarin.jpg';
+import houstonToad from '../../../images/animals_toad.jpg';
+import africanSpurredTortoise from '../../../images/animals_tortoise.jpg';
+import grantZebra from '../../../images/animals_zebra.jpg';
 
 const animals = [
-  { name: 'Amazon Parrot', src: amazonParrot },
-  { name: 'Anaconda', src: anaconda },
-  { name: 'Black Mamba', src: blackMamba },
-  { name: 'Blue Macaw', src: blueMacaw },
-  { name: 'Bongo', src: bongo },
-  { name: 'Bonnethead Shark', src: bonnetheadShark },
-  { name: 'Chimp', src: chimp },
-  { name: 'Cougar', src: cougar },
-  { name: 'Crane', src: crane },
-  { name: 'Elephant', src: elephant },
-  { name: 'Flamingo', src: flamingo },
-  { name: 'Giraffe', src: giraffe },
-  { name: 'Goat', src: goat },
-  { name: 'Gorilla', src: gorilla },
-  { name: 'Humboldt Penguin', src: humboldtPenguin },
-  { name: 'Jaguar', src: jaguar },
-  { name: 'Komodo Dragon', src: komodoDragon },
-  { name: 'Lion', src: lion },
-  { name: 'Ocelot', src: ocelot },
-  { name: 'Orangutan', src: orangutan },
-  { name: 'Ostrich', src: ostrich },
-  { name: 'Painted Dog', src: paintedDog },
-  { name: 'Rhinoceros', src: rhinoceros },
-  { name: 'River Otter', src: riverOtter },
-  { name: 'Siamang', src: siamang },
-  { name: 'Tamarin', src: tamarin },
-  { name: 'Toad', src: toad },
-  { name: 'Tortoise', src: tortoise },
-  { name: 'Zebra', src: zebra },
+  { name: 'St. Vincent Amazon Parrot', src: stVincentAmazonParrot, zone: 'Birds of the World' },
+  { name: 'Green Anaconda', src: greenAnaconda, zone: 'Reptile Lair' },
+  { name: 'Black Mamba', src: blackMamba, zone: 'Reptile Lair' },
+  { name: 'Blue Macaw', src: blueMacaw, zone: 'Birds of the World' },
+  { name: 'Eastern Bongo', src: easternBongo, zone: 'Animals of Africa' },
+  { name: 'Bonnethead Shark', src: bonnetheadShark, zone: 'Galapagos Islands' },
+  { name: 'Chimpanzee', src: chimpanzee, zone: 'World of Primates' },
+  { name: 'Cougar', src: cougar, zone: 'Big Cat Zone' },
+  { name: 'Whooping Crane', src: whoopingCrane, zone: 'Birds of the World' },
+  { name: 'Asian Elephant', src: asianElephant, zone: 'Elephants of Asia' },
+  { name: 'Chilean Flamingo', src: ChileanFlamingo, zone: 'Birds of the World' },
+  { name: 'Masai Giraffe', src: masaiGiraffe, zone: 'Animals of Africa' },
+  { name: 'Domesticated Goat', src: domesticatedGoat, zone: "Children's Zoo" },
+  { name: 'Gorilla', src: gorilla, zone: 'World of Primates' },
+  { name: 'Humboldt Penguin', src: humboldtPenguin, zone: 'Galapagos Islands' },
+  { name: 'Jaguar', src: jaguar, zone: 'Big Cat Zone' },
+  { name: 'Komodo Dragon', src: komodoDragon, zone: 'Reptile Lair' },
+  { name: 'African Lion', src: africanLion, zone: 'Big Cat Zone' },
+  { name: 'Ocelot', src: ocelot, zone: 'Big Cat Zone' },
+  { name: 'Orangutan', src: orangutan, zone: 'World of Primates' },
+  { name: 'Ostrich', src: ostrich, zone: 'Animals of Africa' },
+  { name: 'Painted African Dog', src: paintedAfricanDog, zone: 'Animals of Africa' },
+  { name: 'Southern White Rhinoceros', src: southerWhiteRhinoceros, zone: 'Animals of Africa' },
+  { name: 'North American River Otter', src: northAmericanRiverOtter, zone: "Children's Zoo" },
+  { name: 'Siamang', src: siamang, zone: 'World of Primates' },
+  { name: 'Golden-Head Liontamarin', src: goldenHeadLiontamarin, zone: 'World of Primates' },
+  { name: 'Houston Toad', src: houstonToad, zone: "Children's Zoo" },
+  { name: 'African Spurred Tortoise', src: africanSpurredTortoise, zone: 'Reptile Lair' },
+  { name: 'Grant\'s Zebra', src: grantZebra, zone: 'Animals of Africa' },
 ].sort((a, b) => a.name.localeCompare(b.name));
 
 export default function AnimalGallery() {
+  const [selectedZone, setSelectedZone] = useState('All Zones');
+  
+  const zones = ['All Zones', 'World of Primates', 'Elephants of Asia', 'Big Cat Zone', 'Reptile Lair', 'Animals of Africa', "Children's Zoo", 'Birds of the World', 'Galapagos Islands'];
+  
+  const filteredAnimals = selectedZone === 'All Zones' 
+    ? animals 
+    : animals.filter(animal => animal.zone === selectedZone);
+
   return (
     <main className="animals-page">
-      <div className="animals-hero">
-        <h1>Our Animals</h1>
-      </div>
+      <nav className="animals-navbar">
+        <div className="animals-navbar-container">
+          <Link to="/" className="navbar-logo-link" aria-label="Go to homepage">
+            <img src={logo} alt="Coog Zoo" />
+          </Link>
+          <div className="animals-navbar-links">
+            <Link to="/tickets" className="animals-navbar-link">Buy Tickets</Link>
+            <Link to="/shop" className="animals-navbar-link">Shop</Link>
+            <Link to="/membership" className="animals-navbar-link">Membership</Link>
+            <Link to="/account" className="animals-navbar-link">Customer Login</Link>
+            <Link to="/login" className="animals-navbar-link">Staff Portal</Link>
+          </div>
+        </div>
+      </nav>
 
-      <section className="animals-grid">
-        {animals.map(animal => (
+      <div className="animals-page-inner">
+        <h1 className="animals-title">Our Animals</h1>
+
+        <div className="zone-filter">
+          <label htmlFor="zone-select">Filter by Zone:</label>
+          <select 
+            id="zone-select"
+            value={selectedZone} 
+            onChange={(e) => setSelectedZone(e.target.value)}
+            className="zone-select"
+          >
+            {zones.map(zone => (
+              <option key={zone} value={zone}>{zone}</option>
+            ))}
+          </select>
+        </div>
+
+        <section className="animals-grid">
+        {filteredAnimals.map(animal => (
           <article key={animal.name} className="animal-card">
             <img src={animal.src} alt={animal.name} loading="lazy" />
             <div className="animal-name">{animal.name}</div>
           </article>
         ))}
       </section>
+      </div>
     </main>
   );
 }

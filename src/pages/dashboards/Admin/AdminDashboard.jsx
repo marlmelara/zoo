@@ -6,6 +6,9 @@ import {
     getEmployeesWithDepartments,
     getDepartments,
     createZooUser,
+    getAnimalsWithZones,
+    getFinancialRevenueBreakdown,
+    getRecentTransactions,
     ROLE_DEPT_MAP,
 } from '../../../api/dashboard';
 
@@ -20,8 +23,18 @@ export default function AdminDashboard() {
     });
     const [loading, setLoading] = useState(true);
     const [employees, setEmployees] = useState([]);
-    const [showData, setShowData] = useState(false);
-    const [showRawData, setShowRawData] = useState(false);
+    const [animals, setAnimals] = useState([]);
+    const [revenueBreakdown, setRevenueBreakdown] = useState([]);
+    const [recentTransactions, setRecentTransactions] = useState([]);
+    
+    // UI State
+    const [activeTab, setActiveTab] = useState('Overview');
+    const [showStaffData, setShowStaffData] = useState(false);
+    const [showStaffRaw, setShowStaffRaw] = useState(false);
+    const [showAnimalData, setShowAnimalData] = useState(false);
+    const [showAnimalRaw, setShowAnimalRaw] = useState(false);
+    const [showFinancialData, setShowFinancialData] = useState(false);
+    const [showFinancialRaw, setShowFinancialRaw] = useState(false);
 
     // Create User State
     const [showCreateUser, setShowCreateUser] = useState(false);
@@ -42,12 +55,18 @@ export default function AdminDashboard() {
 
     async function fetchAdminData() {
         try {
-            const [dashStats, allEmployees] = await Promise.all([
+            const [dashStats, allEmployees, allAnimals, revBreakdown, transactions] = await Promise.all([
                 getAdminDashboardStats(),
                 getEmployeesWithDepartments(),
+                getAnimalsWithZones(),
+                getFinancialRevenueBreakdown(),
+                getRecentTransactions(),
             ]);
             setStats(dashStats);
             setEmployees(allEmployees);
+            setAnimals(allAnimals);
+            setRevenueBreakdown(revBreakdown);
+            setRecentTransactions(transactions);
         } catch (error) {
             console.error('Error fetching admin data:', error);
         } finally {
@@ -86,7 +105,7 @@ export default function AdminDashboard() {
     // Whether dept is auto-set by role (non-manager roles)
     const isDeptAutoSet = newUser.role !== 'manager';
 
-    // Aggregate data for the chart
+    // Aggregate data for charts
     const departmentCounts = employees.reduce((acc, emp) => {
         const deptName = emp.departments?.dept_name || 'Unassigned';
         if (!acc[deptName]) acc[deptName] = 0;
@@ -94,10 +113,24 @@ export default function AdminDashboard() {
         return acc;
     }, {});
 
-    const chartData = Object.keys(departmentCounts).map(dept => ({
+    const staffChartData = Object.keys(departmentCounts).map(dept => ({
         name: dept,
         Employees: departmentCounts[dept]
     }));
+
+    const zoneCounts = animals.reduce((acc, animal) => {
+        const zoneName = animal.animal_zones?.zone_name || 'Unassigned';
+        if (!acc[zoneName]) acc[zoneName] = 0;
+        acc[zoneName]++;
+        return acc;
+    }, {});
+
+    const animalChartData = Object.keys(zoneCounts).map(zone => ({
+        name: zone,
+        Animals: zoneCounts[zone]
+    }));
+
+    const TABS = ['Overview', 'Staff Analytics', 'Animal Analytics', 'Financial Revenue'];
 
     return (
         <div>
@@ -169,214 +202,381 @@ export default function AdminDashboard() {
                 </div>
             )}
 
-            {/* Key Metrics Grid */}
-            <div className="grid-cards" style={{ marginBottom: '40px' }}>
-                <div className="glass-panel" style={{ padding: '20px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
-                        <h3 style={{ margin: 0 }}>Tickets</h3>
-                        <Ticket size={20} color="var(--color-primary)" />
-                    </div>
-                    <p style={{ fontSize: '24px', fontWeight: 'bold', margin: 0 }}>${formatDollars(stats.ticketRevenueCents)}</p>
-                </div>
-                <div className="glass-panel" style={{ padding: '20px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
-                        <h3 style={{ margin: 0 }}>Retail</h3>
-                        <ShoppingBag size={20} color="var(--color-secondary)" />
-                    </div>
-                    <p style={{ fontSize: '24px', fontWeight: 'bold', margin: 0 }}>${formatDollars(stats.retailRevenueCents)}</p>
-                </div>
-                <div className="glass-panel" style={{ padding: '20px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
-                        <h3 style={{ margin: 0 }}>Staff</h3>
-                        <Users size={20} color="var(--color-accent)" />
-                    </div>
-                    <p style={{ fontSize: '24px', fontWeight: 'bold', margin: 0 }}>{stats.totalEmployees}</p>
-                </div>
-                <div className="glass-panel" style={{ padding: '20px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
-                        <h3 style={{ margin: 0 }}>Visitors</h3>
-                        <LayoutDashboard size={20} color="#f59e0b" />
-                    </div>
-                    <p style={{ fontSize: '24px', fontWeight: 'bold', margin: 0 }}>{stats.totalCustomers}</p>
-                </div>
+            {/* Tab Navigation */}
+            <div style={{ display: 'flex', gap: '10px', marginBottom: '30px', flexWrap: 'wrap' }}>
+                {TABS.map(tab => (
+                    <button
+                        key={tab}
+                        className="glass-button"
+                        onClick={() => setActiveTab(tab)}
+                        style={{
+                            background: activeTab === tab ? 'var(--color-primary)' : 'rgba(255,255,255,0.05)',
+                            padding: '10px 20px',
+                            fontSize: '14px',
+                            fontWeight: activeTab === tab ? 700 : 400
+                        }}
+                    >
+                        {tab}
+                    </button>
+                ))}
             </div>
 
-            {/* Chart + Query Viewer */}
-            <div className="glass-panel" style={{ padding: '20px', marginBottom: '40px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                    <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <Users size={20} color="var(--color-primary)" />
-                        Employees per Department
-                    </h3>
+            {/* ═══════════ OVERVIEW TAB ═══════════ */}
+            {activeTab === 'Overview' && (
+                <>
+                    {/* Key Metrics Grid */}
+                    <div className="grid-cards" style={{ marginBottom: '40px' }}>
+                        <div className="glass-panel" style={{ padding: '20px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
+                                <h3 style={{ margin: 0 }}>Tickets</h3>
+                                <Ticket size={20} color="var(--color-primary)" />
+                            </div>
+                            <p style={{ fontSize: '24px', fontWeight: 'bold', margin: 0 }}>${formatDollars(stats.ticketRevenueCents)}</p>
+                        </div>
+                        <div className="glass-panel" style={{ padding: '20px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
+                                <h3 style={{ margin: 0 }}>Retail</h3>
+                                <ShoppingBag size={20} color="var(--color-secondary)" />
+                            </div>
+                            <p style={{ fontSize: '24px', fontWeight: 'bold', margin: 0 }}>${formatDollars(stats.retailRevenueCents)}</p>
+                        </div>
+                        <div className="glass-panel" style={{ padding: '20px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
+                                <h3 style={{ margin: 0 }}>Staff</h3>
+                                <Users size={20} color="var(--color-accent)" />
+                            </div>
+                            <p style={{ fontSize: '24px', fontWeight: 'bold', margin: 0 }}>{stats.totalEmployees}</p>
+                        </div>
+                        <div className="glass-panel" style={{ padding: '20px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
+                                <h3 style={{ margin: 0 }}>Animals</h3>
+                                <Database size={20} color="#f59e0b" />
+                            </div>
+                            <p style={{ fontSize: '24px', fontWeight: 'bold', margin: 0 }}>{stats.totalAnimals}</p>
+                        </div>
+                    </div>
+
+                    <div className="glass-panel" style={{ padding: '20px' }}>
+                        <h3 style={{ marginTop: 0 }}>System Status</h3>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#10b981' }}></div>
+                                <span>Database Connection: <span style={{ color: '#10b981' }}>Active</span></span>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#10b981' }}></div>
+                                <span>Auth Service: <span style={{ color: '#10b981' }}>Active</span></span>
+                            </div>
+                        </div>
+                    </div>
+                </>
+            )}
+
+            {/* ═══════════ STAFF ANALYTICS TAB ═══════════ */}
+            {activeTab === 'Staff Analytics' && (
+                <div className="glass-panel" style={{ padding: '20px', marginBottom: '40px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                        <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <Users size={20} color="var(--color-primary)" />
+                            Employees per Department
+                        </h3>
+                        <button 
+                            className="glass-button" 
+                            style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '12px', padding: '5px 10px' }}
+                            onClick={() => setShowStaffData(!showStaffData)}
+                        >
+                            <Database size={14} />
+                            {showStaffData ? 'Hide Summary' : 'Show Summary'}
+                            {showStaffData ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                        </button>
+                    </div>
+
+                    {showStaffData && (
+                        <div style={{ 
+                            background: 'rgba(0,0,0,0.3)', 
+                            padding: '15px', 
+                            borderRadius: '8px', 
+                            marginBottom: '20px',
+                            border: '1px solid rgba(255, 255, 255, 0.1)'
+                        }}>
+                            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                                <thead>
+                                    <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.1)', textAlign: 'left' }}>
+                                        <th style={{ padding: '8px 0', color: 'var(--color-text-muted)' }}>Department</th>
+                                        <th style={{ padding: '8px 0', color: 'var(--color-text-muted)' }}>Employees</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {staffChartData.map((data, idx) => (
+                                        <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                                            <td style={{ padding: '8px 0' }}>{data.name}</td>
+                                            <td style={{ padding: '8px 0', color: 'var(--color-primary)' }}>{data.Employees}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+
+                    <div style={{ width: '100%', height: '350px' }}>
+                        <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={staffChartData} margin={{ top: 5, right: 20, bottom: 5, left: -20 }}>
+                                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" vertical={false} />
+                                <XAxis dataKey="name" stroke="rgba(255,255,255,0.5)" tick={{fill: 'rgba(255,255,255,0.5)', fontSize: 12}} />
+                                <YAxis stroke="rgba(255,255,255,0.5)" tick={{fill: 'rgba(255,255,255,0.5)', fontSize: 12}} allowDecimals={false} />
+                                <Tooltip 
+                                    cursor={{fill: 'rgba(255,255,255,0.05)'}}
+                                    contentStyle={{ background: 'rgba(15, 23, 42, 0.9)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: 'white' }}
+                                />
+                                <Bar dataKey="Employees" fill="var(--color-primary)" radius={[4, 4, 0, 0]} />
+                            </BarChart>
+                        </ResponsiveContainer>
+                    </div>
+
                     <button 
                         className="glass-button" 
-                        style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '12px', padding: '5px 10px' }}
-                        onClick={() => setShowData(!showData)}
+                        style={{ marginTop: '20px', width: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '5px', fontSize: '13px' }}
+                        onClick={() => setShowStaffRaw(!showStaffRaw)}
                     >
-                        <Database size={14} />
-                        {showData ? 'Hide Data' : 'Show Data'}
-                        {showData ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                        <Database size={16} />
+                        {showStaffRaw ? 'Hide Employee Directory' : 'View Employee Directory'}
+                        {showStaffRaw ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                     </button>
-                </div>
 
-                {showData && (
-                    <div style={{ 
-                        background: 'rgba(0,0,0,0.3)', 
-                        padding: '15px', 
-                        borderRadius: '8px', 
-                        marginBottom: '20px',
-                        border: '1px solid rgba(255, 255, 255, 0.1)'
-                    }}>
-                        <div style={{ color: 'var(--color-text-muted)', marginBottom: '10px', fontSize: '12px', fontWeight: 'bold' }}>
-                            Aggregated Data (Employees joined with Departments)
-                        </div>
-                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-                            <thead>
-                                <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.1)', textAlign: 'left' }}>
-                                    <th style={{ padding: '8px 0', color: 'var(--color-text-muted)' }}>Department</th>
-                                    <th style={{ padding: '8px 0', color: 'var(--color-text-muted)' }}>Employees</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {chartData.map((data, idx) => (
-                                    <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                                        <td style={{ padding: '8px 0' }}>{data.name}</td>
-                                        <td style={{ padding: '8px 0', color: 'var(--color-primary)' }}>{data.Employees}</td>
+                    {showStaffRaw && (
+                        <div style={{ marginTop: '15px', overflowX: 'auto', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', padding: '10px' }}>
+                            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', textAlign: 'left' }}>
+                                <thead>
+                                    <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.2)' }}>
+                                        <th style={{ padding: '10px', color: 'var(--color-text-muted)' }}>Name</th>
+                                        <th style={{ padding: '10px', color: 'var(--color-text-muted)' }}>Department</th>
+                                        <th style={{ padding: '10px', color: 'var(--color-text-muted)' }}>Role</th>
+                                        <th style={{ padding: '10px', color: 'var(--color-text-muted)' }}>Pay Rate</th>
                                     </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                )}
-
-                <div style={{ width: '100%', height: '300px' }}>
-                    <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={chartData} margin={{ top: 5, right: 20, bottom: 5, left: -20 }}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" vertical={false} />
-                            <XAxis dataKey="name" stroke="rgba(255,255,255,0.5)" tick={{fill: 'rgba(255,255,255,0.5)', fontSize: 12}} />
-                            <YAxis stroke="rgba(255,255,255,0.5)" tick={{fill: 'rgba(255,255,255,0.5)', fontSize: 12}} allowDecimals={false} />
-                            <Tooltip 
-                                cursor={{fill: 'rgba(255,255,255,0.05)'}}
-                                contentStyle={{ background: 'rgba(15, 23, 42, 0.9)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: 'white' }}
-                                itemStyle={{ color: 'var(--color-primary)' }}
-                            />
-                            <Bar dataKey="Employees" fill="var(--color-primary)" radius={[4, 4, 0, 0]} />
-                        </BarChart>
-                    </ResponsiveContainer>
+                                </thead>
+                                <tbody>
+                                    {employees.map(emp => (
+                                        <tr key={emp.employee_id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                                            <td style={{ padding: '10px', color: 'var(--color-primary)' }}>{emp.first_name} {emp.last_name}</td>
+                                            <td style={{ padding: '10px' }}>{emp.departments?.dept_name || 'N/A'}</td>
+                                            <td style={{ padding: '10px', textTransform: 'capitalize' }}>{emp.role}</td>
+                                            <td style={{ padding: '10px' }}>${(emp.pay_rate_cents / 100).toFixed(2)}/hr</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
                 </div>
+            )}
 
-                {/* Raw Data Toggle Button */}
-                <button 
-                    className="glass-button" 
-                    style={{ marginTop: '20px', width: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '5px', fontSize: '13px' }}
-                    onClick={() => setShowRawData(!showRawData)}
-                >
-                    <Database size={16} />
-                    {showRawData ? 'Hide Raw Spreadsheet' : 'View Raw Spreadsheet'}
-                    {showRawData ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                </button>
+            {/* ═══════════ ANIMAL ANALYTICS TAB ═══════════ */}
+            {activeTab === 'Animal Analytics' && (
+                <div className="glass-panel" style={{ padding: '20px', marginBottom: '40px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                        <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <Database size={20} color="var(--color-secondary)" />
+                            Animal Distribution per Zone
+                        </h3>
+                        <button 
+                            className="glass-button" 
+                            style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '12px', padding: '5px 10px' }}
+                            onClick={() => setShowAnimalData(!showAnimalData)}
+                        >
+                            <Database size={14} />
+                            {showAnimalData ? 'Hide Summary' : 'Show Summary'}
+                            {showAnimalData ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                        </button>
+                    </div>
 
-                {/* Raw Data Dropdown / Spreadsheet */}
-                {showRawData && (
-                    <div style={{ marginTop: '15px', overflowX: 'auto', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', padding: '10px' }}>
-                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', textAlign: 'left' }}>
-                            <thead>
-                                <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.2)' }}>
-                                    <th style={{ padding: '10px', color: 'var(--color-text-muted)' }}>ID</th>
-                                    <th style={{ padding: '10px', color: 'var(--color-text-muted)' }}>Name</th>
-                                    <th style={{ padding: '10px', color: 'var(--color-text-muted)' }}>Department</th>
-                                    <th style={{ padding: '10px', color: 'var(--color-text-muted)' }}>Role</th>
-                                    <th style={{ padding: '10px', color: 'var(--color-text-muted)' }}>Pay Rate</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {employees.map(emp => (
-                                    <tr key={emp.employee_id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                                        <td style={{ padding: '10px' }}>{emp.employee_id}</td>
-                                        <td style={{ padding: '10px', color: 'var(--color-primary)' }}>{emp.first_name} {emp.last_name}</td>
-                                        <td style={{ padding: '10px' }}>{emp.departments?.dept_name || 'N/A'}</td>
-                                        <td style={{ padding: '10px', textTransform: 'capitalize' }}>{emp.role}</td>
-                                        <td style={{ padding: '10px' }}>${(emp.pay_rate_cents / 100).toFixed(2)}/hr</td>
+                    {showAnimalData && (
+                        <div style={{ 
+                            background: 'rgba(0,0,0,0.3)', 
+                            padding: '15px', 
+                            borderRadius: '8px', 
+                            marginBottom: '20px',
+                            border: '1px solid rgba(255, 255, 255, 0.1)'
+                        }}>
+                            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                                <thead>
+                                    <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.1)', textAlign: 'left' }}>
+                                        <th style={{ padding: '8px 0', color: 'var(--color-text-muted)' }}>Zone</th>
+                                        <th style={{ padding: '8px 0', color: 'var(--color-text-muted)' }}>Animals</th>
                                     </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                )}
-            </div>
+                                </thead>
+                                <tbody>
+                                    {animalChartData.map((data, idx) => (
+                                        <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                                            <td style={{ padding: '8px 0' }}>{data.name}</td>
+                                            <td style={{ padding: '8px 0', color: 'var(--color-secondary)' }}>{data.Animals}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
 
-            {/* Employee Directory + System Status */}
-            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '20px' }}>
-                <div className="glass-panel" style={{ padding: '20px' }}>
-                    <h3 style={{ marginTop: 0 }}>Employee Directory (Admin View)</h3>
-                    <div style={{ overflowX: 'auto' }}>
-                        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                            <thead>
-                                <tr style={{ borderBottom: '1px solid var(--glass-border)', textAlign: 'left' }}>
-                                    <th style={{ padding: '10px' }}>Name</th>
-                                    <th style={{ padding: '10px' }}>Department</th>
-                                    <th style={{ padding: '10px' }}>Role</th>
-                                    <th style={{ padding: '10px' }}>Pay Rate</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {employees.map(emp => (
-                                    <tr key={emp.employee_id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                                        <td style={{ padding: '10px' }}>{emp.first_name} {emp.last_name}</td>
-                                        <td style={{ padding: '10px' }}>
-                                            <span style={{
-                                                padding: '2px 8px', borderRadius: '10px', fontSize: '12px',
-                                                background: 'rgba(255,255,255,0.1)'
-                                            }}>
-                                                {emp.departments?.dept_name}
-                                            </span>
-                                        </td>
-                                        <td style={{ padding: '10px' }}>
-                                            <span style={{
-                                                padding: '2px 8px', borderRadius: '10px', fontSize: '12px',
-                                                background: emp.role === 'admin' ? 'rgba(239,68,68,0.2)' :
-                                                    emp.role === 'manager' ? 'rgba(245,158,11,0.2)' :
-                                                    emp.role === 'vet' ? 'rgba(16,185,129,0.2)' :
-                                                    emp.role === 'caretaker' ? 'rgba(59,130,246,0.2)' :
-                                                    emp.role === 'security' ? 'rgba(168,85,247,0.2)' :
-                                                    emp.role === 'retail' ? 'rgba(236,72,153,0.2)' :
-                                                    'rgba(255,255,255,0.1)',
-                                                textTransform: 'capitalize',
-                                            }}>
-                                                {emp.role}
-                                            </span>
-                                        </td>
-                                        <td style={{ padding: '10px' }}>${(emp.pay_rate_cents / 100).toFixed(2)}/hr</td>
+                    <div style={{ width: '100%', height: '350px' }}>
+                        <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={animalChartData} margin={{ top: 5, right: 20, bottom: 5, left: -20 }}>
+                                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" vertical={false} />
+                                <XAxis dataKey="name" stroke="rgba(255,255,255,0.5)" tick={{fill: 'rgba(255,255,255,0.5)', fontSize: 12}} />
+                                <YAxis stroke="rgba(255,255,255,0.5)" tick={{fill: 'rgba(255,255,255,0.5)', fontSize: 12}} allowDecimals={false} />
+                                <Tooltip 
+                                    cursor={{fill: 'rgba(255,255,255,0.05)'}}
+                                    contentStyle={{ background: 'rgba(15, 23, 42, 0.9)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: 'white' }}
+                                />
+                                <Bar dataKey="Animals" fill="var(--color-secondary)" radius={[4, 4, 0, 0]} />
+                            </BarChart>
+                        </ResponsiveContainer>
+                    </div>
+
+                    <button 
+                        className="glass-button" 
+                        style={{ marginTop: '20px', width: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '5px', fontSize: '13px' }}
+                        onClick={() => setShowAnimalRaw(!showAnimalRaw)}
+                    >
+                        <Database size={16} />
+                        {showAnimalRaw ? 'Hide Animal Census' : 'View Animal Census'}
+                        {showAnimalRaw ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                    </button>
+
+                    {showAnimalRaw && (
+                        <div style={{ marginTop: '15px', overflowX: 'auto', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', padding: '10px' }}>
+                            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', textAlign: 'left' }}>
+                                <thead>
+                                    <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.2)' }}>
+                                        <th style={{ padding: '10px', color: 'var(--color-text-muted)' }}>Name</th>
+                                        <th style={{ padding: '10px', color: 'var(--color-text-muted)' }}>Species</th>
+                                        <th style={{ padding: '10px', color: 'var(--color-text-muted)' }}>Zone</th>
+                                        <th style={{ padding: '10px', color: 'var(--color-text-muted)' }}>Age</th>
                                     </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
+                                </thead>
+                                <tbody>
+                                    {animals.map(animal => (
+                                        <tr key={animal.animal_id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                                            <td style={{ padding: '10px', color: 'var(--color-secondary)' }}>{animal.name}</td>
+                                            <td style={{ padding: '10px' }}>{animal.species_common_name}</td>
+                                            <td style={{ padding: '10px' }}>{animal.animal_zones?.zone_name || 'N/A'}</td>
+                                            <td style={{ padding: '10px' }}>{animal.age} yrs</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
                 </div>
+            )}
 
-                <div className="glass-panel" style={{ padding: '20px' }}>
-                    <h3 style={{ marginTop: 0 }}>System Status</h3>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                            <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#10b981' }}></div>
-                            <span>Database Connection: <span style={{ color: '#10b981' }}>Active</span></span>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                            <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#10b981' }}></div>
-                            <span>Auth Service: <span style={{ color: '#10b981' }}>Active</span></span>
-                        </div>
-                        <div style={{ marginTop: '20px', padding: '15px', background: 'rgba(255,255,255,0.05)', borderRadius: '8px' }}>
-                            <h4 style={{ margin: '0 0 10px' }}>Admin Actions</h4>
-                            <button className="glass-button" style={{ width: '100%', marginBottom: '10px' }} onClick={() => setShowCreateUser(true)}>
-                                Create System User
-                            </button>
-                            <button className="glass-button" style={{ width: '100%' }} onClick={() => alert("Feature coming: Generate financial report")}>
-                                Download Report
-                            </button>
-                        </div>
+            {/* ═══════════ FINANCIAL REVENUE TAB ═══════════ */}
+            {activeTab === 'Financial Revenue' && (
+                <div className="glass-panel" style={{ padding: '20px', marginBottom: '40px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                        <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <DollarSign size={20} color="#10b981" />
+                            Revenue Breakdown
+                        </h3>
+                        <button 
+                            className="glass-button" 
+                            style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '12px', padding: '5px 10px' }}
+                            onClick={() => setShowFinancialData(!showFinancialData)}
+                        >
+                            <Database size={14} />
+                            {showFinancialData ? 'Hide Summary' : 'Show Summary'}
+                            {showFinancialData ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                        </button>
                     </div>
+
+                    {showFinancialData && (
+                        <div style={{ 
+                            background: 'rgba(0,0,0,0.3)', 
+                            padding: '15px', 
+                            borderRadius: '8px', 
+                            marginBottom: '20px',
+                            border: '1px solid rgba(255, 255, 255, 0.1)'
+                        }}>
+                            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                                <thead>
+                                    <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.1)', textAlign: 'left' }}>
+                                        <th style={{ padding: '8px 0', color: 'var(--color-text-muted)' }}>Category</th>
+                                        <th style={{ padding: '8px 0', color: 'var(--color-text-muted)' }}>Revenue</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {revenueBreakdown.map((data, idx) => (
+                                        <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                                            <td style={{ padding: '8px 0' }}>{data.name}</td>
+                                            <td style={{ padding: '8px 0', color: '#10b981' }}>${data.Revenue.toLocaleString()}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+
+                    <div style={{ width: '100%', height: '350px' }}>
+                        <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={revenueBreakdown} margin={{ top: 5, right: 20, bottom: 5, left: -20 }}>
+                                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" vertical={false} />
+                                <XAxis dataKey="name" stroke="rgba(255,255,255,0.5)" tick={{fill: 'rgba(255,255,255,0.5)', fontSize: 12}} />
+                                <YAxis stroke="rgba(255,255,255,0.5)" tick={{fill: 'rgba(255,255,255,0.5)', fontSize: 12}} />
+                                <Tooltip 
+                                    cursor={{fill: 'rgba(255,255,255,0.05)'}}
+                                    contentStyle={{ background: 'rgba(15, 23, 42, 0.9)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: 'white' }}
+                                    formatter={(val) => [`$${val.toLocaleString()}`, 'Revenue']}
+                                />
+                                <Bar dataKey="Revenue" fill="#10b981" radius={[4, 4, 0, 0]} />
+                            </BarChart>
+                        </ResponsiveContainer>
+                    </div>
+
+                    <div style={{ marginTop: '20px', padding: '20px', background: 'rgba(255,255,255,0.05)', borderRadius: '12px', textAlign: 'center' }}>
+                        <p style={{ margin: 0, color: 'var(--color-text-muted)', fontSize: '14px' }}>Total Calculated Revenue</p>
+                        <h2 style={{ margin: '10px 0 0', color: '#10b981' }}>
+                            ${(revenueBreakdown.reduce((sum, r) => sum + r.Revenue, 0)).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                        </h2>
+                    </div>
+
+                    <button 
+                        className="glass-button" 
+                        style={{ marginTop: '30px', width: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '5px', fontSize: '13px' }}
+                        onClick={() => setShowFinancialRaw(!showFinancialRaw)}
+                    >
+                        <Database size={16} />
+                        {showFinancialRaw ? 'Hide Transaction Log' : 'View Transaction Log'}
+                        {showFinancialRaw ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                    </button>
+
+                    {showFinancialRaw && (
+                        <div style={{ marginTop: '15px', overflowX: 'auto', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', padding: '10px' }}>
+                            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', textAlign: 'left' }}>
+                                <thead>
+                                    <tr style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.2)' }}>
+                                        <th style={{ padding: '10px', color: 'var(--color-text-muted)' }}>ID</th>
+                                        <th style={{ padding: '10px', color: 'var(--color-text-muted)' }}>Date</th>
+                                        <th style={{ padding: '10px', color: 'var(--color-text-muted)' }}>Amount</th>
+                                        <th style={{ padding: '10px', color: 'var(--color-text-muted)' }}>Type</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {recentTransactions.map(txn => (
+                                        <tr key={txn.transaction_id} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.05)' }}>
+                                            <td style={{ padding: '10px' }}>#{txn.transaction_id}</td>
+                                            <td style={{ padding: '10px' }}>{new Date(txn.transaction_date).toLocaleDateString()}</td>
+                                            <td style={{ padding: '10px', color: '#10b981', fontWeight: 'bold' }}>
+                                                ${(txn.total_amount_cents / 100).toFixed(2)}
+                                            </td>
+                                            <td style={{ padding: '10px' }}>
+                                                {txn.donation_id ? 'Donation' : 'Purchase'}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
                 </div>
-            </div>
+            )}
         </div>
     );
 }

@@ -92,3 +92,52 @@ export async function createZooUser({ email, password, first_name, last_name, de
   if (error) throw error;
   return data;
 }
+/* ── Animals with Zones ── */
+export async function getAnimalsWithZones() {
+  const result = await supabase
+    .from('animals')
+    .select('*, animal_zones(zone_name)')
+    .order('animal_id', { ascending: true });
+
+  return handleSupabaseResult(result);
+}
+
+/* ── Financial Overview (Specifics) ── */
+export async function getFinancialRevenueBreakdown() {
+  const [ticketsRes, salesRes] = await Promise.all([
+    supabase.from('tickets').select('type, price_cents'),
+    supabase.from('sale_items').select('price_at_sale_cents, quantity'),
+  ]);
+
+  const tickets = handleSupabaseResult(ticketsRes);
+  const sales = handleSupabaseResult(salesRes);
+
+  const admissionRevenue = tickets
+    .filter(t => t.type === 'Admission')
+    .reduce((sum, t) => sum + t.price_cents, 0);
+  
+  const attractionRevenue = tickets
+    .filter(t => t.type === 'Attraction')
+    .reduce((sum, t) => sum + t.price_cents, 0);
+
+  const retailRevenue = sales.reduce(
+    (sum, s) => sum + s.quantity * s.price_at_sale_cents,
+    0
+  );
+
+  return [
+    { name: 'Admission', Revenue: admissionRevenue / 100 },
+    { name: 'Attractions', Revenue: attractionRevenue / 100 },
+    { name: 'Retail', Revenue: retailRevenue / 100 },
+  ];
+}
+/* ── Recent Transactions ── */
+export async function getRecentTransactions() {
+  const result = await supabase
+    .from('transactions')
+    .select('*, customers(customer_id)')
+    .order('transaction_date', { ascending: false })
+    .limit(50);
+
+  return handleSupabaseResult(result);
+}

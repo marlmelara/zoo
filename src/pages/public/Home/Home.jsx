@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Swiper, SwiperSlide } from 'swiper/react';
 import { Autoplay, Pagination, Navigation, EffectFade } from 'swiper/modules';
 import { getUpcomingEvents } from '../../../api/public';
@@ -17,14 +18,14 @@ import 'swiper/css/effect-fade';
 export default function Home() {
   document.title = 'Welcome to Coog Zoo!';
 
-  // Static daily schedule for Today's Schedule section
+  // Static daily schedule for Today's Schedule section (first 5 events)
   const staticDailySchedule = [
-  { id: 1, time: '09:30:00', endTime: '10:00:00', title: 'Birds of the World', venue: 'Birds of the World' },
-  { id: 2, time: '10:00:00', endTime: '10:30:00', title: 'African Safari Talk', venue: 'Animals of Africa' },
-  { id: 3, time: '10:30:00', endTime: '11:00:00', title: 'Big Cats Feeding', venue: 'Big Cats Zone' },
-  { id: 4, time: '11:00:00', endTime: '11:30:00', title: 'Galápagos Giants', venue: 'Galápagos Island' },
-  { id: 5, time: '11:30:00', endTime: '12:00:00', title: 'Primate Playtime', venue: 'World of Primates' }
-];
+    { id: 1, time: '09:30:00', endTime: '10:00:00', title: 'Birds of the World', venue: 'Birds of the World' },
+    { id: 2, time: '10:00:00', endTime: '10:30:00', title: 'African Safari Talk', venue: 'Animals of Africa' },
+    { id: 3, time: '10:30:00', endTime: '11:00:00', title: 'Big Cats Feeding', venue: 'Big Cats Zone' },
+    { id: 4, time: '11:00:00', endTime: '11:30:00', title: 'Galápagos Giants', venue: 'Galápagos Island' },
+    { id: 5, time: '11:30:00', endTime: '12:00:00', title: 'Primate Playtime', venue: 'World of Primates' }
+  ];
 
   // State for calendar 
   const [eventsByDate, setEventsByDate] = useState({});
@@ -82,7 +83,7 @@ export default function Home() {
     });
   };
 
-  // Sort events by time for homepage display 
+  // Sort events by time for homepage display
   const sortedEvents = [...staticDailySchedule].sort((a, b) => {
     return a.time.localeCompare(b.time);
   });
@@ -187,15 +188,20 @@ export default function Home() {
   ];
 
   return (
-    <div className="home" style={{ color: "white" }}>
+    <div className="home">
       {/* Navigation Bar */}
-      <nav className="navbar">
-        <div className="navbar-container">
-          <a href="/tickets" className="navbar-link">🎟️ Buy Tickets</a>
-          <a href="/shop" className="navbar-link">🛍️ Shop</a>
-          <a href="/membership" className="navbar-link"> 🦁 Membership</a>
-          <a href="/account" className="navbar-link">🔑 Customer Login</a>
-          <a href="/login" className="navbar-link">🏢 Staff Portal</a>
+      <nav className="home-navbar">
+        <div className="home-navbar-container">
+          <Link to="/" className="navbar-logo-link" aria-label="Go to homepage">
+            <img src={logo} alt="Coog Zoo" />
+          </Link>
+          <div className="home-navbar-links">
+            <Link to="/tickets" className="home-navbar-link">Buy Tickets</Link>
+            <Link to="/shop" className="home-navbar-link">Shop</Link>
+            <Link to="/membership" className="home-navbar-link">Membership</Link>
+            <Link to="/account" className="home-navbar-link">Customer Login</Link>
+            <Link to="/login" className="home-navbar-link">Staff Portal</Link>
+          </div>
         </div>
       </nav>
 
@@ -229,8 +235,8 @@ export default function Home() {
                   <img src={slide.image} alt={slide.title} className="hero-image" />
                   <div className="hero-overlay"></div>
                   <div className="hero-content">
-                    <h2 className="hero-title">{slide.title}</h2>
-                    <p className="hero-subtitle" style={{ color: "white" }}>{slide.subtitle}</p>
+                    <h2 className="hero-title" style = {{color: "#ede9e2"}}>{slide.title}</h2>
+                    <p className="hero-subtitle" style={{ color: "#dcd0d0" }}>{slide.subtitle}</p>
                     <div className="hero-buttons">
                       {slide.buttons.map((button, btnIndex) => (
                         <a key={btnIndex} href={button.link} className={`hero-button hero-button-${button.variant}`}>
@@ -272,7 +278,7 @@ export default function Home() {
       <div className="container">
         {/* Two Column Layout */}
         <div className="home-two-columns">
-          {/* Left Column - Today's Schedule */}
+          {/* Left Column - Today's Schedule (Static) */}
           <div className="home-left-column">
             <h2 className="section-title-home">Today's Schedule</h2>
             <div className="schedule-date-home">{formatDate()}</div>
@@ -385,9 +391,8 @@ export default function Home() {
         <section className="content-section">
           <div className="section-header">
             <h2 className="section-title-home">Support Wildlife</h2>
-            <a href="/conservation" className="section-link">Learn more →</a>
           </div>
-          <div className="card card-conservation">
+          <div className="card card-donations">
             <p className="card-text">
               With your generous donations, you can help fund our animal care programs and conservations efforts! 
             </p>
@@ -397,7 +402,7 @@ export default function Home() {
       </div>
 
       {/* Footer */}
-      <footer className="footer">
+      <footer className="footer" style={{background: "rgb(123, 144, 79)"}}>
         <div className="footer-container">
           <div className="footer-main">
             <div className="footer-section footer-brand">
@@ -406,7 +411,7 @@ export default function Home() {
                   <img src={logo} style={{ maxWidth: '200px', width: '100%', height: 'auto' }} alt="Coog Zoo" />
                 </div>
               </div>
-              <p className="footer-description">
+              <p className="footer-description" style={{color:"white"}}>
                 Discover amazing wildlife, attend exciting events, and support animal conservation at Coog Zoo.
               </p>
             </div>
@@ -415,26 +420,26 @@ export default function Home() {
               <h3 className="footer-title">Contact Us</h3>
               <div className="footer-contact-info">
                 <div className="contact-item">
-                  <FaMapMarkerAlt className="contact-icon" />
+                  <FaMapMarkerAlt className="contact-icon" style={{color:"white"}} />
                   <div>
-                    <p>4302 University Dr</p>
-                    <p>Houston, TX 77004</p>
+                    <p style={{color:"white"}}>4302 University Dr</p>
+                    <p style={{color:"white"}}>Houston, TX 77004</p>
                   </div>
                 </div>
                 <div className="contact-item">
-                  <FaPhone className="contact-icon" />
-                  <a href="tel:5555555555">555-555-5555</a>
+                  <FaPhone className="contact-icon" style={{color:"white"}} />
+                  <a href="tel:5555555555" style={{color:"white"}}>555-555-5555</a>
                 </div>
                 <div className="contact-item">
-                  <FaEnvelope className="contact-icon" />
-                  <a href="mailto:info@coogzoo.org">info@coogzoo.org</a>
+                  <FaEnvelope className="contact-icon" style={{color:"white"}}/>
+                  <a href="mailto:info@coogzoo.org" style={{color:"white"}}>info@coogzoo.org</a>
                 </div>
               </div>
             </div>
           </div>
 
           <div className="footer-bottom">
-            <div className="footer-bottom-content">
+            <div className="footer-bottom-content" style={{color:"white"}}>
               <p>&copy; {new Date().getFullYear()} Coog Zoo. All rights reserved.</p>
             </div>
           </div>

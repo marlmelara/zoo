@@ -94,7 +94,7 @@
 }
 
 .donations-page .glass-button-ghost {
-  background: rgba(253, 250, 244, .6);
+  background: rgba(230, 227, 223, 0.8);
   border: 1px solid rgba(123, 144, 79, 0.22);
 }
 
@@ -138,7 +138,7 @@
   border-radius: 18px;
   max-width: 900px;
   width: 100%;
-  background: rgba(255, 245, 231, .8);
+  background: rgba(255, 255, 255, .6);
   box-shadow: 0 24px 60px rgba(31, 41, 55, 0.08);
   border: 1px solid rgba(123, 144, 79, 0.18);
 }
@@ -191,7 +191,7 @@
   min-height: 64px;
   border-radius: 10px;
   border: 1px solid rgba(123, 144, 79, 0.35);
-  background: rgba(253, 250, 244, .6);
+  background: rgba(230, 227, 223, 0.8);
   color: #0f172a;
   cursor: pointer;
   transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease, color 0.2s ease;

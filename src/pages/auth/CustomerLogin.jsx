@@ -3,7 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { Lock } from 'lucide-react';
-import logo from '../../images/logo.png';
+import logo_alt from '../../images/logo_alt2.png';
 
 export default function CustomerLogin() {
   const [email, setEmail] = useState('');
@@ -63,28 +63,27 @@ export default function CustomerLogin() {
       flexDirection: 'column',
       alignItems: 'center',
       justifyContent: 'center',
-      background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
+      background: 'rgb(255, 245, 231)',
       color: 'white',
       padding: '2rem',
     }}>
-      {/* Small logo symbol — top left */}
-      <Link to="/" style={{ position: 'absolute', top: '24px', left: '24px' }}>
-        <img src={logo} alt="Home" style={{ width: '48px', height: '48px', objectFit: 'contain' }} />
+      <Link to="/" style={{ position: 'absolute', top: '24px', left: '24px', backgroundColor: 'rgb(123,144,79)', padding: '10px 20px', borderRadius: '5px', textDecoration: 'none' }}>
+        <button style={{ background: 'none', border: 'none', color: 'white', fontSize: '18px', fontWeight: 'bold' }}>Home</button>
       </Link>
 
       {/* Coog Zoo logo above panel */}
-      <Link to="/" style={{ marginBottom: '24px' }}>
-        <img src={logo} alt="Coog Zoo" style={{ maxWidth: '160px', height: 'auto' }} />
-      </Link>
+      <div style={{ marginBottom: '24px', padding: '10px', borderRadius: '5px', display: 'inline-block' }}>
+        <img src={logo_alt} alt="Coog Zoo" style={{ maxWidth: '240px', height: 'auto' }} />
+      </div>
 
-      <div className="glass-panel" style={{ padding: '40px', width: '100%', maxWidth: '400px', textAlign: 'center' }}>
+      <div className="glass-panel" style={{padding: '40px', width: '100%', maxWidth: '400px', textAlign: 'center', background: 'rgba(255, 255, 255, 0.5)', backdropFilter: 'blur(10px)' }}>
         <div style={{
-          background: 'var(--color-primary)', width: '60px', height: '60px', borderRadius: '50%',
+          background: 'rgb(123, 144, 79)', width: '60px', height: '60px', borderRadius: '50%',
           display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px',
         }}>
           <Lock size={30} color="white" />
         </div>
-        <h2 style={{ marginBottom: '8px' }}>Customer Sign In</h2>
+        <h2 style={{ marginBottom: '8px', color: '#1f2937'}}>Customer Sign In</h2>
         <p style={{ color: 'var(--color-text-muted)', marginBottom: '24px', fontSize: '0.9rem' }}>
           Sign in to manage your tickets, orders, and membership.
         </p>
@@ -112,14 +111,14 @@ export default function CustomerLogin() {
           </div>
 
           <button type="submit" className="glass-button" disabled={loading}
-            style={{ padding: '15px', background: 'var(--color-secondary)', fontSize: '16px', marginTop: '4px' }}>
+            style={{ padding: '15px', background: 'rgb(123, 144, 79)', fontSize: '16px', marginTop: '4px' }}>
             {loading ? 'Signing in...' : 'Sign In'}
           </button>
         </form>
 
         <p style={{ marginTop: '20px', fontSize: '14px', color: 'var(--color-text-muted)' }}>
           Don't have an account?{' '}
-          <Link to="/signup" style={{ color: 'var(--color-primary)', textDecoration: 'none' }}>Sign up</Link>
+          <Link to="/signup" style={{ color: '#ffbf69', textDecoration: 'none' }}>Sign up</Link>
         </p>
       </div>
     </div>

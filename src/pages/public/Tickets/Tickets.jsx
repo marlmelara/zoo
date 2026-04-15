@@ -7,6 +7,7 @@ import { supabase } from '../../../lib/supabase';
 import { getUpcomingEvents } from '../../../api/public';
 import ShopCartPanel, { useZooCart } from '../../../components/ShopCart';
 import './tickets.css';
+import logo from '../../../images/logo.png';
 
 let dayTime = new Date();
 
@@ -201,7 +202,7 @@ export default function Tickets() {
         {/* Left Column */}
         <div className="tickets-left">
           <div className="page-header">
-            <h1 className="page-title">Tickets & Membership</h1>
+            <h1 className="page-title" style={{color: "#FFBF69"}}>Tickets & Membership</h1>
             <p className="page-description">Plan your visit with admission options, family-friendly pricing, and membership package.</p>
           </div>
 
@@ -255,7 +256,7 @@ export default function Tickets() {
                 <div className="table-cell price">{price}</div>
                 <div className="table-cell quantity">
                   <div className="quantity-controls">
-                    <button className="quantity-btn" onClick={() => handleQuantityChange(type, -1)} disabled={quantities[type] === 0}><FaMinus /></button>
+                    <button className="quantity-btn" onClick={() => handleQuantityChange(type, -1)} disabled={quantities[type] === 0} ><FaMinus /></button>
                     <span className="quantity-number">{quantities[type]}</span>
                     <button className="quantity-btn" onClick={() => handleQuantityChange(type, 1)}><FaPlus /></button>
                   </div>
@@ -312,7 +313,7 @@ export default function Tickets() {
                 );
               })}
             </div>
-            <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginTop: '10px', textAlign: 'center' }}>
+            <p style={{ fontSize: '0.75rem', color: 'black', marginTop: '10px', textAlign: 'center' }}>
               {user ? 'Select a plan and proceed to checkout.' : 'You must be signed in or create an account to purchase a membership.'} Membership discounts (10-20% off) apply to future ticket and shop purchases.
             </p>
           </div>
@@ -481,23 +482,23 @@ export default function Tickets() {
       <ShopCartPanel isOpen={cartOpen} onClose={() => setCartOpen(false)} {...cartHook} />
 
       {/* Footer */}
-      <footer className="footer">
+      <footer className="footer" style={{background: "rgb(123, 144, 79)"}}>
         <div className="footer-container">
           <div className="footer-main">
             <div className="footer-section footer-brand">
-              <div className="footer-logo"><div className="logo-placeholder">🦁 Coog Zoo</div></div>
-              <p className="footer-description">Discover amazing wildlife, attend exciting events, and support animal conservation at Coog Zoo.</p>
+              <img src={logo} style={{ maxWidth: '200px', width: '100%', height: 'auto' }} alt="Coog Zoo" />
+              <p className="footer-description" style={{color:"white"}}>Discover amazing wildlife, attend exciting events, and support animal conservation at Coog Zoo.</p>
             </div>
             <div className="footer-section">
               <h3 className="footer-title">Contact Us</h3>
               <div className="footer-contact-info">
-                <div className="contact-item"><FaMapMarkerAlt className="contact-icon" /><div><p>4302 University Dr</p><p>Houston, TX 77004</p></div></div>
-                <div className="contact-item"><FaPhone className="contact-icon" /><a href="tel:5555555555">555-555-5555</a></div>
-                <div className="contact-item"><FaEnvelope className="contact-icon" /><a href="mailto:info@coogzoo.org">info@coogzoo.org</a></div>
+                <div className="contact-item" style={{color:"white"}}><FaMapMarkerAlt className="contact-icon" style={{color:"white"}} /><div><p>4302 University Dr</p><p>Houston, TX 77004</p></div></div>
+                <div className="contact-item" style={{color:"white"}} ><FaPhone className="contact-icon" style={{color:"white"}} /><a href="tel:5555555555">555-555-5555</a></div>
+                <div className="contact-item" style={{color:"white"}}><FaEnvelope className="contact-icon" style={{color:"white"}} /><a href="mailto:info@coogzoo.org">info@coogzoo.org</a></div>
               </div>
             </div>
           </div>
-          <div className="footer-bottom"><div className="footer-bottom-content"><p>&copy; {new Date().getFullYear()} Coog Zoo. All rights reserved.</p></div></div>
+          <div className="footer-bottom"><div className="footer-bottom-content" style={{color:"white"}}><p>&copy; {new Date().getFullYear()} Coog Zoo. All rights reserved.</p></div></div>
         </div>
       </footer>
     </div>

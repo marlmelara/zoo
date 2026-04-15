@@ -422,17 +422,17 @@ export default function Home() {
                 <div className="contact-item">
                   <FaMapMarkerAlt className="contact-icon" style={{color:"white"}} />
                   <div>
-                    <p style={{color:"white"}}>4302 University Dr</p>
-                    <p style={{color:"white"}}>Houston, TX 77004</p>
+                    <p>4302 University Dr</p>
+                    <p>Houston, TX 77004</p>
                   </div>
                 </div>
                 <div className="contact-item">
                   <FaPhone className="contact-icon" style={{color:"white"}} />
-                  <a href="tel:5555555555" style={{color:"white"}}>555-555-5555</a>
+                  <a href="tel:5555555555">555-555-5555</a>
                 </div>
                 <div className="contact-item">
                   <FaEnvelope className="contact-icon" style={{color:"white"}}/>
-                  <a href="mailto:info@coogzoo.org" style={{color:"white"}}>info@coogzoo.org</a>
+                  <a href="mailto:info@coogzoo.org">info@coogzoo.org</a>
                 </div>
               </div>
             </div>

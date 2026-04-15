@@ -1,7 +1,10 @@
-/* Tickets Page Styles */
 .tickets-page {
   min-height: 100vh;
   padding: 2rem 0;
+  background: var(--color-bg);
+  display: flex;
+  flex-direction: column;
+  flex: 1;
 }
 
 .tickets-container {
@@ -11,6 +14,7 @@
   display: grid;
   grid-template-columns: 1fr 450px;
   gap: 2rem;
+  flex: 1; 
 }
 
 /* Left Column */
@@ -25,12 +29,11 @@
   margin-bottom: 0;
 }
 
-.page-title {
+.page-title h1 {
   font-size: 2.5rem;
   font-weight: 700;
   margin-bottom: 0.5rem;
-  color: white;
-  background-clip: text;
+  color: var(--color-secondary);
 }
 
 .page-description {
@@ -39,7 +42,7 @@
   margin: 0;
 }
 
-/* Member Banner */
+/* Member Banner - More readable with darker background */
 .member-banner {
   display: flex;
   justify-content: space-between;
@@ -47,34 +50,67 @@
   flex-wrap: wrap;
   gap: 1rem;
   padding: 1rem 1.5rem;
+  background: rgba(121, 162, 128, 0.85);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 12px;
+  box-shadow: var(--glass-shadow);
 }
 
 .member-banner p {
   margin: 0;
   font-size: 0.95rem;
   flex: 1;
+  color: white;
+  font-weight: 500;
+}
+
+/* Member Banner Link Button */
+.member-banner .glass-button {
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: white;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-decoration: none;
+  display: inline-block;
+}
+
+.member-banner .glass-button:hover {
+  background: rgba(255, 255, 255, 0.3);
+  transform: translateY(-1px);
 }
 
 /* Tickets Table */
 .tickets-table {
   padding: 0;
   overflow: hidden;
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--glass-border);
+  border-radius: 12px;
+  box-shadow: var(--glass-shadow);
+  background-color: white;
 }
 
 .table-header {
   display: grid;
   grid-template-columns: 2fr 1fr 1.5fr;
-  background: rgba(16, 185, 129, 0.2);
+  background: rgba(121, 162, 128, 0.12);
   border-bottom: 2px solid var(--color-primary);
   padding: 1rem;
   font-weight: 600;
 }
 
 .header-cell {
-  color: var(--color-text);
+  color: var(--color-secondary);
   font-size: 0.85rem;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  font-weight: 700;
 }
 
 .table-row {
@@ -86,13 +122,13 @@
 }
 
 .table-row:hover {
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(121, 162, 128, 0.08);
 }
 
 .table-cell {
   display: flex;
   align-items: center;
-  color: var(--color-text);
+  color: #3d4f3e;
 }
 
 .ticket-type {
@@ -113,6 +149,7 @@
 .ticket-name {
   font-weight: 600;
   font-size: 0.95rem;
+  color: #3d4f3e;
 }
 
 .ticket-age {
@@ -136,19 +173,22 @@
   width: 28px;
   height: 28px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(121, 162, 128, 0.15);
   border: 1px solid var(--glass-border);
-  color: var(--color-text);
+  color: var(--color-secondary);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   transition: all 0.3s ease;
+  font-weight: bold;
 }
 
 .quantity-btn:hover:not(:disabled) {
   background: var(--color-primary);
   border-color: var(--color-primary);
+  color: white;
+  transform: translateY(-1px);
 }
 
 .quantity-btn:disabled {
@@ -161,11 +201,12 @@
   font-weight: 600;
   min-width: 25px;
   text-align: center;
+  color: var(--color-secondary);
 }
 
 .table-footer {
   padding: 1rem;
-  background: rgba(16, 185, 129, 0.05);
+  background: rgba(121, 162, 128, 0.05);
   border-top: 1px solid var(--glass-border);
 }
 
@@ -178,9 +219,13 @@
 /* Membership Card */
 .membership-card {
   padding: 1.5rem;
-  background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(139, 92, 246, 0.1));
+  background: linear-gradient(135deg, rgba(121, 162, 128, 0.15), rgba(209, 146, 51, 0.1));
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--glass-border);
+  border-radius: 12px;
   position: relative;
   overflow: hidden;
+  box-shadow: var(--glass-shadow);
 }
 
 .membership-card::before {
@@ -204,21 +249,20 @@
   font-size: 1.3rem;
   font-weight: 700;
   margin: 0;
-  color: white;
-  background-clip: text;
+  color: var(--color-secondary);
 }
 
 .membership-badge {
   background: var(--color-primary);
   padding: 0.2rem 0.6rem;
   border-radius: 20px;
-  font-size: 0.95rem;
+  font-size: 0.85rem;
   font-weight: 600;
   color: white;
 }
 
 .membership-description {
-  color: var(--color-text-muted);
+  color: #3d4f3e;
   line-height: 1.5;
   margin-bottom: 1rem;
   font-size: 0.9rem;
@@ -244,11 +288,27 @@
   margin-bottom: 1rem;
 }
 
-/* Calendar Card */
+/* Calendar Card  */
 .calendar-card {
-  padding: 1.5rem;
+  background: rgba(255, 255, 255, 0.8);
+  border: 1px solid rgba(121, 162, 128, 0.35);
+  border-radius: 12px;
+  padding: 1rem;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 2px 8px rgba(121, 162, 128, 0.1);
   position: sticky;
   top: 2rem;
+}
+
+.calendar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.calendar-inner {
+  padding: 1.5rem;
 }
 
 .calendar-title {
@@ -258,7 +318,7 @@
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  color: var(--color-text);
+  color: var(--color-secondary);
 }
 
 .calendar-icon {
@@ -272,18 +332,21 @@
   margin-bottom: 1rem;
 }
 
+
 .month-nav {
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid var(--glass-border);
-  padding: 0.4rem 0.8rem;
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(121, 162, 128, 0.35);
   border-radius: 6px;
-  color: var(--color-text);
+  padding: 0.3rem 0.6rem;
   cursor: pointer;
-  font-size: 0.9rem;
+  color: #4a6741;
+  font-size: 0.75rem;
+  transition: all 0.2s;
 }
 
 .month-nav:hover:not(:disabled) {
-  background: rgba(16, 185, 129, 0.2);
+  background: rgba(121, 162, 128, 0.2);
+  border-color: var(--color-primary);
 }
 
 .month-nav:disabled {
@@ -292,23 +355,33 @@
 }
 
 .current-month {
-  font-weight: 500;
+  text-align: center;
+  font-weight: 700;
+  color: #d19233;
   font-size: 0.9rem;
+  margin: 0;
 }
 
+/* Calendar Grid  */
 .calendar-grid {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  gap: 0.3rem;
+  gap: 3px;
+  background-color: rgba(121, 162, 128, 0.15);
+  border: 1px solid rgba(121, 162, 128, 0.3);
+  border-radius: 8px;
+  overflow: hidden;
+  padding: 4px;
   margin-bottom: 1rem;
 }
 
+
 .calendar-weekday {
   text-align: center;
-  font-size: 0.7rem;
+  font-size: 0.65rem;
   font-weight: 600;
-  color: var(--color-text-muted);
-  padding: 0.4rem;
+  color: #79a280;
+  padding: 0.3rem;
 }
 
 .calendar-day {
@@ -317,22 +390,45 @@
   align-items: center;
   justify-content: center;
   border-radius: 6px;
+  font-size: 0.7rem;
+  color: #4a6741;
+  background: rgba(255, 255, 255, 0.75);
+  border: 1px solid rgba(121, 162, 128, 0.25);
   cursor: pointer;
-  transition: all 0.3s ease;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid transparent;
+  transition: all 0.2s ease;
 }
 
 .calendar-day.has-date:hover:not(.past) {
-  background: var(--color-primary);
+  background: rgba(121, 162, 128, 0.25);
+  border-color: var(--color-primary);
+  transform: scale(1.05);
+}
+
+
+.calendar-day:hover:not(.empty):not(.past) {
+  background: rgba(121, 162, 128, 0.25);
+  border-color: #79a280;
+  transform: translateY(-1px);
 }
 
 .calendar-day.selected {
-  background: var(--color-primary);
+  background: #79a280;
+  border-color: #79a280;
+}
+
+.calendar-day.selected .day-number {
+  color: white;
 }
 
 .calendar-day.today {
-  border-color: var(--color-primary);
+  border: 2px solid #d19233;
+  font-weight: bold;
+  color: #d19233;
+}
+
+.calendar-day.today .day-number {
+  font-weight: bold;
+  color: var(--color-secondary);
 }
 
 .calendar-day.past {
@@ -341,70 +437,153 @@
 }
 
 .calendar-day.empty {
-  cursor: default;
   background: transparent;
+  border-color: transparent;
+  cursor: default;
 }
 
 .day-number {
-  font-size: 0.75rem;
-  color: var(--color-text);
+  font-size: 0.7rem;
+  color: inherit;
 }
 
-.calendar-day.selected .day-number {
-  color: white;
-}
 
 /* Time Slots */
 .time-slots {
   margin-top: 1rem;
+  padding-top: 0.5rem;
 }
 
 .time-slots-title {
-  font-size: 1rem;
+  font-size: 0.9rem;
   font-weight: 600;
   margin-bottom: 0.75rem;
-  color: var(--color-text);
+  color: #d19233;
 }
 
 .time-slots-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 0.75rem;
+  gap: 0.5rem;
 }
 
 .time-slot {
   padding: 0.5rem;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid var(--glass-border);
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(121, 162, 128, 0.35);
   border-radius: 6px;
-  color: var(--color-text);
+  color: #4a6741;
   cursor: pointer;
-  font-size: 0.85rem;
-  transition: all 0.3s ease;
+  font-size: 0.8rem;
+  transition: all 0.2s ease;
+  text-align: center;
 }
 
-.time-slot:hover {
-  background: rgba(16, 185, 129, 0.2);
+.time-slot:hover:not(.disabled) {
+  background: rgba(121, 162, 128, 0.2);
+  border-color: var(--color-primary);
+  transform: translateY(-1px);
 }
 
 .time-slot.selected {
-  background: var(--color-primary);
-  border-color: var(--color-primary);
+  background: #79a280;
+  border-color: #79a280;
+  color: white;
 }
 
+.time-slot.disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+/* Selected Summary */
 .selected-summary {
   margin-top: 1rem;
-  padding: 0.6rem;
-  background: rgba(16, 185, 129, 0.1);
-  border-radius: 6px;
+  padding: 0.75rem;
+  background: rgba(121, 162, 128, 0.08);
+  border-radius: 8px;
+  border-left: 3px solid #79a280;
+}
+
+
+.selected-date {
+  margin: 0 0 0.5rem 0;
+  color: #d19233;
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+
+.total-tickets, 
+.total-price {
+  margin: 0.25rem 0;
+  color: #4a6741;
+  font-size: 0.85rem;
+}
+
+.total-price {
+  font-weight: 700;
+  color: #79a280;
   font-size: 1rem;
 }
 
-.selected-date {
-  margin: 0;
-  color: var(--color-text);
+/* Responsive Design */
+@media (max-width: 1024px) {
+  .tickets-container {
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+  }
+  
+  .calendar-card {
+    position: static;
+  }
 }
 
-.total-tickets, .total-price {
-  margin: 0.5rem;
+@media (max-width: 768px) {
+  .tickets-container {
+    padding: 0 1.5rem;
+  }
+  
+  .table-header,
+  .table-row {
+    grid-template-columns: 1.5fr 1fr 1.5fr;
+  }
+  
+  .page-title h1 {
+    font-size: 2rem;
+  }
+  
+  .time-slots-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .table-header {
+    display: none;
+  }
+  
+  .table-row {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+    padding: 1rem;
+  }
+  
+  .table-cell {
+    justify-content: space-between;
+  }
+  
+  .table-cell::before {
+    content: attr(data-label);
+    font-weight: 600;
+    color: var(--color-secondary);
+  }
+  
+  .ticket-type {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .quantity-controls {
+    justify-content: flex-end;
+  }
 }

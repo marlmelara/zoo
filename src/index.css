@@ -2,17 +2,22 @@
 
 :root {
   --font-main: 'Outfit', sans-serif;
-  
-  --color-bg: #0f172a;
-  --color-primary: #10b981; /* Emerald 500 */
-  --color-secondary: #8b5cf6; /* Violet 500 */
-  --color-accent: #f43f5e; /* Rose 500 */
-  --color-text: #f8fafc; /* Slate 50 */
-  --color-text-muted: #94a3b8; /* Slate 400 */
 
-  --glass-bg: rgba(255, 255, 255, 0.05);
-  --glass-border: rgba(255, 255, 255, 0.1);
-  --glass-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+  --color-bg: #FFF5E7;
+  --color-primary: #79a280;
+  --color-secondary: #d19233;
+  --color-accent: #f43f5e;
+  --color-text: #FFBF69;
+  --color-text-muted: #94a3b8;
+  --color-text-dark: #3d4f3e;
+
+  --glass-bg-light: rgba(255, 245, 231, 0.75);
+  --glass-bg-medium: rgba(255, 255, 255, 0.85);
+  --glass-bg-dark: rgba(121, 162, 128, 0.12);
+  --glass-border-warm: rgba(209, 146, 51, 0.25);
+  --glass-border-sage: rgba(121, 162, 128, 0.35);
+  --glass-shadow-warm: 0 8px 32px rgba(209, 146, 51, 0.1);
+  --glass-shadow-sage: 0 4px 20px rgba(121, 162, 128, 0.12);
 }
 
 body {
@@ -30,45 +35,55 @@ body {
 
 /* Glassmorphism Utilities */
 .glass-panel {
-  background: var(--glass-bg);
+  background: var(--glass-bg-light);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border: 1px solid var(--glass-border);
-  box-shadow: var(--glass-shadow);
+  border: 1px solid var(--glass-border-sage);
+  box-shadow: var(--glass-shadow-sage);
   border-radius: 16px;
+  transition: all 0.3s ease;
 }
 
 .glass-button {
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  color: white;
+  background: rgba(121, 162, 128, 0.15);
+  border: 1px solid var(--glass-border-sage);
+  color: var(--color-text-dark);
   padding: 10px 20px;
   border-radius: 8px;
   cursor: pointer;
   transition: all 0.3s ease;
   font-weight: 600;
+  backdrop-filter: blur(4px);
 }
 
 .glass-button:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: white;
   transform: translateY(-2px);
-  box-shadow: 0 0 15px rgba(255, 255, 255, 0.1);
+  box-shadow: 0 4px 12px rgba(121, 162, 128, 0.3);
 }
 
 .glass-input {
-  background: rgba(0, 0, 0, 0.2);
-  border: 1px solid var(--glass-border);
-  color: white;
+  background: rgba(255, 255, 255, 0.8);
+  border: 1px solid var(--glass-border-sage);
+  color: var(--color-text-dark);
   padding: 10px 15px;
   border-radius: 8px;
   width: 100%;
   box-sizing: border-box;
   outline: none;
-  transition: border-color 0.3s ease;
+  transition: all 0.3s ease;
 }
 
 .glass-input:focus {
   border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(121, 162, 128, 0.1);
+  background: white;
+}
+
+.glass-input::placeholder {
+  color: var(--color-text-muted);
 }
 
 /* Layout Utilities */
@@ -95,16 +110,11 @@ a {
   text-decoration: none;
 }
 
-.text-xs {
-  color: white;
-}
-
-
 /* Footer Styles */
 .footer {
-  background-color: #1a2a3a;
+  background-color: rgb(123, 144, 79);
   color: #ffffff;
-  margin-top: 4rem;
+  margin-top: auto; 
   position: relative;
 }
 
@@ -112,6 +122,7 @@ a {
   max-width: 1200px;
   margin: 0 auto;
   padding: 3rem 2rem 0;
+  background-color: rgb(123, 144, 79);
 }
 
 .footer-main {
@@ -121,7 +132,6 @@ a {
   margin-bottom: 3rem;
 }
 
-/* Brand Section */
 .footer-brand {
   max-width: 300px;
 }
@@ -130,11 +140,10 @@ a {
   margin-bottom: 1rem;
 }
 
-.logo-placeholder {
-  font-size: 1.5rem;
-  font-weight: bold;
-  color: #ff6b35;
-  padding: 0.5rem 0;
+.logo-placeholder img {
+  max-width: 200px;
+  width: 100%;
+  height: auto;
 }
 
 .footer-description {
@@ -144,7 +153,6 @@ a {
   font-size: 0.9rem;
 }
 
-/* Footer Titles */
 .footer-title {
   font-size: 1.1rem;
   font-weight: 600;
@@ -164,7 +172,6 @@ a {
   background-color: #ff6b35;
 }
 
-/* Contact Information */
 .footer-contact-info {
   display: flex;
   flex-direction: column;
@@ -177,10 +184,11 @@ a {
   gap: 0.75rem;
   font-size: 0.9rem;
   line-height: 1.5;
+  color: white;
 }
 
 .contact-icon {
-  color: #ff6b35;
+  color: white;
   margin-top: 0.2rem;
   flex-shrink: 0;
 }
@@ -200,30 +208,6 @@ a {
   margin: 0;
 }
 
-/* Footer Links */
-.footer-links {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-}
-
-.footer-links li {
-  margin-bottom: 0.75rem;
-}
-
-.footer-links a {
-  color: #cccccc;
-  text-decoration: none;
-  transition: color 0.3s ease;
-  font-size: 0.9rem;
-}
-
-.footer-links a:hover {
-  color: #ff6b35;
-  padding-left: 5px;
-}
-
-/* Footer Bottom */
 .footer-bottom {
   border-top: 1px solid rgba(255, 255, 255, 0.1);
   padding: 1.5rem 0;
@@ -247,31 +231,15 @@ a {
   
   .footer-main {
     grid-template-columns: 1fr;
-    gap: 2rem;
   }
   
   .footer-brand {
     max-width: 100%;
   }
   
-  .footer-newsletter {
-    max-width: 100%;
-  }
-  
-  .form-row {
-    grid-template-columns: 1fr;
-  }
-  
   .footer-bottom-content {
     flex-direction: column;
     text-align: center;
-  }
-
-}
-
-@media (max-width: 480px) {
-  .footer-container {
-    padding: 1.5rem 1rem 0;
   }
   
   .footer-title::after {
@@ -285,13 +253,5 @@ a {
   
   .contact-item {
     justify-content: center;
-  }
-  
-  .footer-links {
-    text-align: center;
-  }
-  
-  .footer-links a:hover {
-    padding-left: 0;
   }
 }

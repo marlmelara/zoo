@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Link } from 'react-router-dom';
-import { FaCheck, FaStar, FaUsers, FaParking, FaTicketAlt, FaGift } from 'react-icons/fa';
+import { FaCheck, FaStar, FaUsers, FaParking, FaTicketAlt, FaGift, FaClock, FaMap, FaMapMarkerAlt, FaPhone, FaEnvelope, FaArrowRight } from 'react-icons/fa';
+
+
 import logo from '../../../images/logo.png';
 import './Membership.css';
 import { useZooCart } from '../../../components/ShopCart';
@@ -62,19 +64,32 @@ export default function Membership() {
 
   document.title = 'Memberships - Coog Zoo';
 
-  return (
+    return (
     <div className="membership-page">
+
+      <nav className="home-navbar">
+        <div className="home-navbar-container">
+          <Link to="/" className="navbar-logo-link" aria-label="Go to homepage">
+            <img src={logo} alt="Coog Zoo" />
+          </Link>
+          <div style={{ textAlign: 'center', flex: 1, padding: '0 20px' }}>
+            <h2 className="page-title" style={{ margin: 0 }}>Memberships</h2>
+            <p className="page-description">
+              Become a Coog Zoo member today and enjoy 12 months of wildlife fun, along with member exclusive discounts and benefits!
+            </p>
+          </div>
+          <div className="home-navbar-links">
+            <Link to="/tickets" className="home-navbar-link">Buy Tickets</Link>
+            <Link to="/shop" className="home-navbar-link">Shop</Link>
+            <Link to="/account" className="home-navbar-link">Customer Login</Link>
+            <Link to="/login" className="home-navbar-link">Staff Portal</Link>
+          </div>
+        </div>
+      </nav>
+
+      <div className="membership-container"></div>
+        
       <div className="membership-container">
-
-        {/* Header */}
-        <h2 className="page-title" style={{ textAlign: 'center' ,  gap: '8px'}}>Memberships</h2>
-        <p className="page-description" style={{ textAlign: 'center', width: '450px', margin: '0 auto' ,  gap: '16px' }}>
-          Become a Coog Zoo member today and enjoy 12 months of wildlife fun, along with member exclusive discounts and benefits!
-        </p>
-
-        <Link to="/" style={{ position: 'absolute', top: '-28px', left: '24px' }}>
-          <img src={logo} alt="Home" style={{ width: '192px', height: '192px', objectFit: 'contain' }} />
-        </Link>
 
         <div className="glass-panel membership-cta" >
           <div className="cta-split">
@@ -139,6 +154,50 @@ export default function Membership() {
         </div>
 
       </div>
+      {/* Footer */}
+      <footer className="footer" style={{background: "rgb(123, 144, 79)"}}>
+        <div className="footer-container">
+          <div className="footer-main">
+            <div className="footer-section footer-brand">
+              <div className="footer-logo">
+                <div className="logo-placeholder">
+                  <img src={logo} style={{ maxWidth: '200px', width: '100%', height: 'auto' }} alt="Coog Zoo" />
+                </div>
+              </div>
+              <p className="footer-description" style={{color:"white"}}>
+                Discover amazing wildlife, attend exciting events, and support animal conservation at Coog Zoo.
+              </p>
+            </div>
+
+            <div className="footer-section">
+              <h3 className="footer-title">Contact Us</h3>
+              <div className="footer-contact-info">
+                <div className="contact-item">
+                  <FaMapMarkerAlt className="contact-icon" style={{color:"white"}} />
+                  <div>
+                    <p>4302 University Dr</p>
+                    <p>Houston, TX 77004</p>
+                  </div>
+                </div>
+                <div className="contact-item">
+                  <FaPhone className="contact-icon" style={{color:"white"}} />
+                  <a href="tel:5555555555">555-555-5555</a>
+                </div>
+                <div className="contact-item">
+                  <FaEnvelope className="contact-icon" style={{color:"white"}}/>
+                  <a href="mailto:info@coogzoo.org">info@coogzoo.org</a>
+                </div>
+            </div>
+         </div>
+       </div>
+
+       <div className="footer-bottom">
+          <div className="footer-bottom-content" style={{color:"white"}}>
+            <p>&copy; {new Date().getFullYear()} Coog Zoo. All rights reserved.</p>
+         </div>
+       </div>
+      </div>
+   </footer>
     </div>
   );
 }

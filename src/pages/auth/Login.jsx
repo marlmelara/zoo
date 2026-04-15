@@ -3,7 +3,7 @@ import { supabase } from '../../lib/supabase';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { Lock } from 'lucide-react';
-import logo from '../../images/logo.png';
+import logo from '../../images/logo_alt2.png';
 
 const SUPER_ADMINS = ['admin@zoo.com', 'pablovelazquezbremont@gmail.com'];
 
@@ -69,28 +69,28 @@ export default function Login() {
             flexDirection: 'column',
             alignItems: 'center',
             justifyContent: 'center',
-            background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
+            background: 'rgb(255, 245, 231)',
             color: 'white',
             padding: '2rem',
         }}>
-            {/* Small logo symbol — top left */}
-            <Link to="/" style={{ position: 'absolute', top: '24px', left: '24px' }}>
-                <img src={logo} alt="Home" style={{ width: '48px', height: '48px', objectFit: 'contain' }} />
+            {/* Home button */}
+            <Link to="/" style={{ position: 'absolute', top: '24px', left: '24px', backgroundColor: 'rgb(123,144,79)', padding: '10px 20px', borderRadius: '5px', textDecoration: 'none' }}>
+                <button style={{ background: 'none', border: 'none', color: 'white', fontSize: '18px', fontWeight: 'bold' }}>Home</button>
             </Link>
 
             {/* Coog Zoo logo above panel */}
-            <Link to="/" style={{ marginBottom: '24px' }}>
-                <img src={logo} alt="Coog Zoo" style={{ maxWidth: '160px', height: 'auto' }} />
-            </Link>
+            <div style={{ marginBottom: '24px', padding: '10px', borderRadius: '5px', display: 'inline-block' }}>
+                <img src={logo} alt="Coog Zoo" style={{ maxWidth: '240px', height: 'auto' }} />
+            </div>
 
-            <div className="glass-panel" style={{ padding: '40px', width: '100%', maxWidth: '400px', textAlign: 'center' }}>
+            <div className="glass-panel" style={{ padding: '40px', width: '100%', maxWidth: '400px', textAlign: 'center', background: 'rgba(255, 255, 255, 0.5)', backdropFilter: 'blur(10px)' }}>
                 <div style={{
-                    background: 'var(--color-primary)', width: '60px', height: '60px', borderRadius: '50%',
+                    background: 'rgb(123, 144, 79)', width: '60px', height: '60px', borderRadius: '50%',
                     display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px',
                 }}>
                     <Lock size={30} color="white" />
                 </div>
-                <h2 style={{ marginBottom: '8px' }}>Staff Portal</h2>
+                <h2 style={{ color: '#1f2937', marginBottom: '8px' }}>Staff Portal</h2>
                 <p style={{ color: 'var(--color-text-muted)', marginBottom: '24px', fontSize: '0.9rem' }}>
                     Employee access only. Accounts are created by administrators.
                 </p>
@@ -112,14 +112,14 @@ export default function Login() {
                         onChange={(e) => setPassword(e.target.value)} required style={{ padding: '15px' }} />
 
                     <button type="submit" className="glass-button" disabled={loading}
-                        style={{ padding: '15px', background: 'var(--color-secondary)', fontSize: '16px', marginTop: '4px' }}>
+                        style={{ padding: '15px', background: 'rgb(123,144,79)', color: 'white', fontSize: '16px', marginTop: '4px' }}>
                         {loading ? 'Signing in...' : 'Sign In'}
                     </button>
                 </form>
 
                 <p style={{ marginTop: '20px', fontSize: '14px', color: 'var(--color-text-muted)' }}>
                     Looking for the customer portal?{' '}
-                    <Link to="/account" style={{ color: 'var(--color-primary)', textDecoration: 'none' }}>
+                    <Link to="/account" style={{ color: '#ffbf69', textDecoration: 'none' }}>
                         Customer login
                     </Link>
                 </p>

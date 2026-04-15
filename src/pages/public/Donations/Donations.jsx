@@ -52,6 +52,8 @@ export default function Donations() {
 
   return (
     <div className="donations-page">
+      
+      {/* Navigation Bar */}
       <nav className="donations-navbar">
         <div className="donations-navbar-container">
           <Link to="/" className="navbar-logo-link" aria-label="Go to homepage">

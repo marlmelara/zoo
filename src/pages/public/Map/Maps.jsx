@@ -1,10 +1,10 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import './map.css';
 import map from '../../../images/map.png';
 import pdf from '../../../images/map.pdf';
 import logo from '../../../images/logo.png';
-import { FaMapMarkerAlt, FaPhone, FaEnvelope, FaArrowLeft } from 'react-icons/fa';
+import { FaMapMarkerAlt, FaPhone, FaEnvelope } from 'react-icons/fa';
 
 export default function Maps() {
   const navigate = useNavigate();
@@ -23,21 +23,21 @@ export default function Maps() {
 
   return (
     <div className="map-page-wrapper">
-      <div style={{ padding: '16px 24px' }}>
-          <button 
-            onClick={() => navigate('/')} 
-            className="glass-button" 
-            style={{ 
-            padding: '8px 14px', 
-            fontSize: '14px', 
-            display: 'flex', 
-            alignItems: 'center', 
-            gap: '6px' 
-              }}
-            >
-            <FaArrowLeft size={12} /> Home
-          </button>
-      </div>
+      {/* Navigation Bar */}
+      <nav className="home-navbar">
+        <div className="home-navbar-container">
+          <Link to="/" className="navbar-logo-link" aria-label="Go to homepage">
+            <img src={logo} alt="Coog Zoo" />
+          </Link>
+          <div className="home-navbar-links">
+            <Link to="/tickets" className="home-navbar-link">Buy Tickets</Link>
+            <Link to="/shop" className="home-navbar-link">Shop</Link>
+            <Link to="/membership" className="home-navbar-link">Membership</Link>
+            <Link to="/account" className="home-navbar-link">Customer Login</Link>
+            <Link to="/login" className="home-navbar-link">Staff Portal</Link>
+          </div>
+        </div>
+      </nav>      
       
       <div className="map-container">
         <h1 className="map-title">Zoo Map</h1>
@@ -46,9 +46,8 @@ export default function Maps() {
           Download PDF
         </button>
       </div>
-
       {/* Footer */}
-      <footer className="footer">
+      <footer className="footer" style={{background: "rgb(123, 144, 79)"}}>
         <div className="footer-container">
           <div className="footer-main">
             <div className="footer-section footer-brand">
@@ -57,7 +56,7 @@ export default function Maps() {
                   <img src={logo} style={{ maxWidth: '200px', width: '100%', height: 'auto' }} alt="Coog Zoo" />
                 </div>
               </div>
-              <p className="footer-description">
+              <p className="footer-description" style={{color:"white"}}>
                 Discover amazing wildlife, attend exciting events, and support animal conservation at Coog Zoo.
               </p>
             </div>
@@ -66,18 +65,18 @@ export default function Maps() {
               <h3 className="footer-title">Contact Us</h3>
               <div className="footer-contact-info">
                 <div className="contact-item">
-                  <FaMapMarkerAlt className="contact-icon" />
+                  <FaMapMarkerAlt className="contact-icon" style={{color:"white"}} />
                   <div>
                     <p>4302 University Dr</p>
                     <p>Houston, TX 77004</p>
                   </div>
                 </div>
                 <div className="contact-item">
-                  <FaPhone className="contact-icon" />
+                  <FaPhone className="contact-icon" style={{color:"white"}} />
                   <a href="tel:5555555555">555-555-5555</a>
                 </div>
                 <div className="contact-item">
-                  <FaEnvelope className="contact-icon" />
+                  <FaEnvelope className="contact-icon" style={{color:"white"}}/>
                   <a href="mailto:info@coogzoo.org">info@coogzoo.org</a>
                 </div>
               </div>
@@ -85,12 +84,13 @@ export default function Maps() {
           </div>
 
           <div className="footer-bottom">
-            <div className="footer-bottom-content">
+            <div className="footer-bottom-content" style={{color:"white"}}>
               <p>&copy; {new Date().getFullYear()} Coog Zoo. All rights reserved.</p>
             </div>
           </div>
         </div>
       </footer>
+      
     </div>
   );
 }

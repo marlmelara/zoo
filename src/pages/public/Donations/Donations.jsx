@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { FaMapMarkerAlt, FaPhone, FaEnvelope } from 'react-icons/fa';
 import logo from '../../../images/logo.png';
 import './donations.css';
 
@@ -151,7 +152,52 @@ export default function Donations() {
           {status === 'error' && <p style={{ color: '#ff8b8b' }}>There was an error. Please try again.</p>}
         </form>
       </div>
+      </div>
+
+      {/* Footer */}
+      <footer className="footer" style={{background: "rgb(123, 144, 79)"}}>
+        <div className="footer-container">
+          <div className="footer-main">
+            <div className="footer-section footer-brand">
+              <div className="footer-logo">
+                <div className="logo-placeholder">
+                  <img src={logo} style={{ maxWidth: '200px', width: '100%', height: 'auto' }} alt="Coog Zoo" />
+                </div>
+              </div>
+              <p className="footer-description" style={{color:"white"}}>
+                Discover amazing wildlife, attend exciting events, and support animal conservation at Coog Zoo.
+              </p>
+            </div>
+
+            <div className="footer-section">
+              <h3 className="footer-title">Contact Us</h3>
+              <div className="footer-contact-info">
+                <div className="contact-item">
+                  <FaMapMarkerAlt className="contact-icon" style={{color:"white"}} />
+                  <div>
+                    <p>4302 University Dr</p>
+                    <p>Houston, TX 77004</p>
+                  </div>
+                </div>
+                <div className="contact-item">
+                  <FaPhone className="contact-icon" style={{color:"white"}} />
+                  <a href="tel:5555555555">555-555-5555</a>
+                </div>
+                <div className="contact-item">
+                  <FaEnvelope className="contact-icon" style={{color:"white"}}/>
+                  <a href="mailto:info@coogzoo.org">info@coogzoo.org</a>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="footer-bottom">
+            <div className="footer-bottom-content" style={{color:"white"}}>
+              <p>&copy; {new Date().getFullYear()} Coog Zoo. All rights reserved.</p>
+            </div>
+          </div>
+        </div>
+      </footer>
     </div>
-  </div>
   );
 }

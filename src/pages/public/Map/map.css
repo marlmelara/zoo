@@ -2,7 +2,7 @@
   display: flex;
   flex-direction: column;
   min-height: 100vh;
-  background-color: #0f172a;
+  background-color: rgb(255, 245, 231);
   position: relative;
 }
 
@@ -19,7 +19,7 @@
 .map-title {
   font-size: 2.5rem;
   font-weight: bold;
-  color: #f8fafc;
+  color: #ffbf69;
   margin-bottom: 30px;
   text-align: center;
 }
@@ -38,7 +38,7 @@
   font-size: 1rem;
   font-weight: 600;
   color: white;
-  background-color: #10b981;
+  background-color: rgb(123,144,79);
   border: none;
   border-radius: 4px;
   cursor: pointer;
@@ -47,16 +47,85 @@
 }
 
 .download-button:hover {
-  background-color: #059669;
+  background-color: #6d8243;
 }
 
 .download-button:active {
   transform: scale(0.98);
 }
 
+/* Navigation Bar */
+.home-navbar {
+  width: 100%;
+  background: rgb(123,144,79);
+  padding: 1rem 0;
+  box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.08), 0 10px 30px rgba(0, 0, 0, 0.08);
+}
+
+.home-navbar-container {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.navbar-logo-link {
+  display: flex;
+  align-items: center;
+  text-decoration: none;
+}
+
+.navbar-logo-link img {
+  max-width: 180px;
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.home-navbar-links {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.home-navbar-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.75rem 1rem;
+  border-radius: 0.75rem;
+  background: rgba(255, 255, 255, 0.18);
+  color: white;
+  text-decoration: none;
+  font-weight: 600;
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.home-navbar-link:hover {
+  background: rgba(255, 255, 255, 0.32);
+  transform: translateY(-1px);
+}
+
+@media (max-width: 768px) {
+  .home-navbar-container {
+    justify-content: center;
+  }
+
+  .home-navbar-links {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
 /* Footer */
 .footer {
-  background-color: #1a2a3a;
+  background-color: rgb(123,144,79);
   color: #ffffff;
   margin-top: 4rem;
   position: relative;
@@ -181,32 +250,25 @@
   }
 
   .footer-container {
-    padding: 2rem 1.5rem 0;
+    padding: 2rem 1rem 0;
   }
   
   .footer-main {
     grid-template-columns: 1fr;
+    gap: 1.5rem;
   }
   
   .footer-brand {
-    max-width: 100%;
+    max-width: none;
   }
   
   .footer-bottom-content {
     flex-direction: column;
-    text-align: center;
+    align-items: flex-start;
+    gap: 0.5rem;
   }
   
   .footer-title::after {
-    left: 50%;
-    transform: translateX(-50%);
-  }
-  
-  .footer-title {
-    text-align: center;
-  }
-  
-  .contact-item {
-    justify-content: center;
+    width: 30px;
   }
 }

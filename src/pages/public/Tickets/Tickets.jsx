@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { FaCalendarAlt, FaUser, FaChild, FaMapMarkerAlt, FaPhone, FaEnvelope, FaMinus, FaPlus, FaClock, FaTicketAlt, FaShoppingCart, FaStar, FaArrowLeft } from 'react-icons/fa';
 import { FaPersonCane } from "react-icons/fa6";
 import { useAuth } from '../../../contexts/AuthContext';
@@ -182,23 +182,22 @@ export default function Tickets() {
   const weekDays = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
 
   return (
-    <div className="tickets-page" style={{ margin: 0, padding: 0 }}>
-      {/* Navigation Bar */}
-      <nav className="navbar">
-        <div className="navbar-container">
-          <Link to="/" className="navbar-logo-link" aria-label="Go to homepage">
-            <img src={logo} alt="Coog Zoo" />
-          </Link>
-          <div className="navbar-links">
-            <Link to="/tickets" className="navbar-link">Buy Tickets</Link>
-            <Link to="/shop" className="navbar-link">Shop</Link>
-            <Link to="/membership" className="navbar-link">Membership</Link>
-            <Link to="/account" className="navbar-link">Customer Login</Link>
-            <Link to="/login" className="navbar-link">Staff Portal</Link>
-          </div>
-        </div>
-      </nav>
-
+    <div className="tickets-page">
+      <div style={{ padding: '16px 24px' }}>
+        <button 
+          onClick={() => navigate('/')} 
+          className="glass-button" 
+          style={{ 
+            padding: '8px 14px', 
+            fontSize: '14px', 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: '6px' 
+          }}
+        >
+          <FaArrowLeft size={12} /> Home
+      </button>
+      </div>
       <div className="tickets-container">
         {/* Left Column */}
         <div className="tickets-left">

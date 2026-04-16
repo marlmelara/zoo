@@ -402,7 +402,7 @@ export default function Home() {
       </div>
 
       {/* Footer */}
-      <footer className="footer" style={{background: "rgb(123, 144, 79)"}}>
+      <footer className="footer">
         <div className="footer-container">
           <div className="footer-main">
             <div className="footer-section footer-brand">

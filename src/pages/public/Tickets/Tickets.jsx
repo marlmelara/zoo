@@ -190,7 +190,6 @@ export default function Tickets() {
             <img src={logo} alt="Coog Zoo" />
           </Link>
           <div className="navbar-links">
-            <Link to="/tickets" className="navbar-link">Buy Tickets</Link>
             <Link to="/shop" className="navbar-link">Shop</Link>
             <Link to="/membership" className="navbar-link">Membership</Link>
             <Link to="/account" className="navbar-link">Customer Login</Link>
@@ -213,7 +212,7 @@ export default function Tickets() {
               <div>
                 <p style={{ margin: 0, fontWeight: 600 }}>Welcome, {customerName || 'Member'}!</p>
                 {membershipType ? (
-                  <p style={{ margin: '4px 0 0', fontSize: '0.85rem', color: '#6ee7b7' }}>
+                  <p style={{ margin: '4px 0 0', fontSize: '0.85rem', color: '#e3d367' }}>
                     <FaStar style={{ marginRight: '4px', verticalAlign: 'middle' }} />
                     <span style={{ textTransform: 'capitalize' }}>{membershipType}</span> member — enjoy your discounts!
                   </p>
@@ -298,7 +297,7 @@ export default function Tickets() {
                       <span style={{ fontSize: '0.8rem', fontWeight: 400, color: 'var(--color-text-muted)' }}>/yr</span>
                     </div>
                     {isCurrentPlan ? (
-                      <div style={{ marginTop: '12px', padding: '10px', background: 'rgba(16,185,129,0.15)', borderRadius: '8px', fontSize: '0.8rem', color: '#6ee7b7', fontWeight: 600 }}>
+                      <div style={{ marginTop: '12px', padding: '10px', background: 'rgba(16,185,129,0.15)', borderRadius: '8px', fontSize: '0.8rem', color: '#12714b', fontWeight: 600 }}>
                         Current Plan
                       </div>
                     ) : (

@@ -3,7 +3,7 @@ import { useLocation, useNavigate, Link } from 'react-router-dom';
 import {
   FaShoppingCart, FaUser, FaChild, FaTrash,
   FaLock, FaCreditCard, FaEnvelope, FaCheckCircle, FaHeart,
-  FaTag, FaCrown, FaTimesCircle,
+  FaTag, FaCrown, FaTimesCircle, FaMapMarkerAlt, FaPhone,
 } from 'react-icons/fa';
 import { FaPersonCane } from 'react-icons/fa6';
 import { useAuth } from '../../../contexts/AuthContext';
@@ -538,7 +538,6 @@ export default function Checkout() {
       <div className="checkout-wrapper">
         {/* ── Left column: forms ── */}
         <div className="checkout-forms">
-
           {/* Header */}
           <div className="checkout-header">
             <h1>{isDonation ? <><FaHeart style={{ color: '#ef4444' }} /> Make a Donation</> : <><FaShoppingCart /> Checkout</>}</h1>
@@ -550,7 +549,7 @@ export default function Checkout() {
               <p>Have an account? Sign in for faster checkout{!isDonation && ' and member discounts'}.</p>
               <div className="auth-banner-actions">
                 <button className="glass-button" onClick={() => setAuthMode('login')}>Sign In</button>
-                <button className="glass-button ghost" onClick={() => setAuthMode('guest')}>
+                <button className="glass-button" onClick={() => setAuthMode('guest')}>
                   Continue as Guest
                 </button>
               </div>
@@ -677,7 +676,7 @@ export default function Checkout() {
                           <label>First Name <span className="req">*</span></label>
                           <input name="firstName" value={shipping.firstName} onChange={handleShippingChange} placeholder="First name" required />
                         </div>
-                        <div className="form-group">
+                        <div className="glass-panel form-group">
                           <label>Last Name <span className="req">*</span></label>
                           <input name="lastName" value={shipping.lastName} onChange={handleShippingChange} placeholder="Last name" required />
                         </div>
@@ -910,7 +909,7 @@ export default function Checkout() {
             )}
           </div>
         </div>
-      </div>
+      </div>   
     </div>
   );
 }

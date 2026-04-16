@@ -36,7 +36,7 @@
 .checkout-header h1 {
   font-size: 1.8rem;
   font-weight: 700;
-  color: white;
+  color: var(--color-text);
   display: flex;
   align-items: center;
   gap: 10px;
@@ -161,7 +161,7 @@
   border-bottom: 1px solid var(--glass-border);
   display: flex;
   align-items: center;
-  color: white;
+  color: var(--color-primary);
 }
 
 .form-row-2col {
@@ -169,6 +169,7 @@
   grid-template-columns: 1fr 1fr;
   gap: 12px;
   margin-bottom: 12px;
+  color: var(--color-text-dark);
 }
 
 .form-group {
@@ -181,12 +182,13 @@
 .form-group.full {
   grid-column: span 2;
   margin-bottom: 12px;
+  color: var(--color-primary);
 }
 
 .form-group label {
   font-size: 0.8rem;
   font-weight: 600;
-  color: var(--color-text);
+  color: var(--color-secondary);
 }
 
 .req {
@@ -198,9 +200,10 @@
   width: 100%;
   padding: 10px 12px;
   background: rgba(255, 255, 255, 0.05);
-  border: 1px solid var(--glass-border);
+  border: 1px solid rgb(161, 155, 155);;
+  box-shadow: var(--glass-shadow-sage);
   border-radius: 8px;
-  color: var(--color-text);
+  color: black;
   font-size: 0.9rem;
   transition: border-color 0.2s;
   box-sizing: border-box;
@@ -272,7 +275,7 @@
   margin: 0 0 1rem;
   padding-bottom: 0.6rem;
   border-bottom: 2px solid var(--color-primary);
-  color: white;
+  color: var(--color-secondary);
 }
 
 .summary-section {

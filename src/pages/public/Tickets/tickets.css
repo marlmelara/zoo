@@ -184,8 +184,8 @@
 }
 
 .quantity-btn:hover:not(:disabled) {
-  background: var(--color-primary);
-  border-color: var(--color-primary);
+  background: rgb(123, 144, 79);
+  border-color: rgb(123, 144, 79);
   color: white;
   transform: translateY(-1px);
 }
@@ -218,9 +218,8 @@
 /* Membership Card */
 .membership-card {
   padding: 1.5rem;
-  background: linear-gradient(135deg, rgba(121, 162, 128, 0.15), rgba(209, 146, 51, 0.1));
-  backdrop-filter: blur(12px);
-  border: 1px solid var(--glass-border);
+  background: rgba(255, 255, 255, 0.5);
+  border: 1px solid rgba(121, 162, 128, 0.35);
   border-radius: 12px;
   position: relative;
   overflow: hidden;
@@ -234,7 +233,6 @@
   left: 0;
   right: 0;
   height: 3px;
-  background: linear-gradient(90deg, var(--color-primary), var(--color-secondary));
 }
 
 .membership-header {
@@ -248,11 +246,11 @@
   font-size: 1.3rem;
   font-weight: 700;
   margin: 0;
-  color: var(--color-secondary);
+  color: #ffbf69;
 }
 
 .membership-badge {
-  background: var(--color-primary);
+  background: var(--color-secondary);
   padding: 0.2rem 0.6rem;
   border-radius: 20px;
   font-size: 0.85rem;
@@ -261,7 +259,7 @@
 }
 
 .membership-description {
-  color: #3d4f3e;
+  color: #d19233;
   line-height: 1.5;
   margin-bottom: 1rem;
   font-size: 0.9rem;
@@ -274,7 +272,7 @@
 .membership-price {
   font-size: 1.75rem;
   font-weight: 700;
-  color: var(--color-primary);
+  color: rgb(123, 144, 79);
 }
 
 .membership-period {

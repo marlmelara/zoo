@@ -272,7 +272,7 @@ export default function Tickets() {
           <div className="glass-panel membership-card">
             <div className="membership-header">
               <h2 className="membership-title">Annual Membership Plans</h2>
-              <button className="glass-button" onClick={() => navigate('/membership')} style={{ marginLeft: 'auto'}}>
+              <button className="glass-button" onClick={() => navigate('/membership')} style={{ background:'rgb(123, 144, 79)', color: 'white', marginLeft: 'auto'}}>
                 Learn More
               </button>
             </div>
@@ -283,12 +283,12 @@ export default function Tickets() {
                 const isCurrentPlan = membershipType === plan.type;
                 return (
                   <div key={plan.type} style={{
-                    background: plan.featured ? 'rgba(16,185,129,0.1)' : 'rgba(255,255,255,0.05)',
-                    border: isSelected ? '2px solid var(--color-primary)' : plan.featured ? '2px solid rgba(16,185,129,0.4)' : '1px solid rgba(255,255,255,0.1)',
+                    background: plan.featured ? 'rgba(209, 146, 51, 0.1)' : 'rgba(255,255,255,0.05)',
+                    border: isSelected ? '2px solid rgba(121, 162, 128, 0.35)' : plan.featured ? '2px solid var(--color-secondary)' : '2px solid rgba(121, 162, 128, 0.35)',
                     borderRadius: '12px', padding: '16px', textAlign: 'center', position: 'relative',
                   }}>
                     {plan.featured && (
-                      <div style={{ position: 'absolute', top: '-10px', left: '50%', transform: 'translateX(-50%)', background: 'var(--color-primary)', color: 'white', padding: '2px 12px', borderRadius: '10px', fontSize: '11px', fontWeight: 700 }}>Best Value</div>
+                      <div style={{ position: 'absolute', top: '-10px', left: '50%', transform: 'translateX(-50%)', background: 'var(--color-secondary)', color: 'white', padding: '2px 12px', borderRadius: '10px', fontSize: '11px', fontWeight: 700 }}>Best Value</div>
                     )}
                     <h3 style={{ margin: '8px 0 4px', fontSize: '1.1rem', textTransform: 'capitalize' }}>{plan.name}</h3>
                     <div style={{ fontSize: '12px', color: 'var(--color-text-muted)', marginBottom: '8px' }}>{Math.round(plan.discount * 100)}% off all purchases</div>
@@ -304,7 +304,7 @@ export default function Tickets() {
                       <button
                         className="glass-button"
                         onClick={() => handleSelectMembership(plan)}
-                        style={{ marginTop: '12px', width: '100%', padding: '10px', background: isSelected ? 'var(--color-secondary)' : plan.featured ? 'var(--color-primary)' : 'rgba(255,255,255,0.1)', fontSize: '0.85rem' }}
+                        style={{ color: 'white', marginTop: '12px', width: '100%', padding: '10px', background: isSelected ? 'var(--color-secondary)' : plan.featured ? 'rgb(123, 144, 79)' : 'rgb(123, 144, 79)', fontSize: '0.85rem' }}
                       >
                         {isSelected ? 'In Cart' : 'Select Plan'}
                       </button>
@@ -371,7 +371,7 @@ export default function Tickets() {
                               onClick={() => cartHook.updateEventQty(event.event_id, -1)}>
                               <FaMinus size={10} />
                             </button>
-                            <span style={{ fontWeight: 700, minWidth: '20px', textAlign: 'center' }}>{inCart.quantity}</span>
+                            <span style={{ color: 'var(--color-secondary)', fontWeight: 700, minWidth: '20px', textAlign: 'center' }}>{inCart.quantity}</span>
                             <button className="glass-button" style={{ color: 'var(--color-secondary)', border: 'none', background: 'rgba(123, 144, 79, 0.15)', padding: '6px 10px', fontSize: '0.8rem' }}
                               onClick={() => cartHook.updateEventQty(event.event_id, 1)}>
                               <FaPlus size={10} />

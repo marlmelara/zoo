@@ -1,68 +1,34 @@
-import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { Swiper, SwiperSlide } from 'swiper/react';
-import { Autoplay, Pagination, Navigation, EffectFade } from 'swiper/modules';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
+import { FaCalendarAlt, FaTicketAlt, FaCheckCircle, FaExclamationTriangle, FaMapMarkerAlt, FaClock, FaPhone, FaEnvelope } from 'react-icons/fa';
 import { getUpcomingEvents } from '../../../api/public';
-import "./home.css"; 
 import logo from '../../../images/logo.png';
+import './calendar.css';
 
-// Import React Icons
-import { FaClock, FaTicketAlt, FaMap, FaMapMarkerAlt, FaPhone, FaEnvelope, FaArrowRight } from 'react-icons/fa';
+export default function Events() {
+  document.title = 'Events Calendar - Coog Zoo';
 
-// Import Swiper styles
-import 'swiper/css';
-import 'swiper/css/pagination';
-import 'swiper/css/navigation';
-import 'swiper/css/effect-fade';
+  const navigate = useNavigate();
+  const [events, setEvents] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-export default function Home() {
-  document.title = 'Welcome to Coog Zoo!';
-
-  // Static daily schedule for Today's Schedule section (first 5 events)
-  const staticDailySchedule = [
-    { id: 1, time: '09:30:00', endTime: '10:00:00', title: 'Birds of the World', venue: 'Birds of the World' },
-    { id: 2, time: '10:00:00', endTime: '10:30:00', title: 'African Safari Talk', venue: 'Animals of Africa' },
-    { id: 3, time: '10:30:00', endTime: '11:00:00', title: 'Big Cats Feeding', venue: 'Big Cats Zone' },
-    { id: 4, time: '11:00:00', endTime: '11:30:00', title: 'Galápagos Giants', venue: 'Galápagos Island' },
-    { id: 5, time: '11:30:00', endTime: '12:00:00', title: 'Primate Playtime', venue: 'World of Primates' }
-  ];
-
-  // State for calendar 
-  const [eventsByDate, setEventsByDate] = useState({});
-  const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
-  const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
-  const [selectedDateEvents, setSelectedDateEvents] = useState(null);
-  const [calendarLoading, setCalendarLoading] = useState(true);
-
-  // Fetch events for calendar from database
   useEffect(() => {
-    const fetchCalendarEvents = async () => {
+    const fetchEvents = async () => {
       try {
-        const events = await getUpcomingEvents(100);
-        
-        const eventsMap = {};
-        events.forEach(event => {
-          if (!event.event_date) return;
-          const [year, month, day] = event.event_date.split('-');
-          const dateKey = new Date(Date.UTC(year, month - 1, day)).toDateString();
-          if (!eventsMap[dateKey]) {
-            eventsMap[dateKey] = [];
-          }
-          eventsMap[dateKey].push(event);
-        });
-        setEventsByDate(eventsMap);
-        setCalendarLoading(false);
+        const data = await getUpcomingEvents(100);
+        console.log('Raw events from DB:', data);
+        setEvents(data);
+        setLoading(false);
       } catch (error) {
-        console.error('Error fetching calendar events:', error);
-        setCalendarLoading(false);
+        console.error('Error fetching events:', error);
+        setLoading(false);
       }
     };
-
-    fetchCalendarEvents();
+    fetchEvents();
   }, []);
 
   const formatTime = (timeString) => {
-    if (!timeString) return 'TBD';
+    if (!timeString) return '';
     try {
       const [hours, minutes] = timeString.split(':');
       const hour = parseInt(hours);
@@ -74,331 +40,215 @@ export default function Home() {
     }
   };
 
-  const formatDate = () => {
-    const today = new Date();
-    return today.toLocaleDateString('en-US', { 
-      weekday: 'long', 
-      month: 'long', 
-      day: 'numeric' 
+  const getEventTime = (event) => {
+    return event.event_time || event.start_time || event.time;
+  };
+
+  const formatEventDate = (dateString) => {
+    if (!dateString) return { month: '???', day: '??', full: 'Date TBD', weekday: '???' };
+    
+    const [year, month, day] = dateString.split('-');
+    const date = new Date(year, month - 1, day);
+    
+    const weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const weekday = weekdays[date.getDay()];
+    
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const monthAbbr = months[date.getMonth()];
+    
+    const fullDate = `${weekday}, ${monthAbbr} ${parseInt(day)}, ${year}`;
+    
+    return {
+      month: monthAbbr.toUpperCase(),
+      day: parseInt(day),
+      year: year,
+      full: fullDate,
+      weekday: weekday
+    };
+  };
+
+  const handleEventClick = (event) => {
+    const ticketStatus = getTicketStatus(event);
+    if (ticketStatus.status === 'sold_out') return;
+    
+    navigate('/tickets', {
+      state: {
+        preselectedEvent: {
+          id: event.event_id,
+          title: event.title,
+          date: event.event_date,
+          venue: event.venues?.venue_name
+        }
+      }
     });
   };
 
-  // Sort events by time for homepage display
-  const sortedEvents = [...staticDailySchedule].sort((a, b) => {
-    return a.time.localeCompare(b.time);
-  });
-
-  // Calendar functions
-  const generateCalendarDays = () => {
-    const firstDay = new Date(Date.UTC(currentYear, currentMonth, 1));
-    const lastDay = new Date(Date.UTC(currentYear, currentMonth + 1, 0));
-    const daysInMonth = lastDay.getUTCDate();
-    const startingDayOfWeek = firstDay.getUTCDay();
+  const getTicketStatus = (event) => {
+    const maxCapacity = event.max_capacity;
+    const ticketsSold = event.tickets_sold || 0;
+    const remaining = maxCapacity - ticketsSold;
     
-    const days = [];
-    for (let i = 0; i < startingDayOfWeek; i++) {
-      days.push(null);
+    if (!maxCapacity || maxCapacity === 0) {
+      return { status: 'unlimited', text: 'Tickets Available', color: '#10b981', icon: FaCheckCircle };
     }
-    for (let i = 1; i <= daysInMonth; i++) {
-      const date = new Date(Date.UTC(currentYear, currentMonth, i));
-      const dateKey = date.toDateString();
-      const hasEvents = eventsByDate[dateKey] && eventsByDate[dateKey].length > 0;
-      const events = eventsByDate[dateKey] || [];
+    
+    if (remaining <= 0) {
+      return { status: 'sold_out', text: 'Sold Out', color: '#ef4444', icon: FaExclamationTriangle };
+    }
+    
+    if (remaining <= 10) {
+      return { status: 'low', text: `Only ${remaining} left!`, color: '#f59e0b', icon: FaExclamationTriangle };
+    }
+    
+    return { status: 'available', text: `${remaining} tickets left`, color: '#10b981', icon: FaCheckCircle };
+  };
+
+  const groupEventsByMonth = () => {
+    const grouped = {};
+    events.forEach(event => {
+      if (!event.event_date) return;
       
-      const todayUTC = new Date();
-      const todayDate = new Date(Date.UTC(todayUTC.getFullYear(), todayUTC.getMonth(), todayUTC.getDate()));
-      const isToday = date.toDateString() === todayDate.toDateString();
+      const [year, month] = event.event_date.split('-');
+      const monthKey = `${year}-${month}`;
       
-      days.push({
-        day: i,
-        date: date,
-        hasEvents,
-        isToday,
-        events: events
-      });
-    }
-    return days;
-  };
-
-  const formatDisplayDate = (date) => {
-    const year = date.getUTCFullYear();
-    const month = date.getUTCMonth();
-    const day = date.getUTCDate();
-    const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-    return `${monthNames[month]} ${day}, ${year}`;
-  };
-
-  const handleDateClick = (day) => {
-    if (day && day.hasEvents) {
-      if (selectedDateEvents && selectedDateEvents.date.toDateString() === day.date.toDateString()) {
-        setSelectedDateEvents(null);
-      } else {
-        setSelectedDateEvents(day);
+      if (!grouped[monthKey]) {
+        grouped[monthKey] = [];
       }
-    }
+      grouped[monthKey].push(event);
+    });
+    return grouped;
   };
 
-  const changeMonth = (direction) => {
-    if (direction === 'prev') {
-      if (currentMonth === 0) {
-        setCurrentMonth(11);
-        setCurrentYear(currentYear - 1);
-      } else {
-        setCurrentMonth(currentMonth - 1);
-      }
-    } else {
-      if (currentMonth === 11) {
-        setCurrentMonth(0);
-        setCurrentYear(currentYear + 1);
-      } else {
-        setCurrentMonth(currentMonth + 1);
-      }
-    }
-    setSelectedDateEvents(null);
-  };
-
-  const calendarDays = generateCalendarDays();
-  const weekDays = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
-
-  const slides = [
-    {
-      image: '/images/elephant2.jpg',
-      title: 'Stop by the Zoo',
-      subtitle: 'Experience over 20+ species from around the world!',
-      buttons: [{ text: 'Meet Our Animals', link: '/animals', variant: 'primary' }]
-    },
-    {
-      image: '/images/giraffe.jpg',
-      title: 'Daily Animal Encounters',
-      subtitle: 'Get up close with our friendly animals',
-      buttons: [{ text: 'View Schedule', link: '/schedule', variant: 'secondary' }]
-    },
-    {
-      image: '/images/lion.jpg',
-      title: 'New Lion Exhibit',
-      subtitle: 'Now open! Visit our majestic lions',
-      buttons: [{ text: 'Learn More', link: '/map', variant: 'primary' }]
-    },
-    {
-      image: '/images/penguin.jpg',
-      title: 'Lunch with the Zoo Keepers!',
-      subtitle: 'Learn more about how you can support the zoo',
-      buttons: [{ text: 'RSVP for the lunch!', link: '/tickets', variant: 'secondary' }]
-    }
-  ];
+  const groupedEvents = groupEventsByMonth();
+  
+  const sortedMonths = Object.keys(groupedEvents).sort((a, b) => {
+    const [yearA, monthA] = a.split('-');
+    const [yearB, monthB] = b.split('-');
+    if (yearA !== yearB) return yearA - yearB;
+    return monthA - monthB;
+  });
+  
+  const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
   return (
-    <div className="home">
+    <div className="events-page">
       {/* Navigation Bar */}
-      <nav className="home-navbar">
-        <div className="home-navbar-container">
+      <nav className="navbar">
+        <div className="navbar-container">
           <Link to="/" className="navbar-logo-link" aria-label="Go to homepage">
             <img src={logo} alt="Coog Zoo" />
           </Link>
-          <div className="home-navbar-links">
-            <Link to="/tickets" className="home-navbar-link">Buy Tickets</Link>
-            <Link to="/shop" className="home-navbar-link">Shop</Link>
-            <Link to="/membership" className="home-navbar-link">Membership</Link>
-            <Link to="/account" className="home-navbar-link">Customer Login</Link>
-            <Link to="/login" className="home-navbar-link">Staff Portal</Link>
+          <div className="navbar-links">
+            <Link to="/tickets" className="navbar-link">Buy Tickets</Link>
+            <Link to="/shop" className="navbar-link">Shop</Link>
+            <Link to="/membership" className="navbar-link">Membership</Link>
+            <Link to="/account" className="navbar-link">Customer Login</Link>
+            <Link to="/login" className="navbar-link">Staff Portal</Link>
           </div>
         </div>
       </nav>
 
-      {/* Welcome Section */}
-      <section className="welcome-section">
-        <div className="container">
-          <h1 className="welcome-title">Welcome to Coog Zoo</h1>
-          <p className="welcome-subtitle">
-            Discover amazing wildlife, attend exciting events, and support animal conservation.
+      <div className="events-container">
+        <div className="events-hero">
+          <h1 className="events-title">Don't Miss These Events</h1>
+          <p className="events-subtitle">
+            Discover exciting events, special programs, and unique experiences at Coog Zoo.
           </p>
         </div>
-      </section>
 
-      {/* Slideshow Section */}
-      <section className="slideshow-section">
-        <div className="container">
-          <Swiper
-            modules={[Autoplay, Pagination, Navigation, EffectFade]}
-            effect="fade"
-            spaceBetween={0}
-            slidesPerView={1}
-            autoplay={{ delay: 5000, disableOnInteraction: false }}
-            pagination={{ clickable: true, dynamicBullets: true }}
-            navigation={true}
-            loop={true}
-            className="hero-swiper"
-          >
-            {slides.map((slide, index) => (
-              <SwiperSlide key={index}>
-                <div className="hero-slide">
-                  <img src={slide.image} alt={slide.title} className="hero-image" />
-                  <div className="hero-overlay"></div>
-                  <div className="hero-content">
-                    <h2 className="hero-title" style = {{color: "#ede9e2"}}>{slide.title}</h2>
-                    <p className="hero-subtitle" style={{ color: "#dcd0d0" }}>{slide.subtitle}</p>
-                    <div className="hero-buttons">
-                      {slide.buttons.map((button, btnIndex) => (
-                        <a key={btnIndex} href={button.link} className={`hero-button hero-button-${button.variant}`}>
-                          {button.text}
-                        </a>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </SwiperSlide>
-            ))}
-          </Swiper>
+        <div className="results-count">
+          Showing {events.length} {events.length === 1 ? 'event' : 'events'}
         </div>
-      </section>
 
-      {/* Today's Information Bar */}
-      <section className="info-bar">
-        <div className="container">
-          <div className="info-grid">
-            <a className="info-card">
-              <FaClock className="info-icon" size={50} />
-              <p className="info-label">Today's Hours</p>
-              <p className="info-value">9am - 5pm</p>
-            </a>
-            <a href="/tickets" className="info-card">
-              <FaTicketAlt className="info-icon" size={50} />
-              <p className="info-label">Buy Tickets</p>
-              <p className="info-value">Admission</p>
-            </a>
-            <a href="/map" className="info-card">
-              <FaMap className="info-icon" size={50} />
-              <p className="info-label">Zoo Map</p>
-              <p className="info-value">View Map</p>
-            </a>
+        {loading ? (
+          <div className="loading-state">Loading events...</div>
+        ) : events.length === 0 ? (
+          <div className="empty-state">
+            <p>No events scheduled.</p>
+            <p className="empty-subtitle">Check back soon for exciting events!</p>
           </div>
-        </div>
-      </section>
-
-      <div className="container">
-        {/* Two Column Layout */}
-        <div className="home-two-columns">
-          {/* Left Column - Today's Schedule (Static) */}
-          <div className="home-left-column">
-            <h2 className="section-title-home">Today's Schedule</h2>
-            <div className="schedule-date-home">{formatDate()}</div>
+        ) : (
+          sortedMonths.map(monthKey => {
+            const [year, month] = monthKey.split('-');
+            const monthEvents = groupedEvents[monthKey];
             
-            <div className="schedule-card-home">
-              <div className="schedule-note-home">
-                Schedule updated each morning before we open at 9 a.m.
-              </div>
-              
-              <div className="schedule-table-home">
-                {sortedEvents.map((event) => (
-                  <div key={event.id} className="schedule-row-home">
-                    <div className="schedule-time-home">
-                      {event.endTime
-                        ? `${formatTime(event.time)} – ${formatTime(event.endTime)}`
-                        : formatTime(event.time)}
-                    </div>
-                    <div className="schedule-event-home">
-                      {event.title}
-                      <span className="schedule-venue-home"> @ {event.venue}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              
-              <div className="schedule-footer-home">
-                <a href="/schedule" className="view-full-link">View Full Schedule →</a>
-              </div>
-            </div>
-          </div>
-
-          {/* Right Column - Upcoming Events Calendar */}
-          <div className="home-right-column">
-            <div className="upcoming-header">
-              <h2 className="section-title-home">Upcoming Events</h2>
-              <a href="/calendar" className="all-events-link">ALL EVENTS →</a>
-            </div>
-            
-            <div className="calendar-card-home">
-              <div className="calendar-header-home">
-                <button className="month-nav-home" onClick={() => changeMonth('prev')}>
-                  ←
-                </button>
-                <div className="calendar-month-home">
-                  {new Date(currentYear, currentMonth).toLocaleString('default', { month: 'long', year: 'numeric' })}
-                </div>
-                <button className="month-nav-home" onClick={() => changeMonth('next')}>
-                  →
-                </button>
-              </div>
-              
-              <div className="calendar-grid-home">
-                {weekDays.map(day => (
-                  <div key={day} className="calendar-weekday-home">{day}</div>
-                ))}
-                {calendarDays.map((day, index) => (
-                  <div
-                    key={index}
-                    className={`calendar-day-home ${day ? 'has-date' : 'empty'} 
-                      ${day?.isToday ? 'today' : ''}
-                      ${day?.hasEvents ? 'has-events' : ''}
-                      ${selectedDateEvents && day && selectedDateEvents.date.toDateString() === day.date.toDateString() ? 'selected' : ''}`}
-                    onClick={() => handleDateClick(day)}
-                    style={{ cursor: day?.hasEvents ? 'pointer' : 'default' }}
-                  >
-                    {day && <span className="day-number-home">{day.day}</span>}
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Events List for Selected Date */}
-            {selectedDateEvents && selectedDateEvents.hasEvents && (
-              <div className="selected-events-card glass-panel">
-                <div className="selected-events-header">
-                  <h4 className="selected-events-date">
-                    {formatDisplayDate(selectedDateEvents.date)}
-                  </h4>
-                </div>
-                <div className="selected-events-list">
-                  {selectedDateEvents.events.map((event, index) => (
-                    <div key={event.event_id || index} className="selected-event-item">
-                      {(event.start_time || event.event_time) && (
-                        <div className="selected-event-time">
-                          <FaClock className="selected-event-icon" />
-                          {event.start_time && event.end_time
-                            ? `${formatTime(event.start_time)} – ${formatTime(event.end_time)}`
-                            : formatTime(event.event_time)}
+            return (
+              <div key={monthKey} className="event-month-section">
+                <h2 className="event-month-title">
+                  {monthNames[parseInt(month) - 1]} {year}
+                </h2>
+                <div className="events-list">
+                  {monthEvents.map((event, index) => {
+                    const dateInfo = formatEventDate(event.event_date);
+                    const ticketStatus = getTicketStatus(event);
+                    const StatusIcon = ticketStatus.icon;
+                    const isSoldOut = ticketStatus.status === 'sold_out';
+                    const eventTime = getEventTime(event);
+                    
+                    return (
+                      <div 
+                        key={event.event_id || index} 
+                        className={`event-item glass-panel ${isSoldOut ? 'sold-out-event' : 'clickable-event'}`}
+                        onClick={() => handleEventClick(event)}
+                        style={isSoldOut ? { cursor: 'not-allowed', opacity: 0.7 } : {}}
+                      >
+                        <div className="event-date-card">
+                          <span className="event-date-month">{dateInfo.month}</span>
+                          <span className="event-date-day">{dateInfo.day}</span>
                         </div>
-                      )}
-                      <div className="selected-event-title">{event.event_name || event.title}</div>
-                      {event.description && (
-                        <div className="selected-event-description">{event.description}</div>
-                      )}
-                      {event.venues?.venue_name && (
-                        <div className="selected-event-location">
-                          <FaMapMarkerAlt className="selected-event-icon" />
-                          {event.venues.venue_name}{event.venues.location ? ` — ${event.venues.location}` : ''}
+                        
+                        <div className="event-details">
+                          <h3 className="event-item-title">{event.title}</h3>
+                          
+                          <div className="event-meta">
+                            <div className="event-meta-item">
+                              <FaCalendarAlt className="meta-icon" />
+                              <span>{dateInfo.full}</span>
+                            </div>
+                            {eventTime && (
+                              <div className="event-meta-item">
+                                <FaClock className="meta-icon" />
+                                <span>{formatTime(eventTime)}</span>
+                              </div>
+                            )}
+                            {event.venues?.venue_name && (
+                              <div className="event-meta-item">
+                                <FaMapMarkerAlt className="meta-icon" />
+                                <span>{event.venues.venue_name}</span>
+                              </div>
+                            )}
+                          </div>
+                          
+                          {event.description && (
+                            <p className="event-description">{event.description}</p>
+                          )}
+                          
+                          <div className={`ticket-status ${ticketStatus.status}`}>
+                            <StatusIcon className="status-icon" />
+                            <span style={{ color: ticketStatus.color }}>{ticketStatus.text}</span>
+                          </div>
+                          
+                          {!isSoldOut && (
+                            <div className="event-ticket-button">
+                              <FaTicketAlt className="ticket-icon" /> Get Tickets →
+                            </div>
+                          )}
+                          
+                          {isSoldOut && (
+                            <div className="sold-out-message">
+                              <FaExclamationTriangle className="sold-out-icon" />
+                              Sold Out - Check back for future dates
+                            </div>
+                          )}
                         </div>
-                      )}
-                    </div>
-                  ))}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
-            )}
-          </div>
-        </div>
-
-        {/* Support Wildlife Section */}
-        <section className="content-section">
-          <div className="section-header">
-            <h2 className="section-title-home">Support Wildlife</h2>
-          </div>
-          <div className="card card-donations">
-            <p className="card-text">
-              With your generous donations, you can help fund our animal care programs and conservations efforts! 
-            </p>
-            <a href="/donations" className="button button-primary">Donate Now</a>
-          </div>
-        </section>
+            );
+          })
+        )}
       </div>
 
       {/* Footer */}
@@ -406,43 +256,19 @@ export default function Home() {
         <div className="footer-container">
           <div className="footer-main">
             <div className="footer-section footer-brand">
-              <div className="footer-logo">
-                <div className="logo-placeholder">
-                  <img src={logo} style={{ maxWidth: '200px', width: '100%', height: 'auto' }} alt="Coog Zoo" />
-                </div>
-              </div>
-              <p className="footer-description" style={{color:"white"}}>
-                Discover amazing wildlife, attend exciting events, and support animal conservation at Coog Zoo.
-              </p>
+              <img src={logo} style={{ maxWidth: '200px', width: '100%', height: 'auto' }} alt="Coog Zoo" />
+              <p className="footer-description" style={{color:"white"}}>Discover amazing wildlife, attend exciting events, and support animal conservation at Coog Zoo.</p>
             </div>
-
             <div className="footer-section">
               <h3 className="footer-title">Contact Us</h3>
               <div className="footer-contact-info">
-                <div className="contact-item">
-                  <FaMapMarkerAlt className="contact-icon" style={{color:"white"}} />
-                  <div>
-                    <p>4302 University Dr</p>
-                    <p>Houston, TX 77004</p>
-                  </div>
-                </div>
-                <div className="contact-item">
-                  <FaPhone className="contact-icon" style={{color:"white"}} />
-                  <a href="tel:5555555555">555-555-5555</a>
-                </div>
-                <div className="contact-item">
-                  <FaEnvelope className="contact-icon" style={{color:"white"}}/>
-                  <a href="mailto:info@coogzoo.org">info@coogzoo.org</a>
-                </div>
+                <div className="contact-item" style={{color:"white"}}><FaMapMarkerAlt className="contact-icon" style={{color:"white"}} /><div><p>4302 University Dr</p><p>Houston, TX 77004</p></div></div>
+                <div className="contact-item" style={{color:"white"}} ><FaPhone className="contact-icon" style={{color:"white"}} /><a href="tel:5555555555">555-555-5555</a></div>
+                <div className="contact-item" style={{color:"white"}}><FaEnvelope className="contact-icon" style={{color:"white"}} /><a href="mailto:info@coogzoo.org">info@coogzoo.org</a></div>
               </div>
             </div>
           </div>
-
-          <div className="footer-bottom">
-            <div className="footer-bottom-content" style={{color:"white"}}>
-              <p>&copy; {new Date().getFullYear()} Coog Zoo. All rights reserved.</p>
-            </div>
-          </div>
+          <div className="footer-bottom"><div className="footer-bottom-content" style={{color:"white"}}><p>&copy; {new Date().getFullYear()} Coog Zoo. All rights reserved.</p></div></div>
         </div>
       </footer>
     </div>

@@ -1,0 +1,346 @@
+.shop-page {
+  overflow: hidden;
+  position: relative;
+  color: white;
+  min-height: 100vh;
+  background: linear-gradient(to bottom, #f7ead8 0%, #c9a87a 65%, #a8845a 100%);
+  display: flex;
+  flex-direction: column;
+}
+.shop-page::after {
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: auto;
+  height: calc(100% - 300px);
+  inset: unset;
+  position: absolute;
+  content: '';
+  background-image: var(--silhouette-img);
+  background-repeat: no-repeat;
+  background-position: center 60%;
+  background-size: 400px;
+  opacity: 0.5;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.shop-navbar {
+  padding: 0 2rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid rgba(123, 144, 79, 0.3);
+  position: sticky;
+  top: 0;
+  background: rgba(123, 144, 79, 0.92);
+  backdrop-filter: blur(10px);
+  z-index: 100;
+  height: 80px;
+}
+
+.shop-navbar-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.shop-navbar-logo {
+  height: 48px;
+  width: auto;
+  margin: 8px 0;
+}
+
+.shop-navbar-title {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 700;
+  color: white;
+}
+
+.shop-navbar-links {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.shop-navbar-link {
+  color: white;
+  text-decoration: none;
+  font-size: 14px;
+  padding: 0.75rem 1rem;
+  border-radius: 0.75rem;
+  background: rgba(255, 255, 255, 0.18);
+  font-weight: 600;
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.shop-navbar-link:hover {
+  background: rgba(255, 255, 255, 0.32);
+  transform: translateY(-1px);
+}
+
+.cart-button {
+  padding: 0.75rem 1rem;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  border: none;
+  border-radius: 0.75rem;
+  background: rgba(255, 255, 255, 0.18);
+  color: white;
+  cursor: pointer;
+  font-weight: 600;
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.cart-button:hover {
+  background: rgba(255, 255, 255, 0.32);
+  transform: translateY(-1px);
+}
+
+.cart-button-active {
+  background: rgba(255, 255, 255, 0.32);
+}
+
+.back-button {
+  padding: 8px 14px;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid rgba(255,255,255,0.3);
+  border-radius: 8px;
+  background: rgba(255,255,255,0.15);
+  color: white !important;
+  cursor: pointer;
+  transition: background 0.5s;
+  text-decoration: none;
+}
+
+.back-button:hover {
+  color: white;
+  background: rgba(255,255,255,0.25);
+}
+
+.shop-content,
+.shop-content-centered {
+  position: relative;
+  z-index: 1;
+}
+
+.shop-hero-title {
+  font-size: 42px;
+  margin-bottom: 12px;
+  color: white;
+}
+
+.shop-subtitle {
+  color: #7a5c3a;
+  margin-bottom: 30px;
+  text-align: center;
+  font-size: 15px;
+}
+
+.shop-sections-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 24px;
+}
+
+.shop-section-card {
+  padding: 40px 30px;
+  border-radius: 20px;
+  cursor: pointer;
+  text-align: center;
+  background: rgba(123, 144, 79, 0.22);
+  border: 2px solid transparent;
+  transition: all 0.25s ease;
+}
+
+.shop-section-card:hover {
+  border-color: #7b904f;
+  transform: translateY(-4px);
+  background: rgba(123, 144, 79, 0.35);
+}
+
+.shop-section-icon {
+  width: 70px;
+  height: 70px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 20px;
+}
+
+.shop-section-title {
+  margin-top: 0;
+  margin-bottom: 10px;
+  color: white;
+  font-size: 22px;
+}
+
+.shop-section-desc {
+  color: #7a5c3a;
+  margin-bottom: 20px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.shop-section-btn {
+  padding: 12px 28px;
+  font-size: 15px;
+  border: none;
+  border-radius: 8px;
+  color: white;
+  cursor: pointer;
+  font-weight: 600;
+  transition: opacity 0.2s;
+}
+
+.shop-section-btn:hover {
+  opacity: 0.85;
+}
+
+.items-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 20px;
+}
+
+.item-card {
+  border-radius: 16px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background: rgba(123, 144, 79, 0.22);
+  border: 2px solid transparent;
+  transition: border-color 0.2s, transform 0.2s;
+}
+
+.item-card:hover {
+  border-color: #7b904f;
+  transform: translateY(-2px);
+}
+
+.item-card-image {
+  width: 100%;
+  height: 200px;
+  overflow: hidden;
+}
+
+.item-card-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.item-card-body {
+  padding: 16px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.item-card-name {
+  margin: 0 0 6px;
+  font-size: 16px;
+  color: white;
+}
+
+.item-card-desc {
+  color: #7a5c3a;
+  font-size: 13px;
+  margin: 0 0 12px;
+  flex: 1;
+  line-height: 1.5;
+}
+.footer {
+  position: relative;
+  z-index: 1;
+  overflow: hidden;
+  background: rgb(123, 144, 79) !important;
+  
+}
+
+.item-card-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.item-card-price {
+  color: #7b904f;
+  font-weight: 700;
+  font-size: 18px;
+}
+
+.add-to-cart-btn {
+  padding: 8px 14px;
+  background: #7b904f;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: none;
+  border-radius: 8px;
+  color: white;
+  cursor: pointer;
+  font-weight: 600;
+  transition: opacity 0.2s;
+}
+
+.add-to-cart-btn:hover {
+  opacity: 0.85;
+}
+
+.cart-fab {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: #7b904f;
+  border: none;
+  color: white;
+  cursor: pointer;
+  font-size: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 20px rgba(123, 144, 79, 0.5);
+  z-index: 100;
+}
+
+.cart-fab-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  background: #ef4444;
+  border-radius: 50%;
+  width: 22px;
+  height: 22px;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+}
+
+@media (max-width: 768px) {
+  .shop-navbar {
+    padding: 0 1rem;
+  }
+
+  .shop-navbar-links {
+    display: none;
+  }
+
+  .shop-hero-title {
+    font-size: 28px;
+  }
+}

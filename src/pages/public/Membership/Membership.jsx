@@ -87,7 +87,7 @@ export default function Membership() {
         </div>
       </nav>
 
-      <div className="membership-container"></div>
+      <div style={{ minHeight: '2rem' }}></div>
         
       <div className="membership-container">
 

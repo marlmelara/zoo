@@ -1,6 +1,7 @@
 /* Membership Page Styles */
 .membership-page {
   min-height: 100vh;
+  background: linear-gradient(to bottom, #f7ead8, #d9c4a8, #a8845a)
 }
 
 .membership-container {

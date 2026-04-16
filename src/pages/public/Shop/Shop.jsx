@@ -1,11 +1,14 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { FaShoppingCart, FaGift, FaUtensils, FaArrowLeft } from 'react-icons/fa';
+import { useNavigate, Link } from 'react-router-dom';
 import ShopCartPanel, { useZooCart } from '../../../components/ShopCart';
+import { FaShoppingCart, FaUtensils, FaCheck, FaStar, FaUsers, FaParking, FaTicketAlt, FaGift, FaClock, FaMap, FaMapMarkerAlt, FaPhone, FaEnvelope, FaArrowRight } from 'react-icons/fa';
+import logo from '../../../images/logo.png';
+import hotdogImg from '../../../images/bgui/background.png';
+import './Shop.css';
 
 const shopSections = [
-  { title: 'Gift Shop', description: 'Zoo-themed merchandise, plush animals, mugs, shirts, and souvenirs.', path: '/shop/gifts', icon: FaGift, color: '#10b981' },
-  { title: 'Food & Snacks', description: 'Quick bites, drinks, family meal combos, and seasonal snacks.', path: '/shop/food', icon: FaUtensils, color: '#f59e0b' },
+  { title: 'Gift Shop', description: 'Zoo-themed merchandise, plush animals, mugs, shirts, and souvenirs.', path: '/shop/gifts', icon: FaGift, color: '#7b904f' },
+  { title: 'Food & Snacks', description: 'Quick bites, drinks, family meal combos, and seasonal snacks.', path: '/shop/food', icon: FaUtensils, color: '#7b904f' },
 ];
 
 export default function Shop() {
@@ -16,34 +19,93 @@ export default function Shop() {
   document.title = 'Shop Home - Coog Zoo';
 
   return (
-    <div style={{ color: 'white', minHeight: '100vh', background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)' }}>
-      <div style={{ padding: '16px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-        <button onClick={() => navigate('/')} className="glass-button" style={{ padding: '8px 14px', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '6px' }}><FaArrowLeft size={12} /> Home</button>
-        <button onClick={() => setCartOpen(true)} className="glass-button" style={{
-          padding: '10px 18px', background: cartHook.totalItems > 0 ? 'var(--color-primary)' : 'rgba(255,255,255,0.1)',
-          display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px',
-        }}><FaShoppingCart /> Cart {cartHook.totalItems > 0 && `(${cartHook.totalItems})`}</button>
-      </div>
-      <div style={{ padding: '40px 24px', maxWidth: '800px', margin: '0 auto', textAlign: 'center' }}>
-        <h1 style={{ fontSize: '42px', marginBottom: '12px' }}>Zoo Shop</h1>
-        <p style={{ color: 'var(--color-text-muted)', marginBottom: '40px' }}>Browse zoo souvenirs, gifts, food, and snacks during your visit.</p>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '24px' }}>
+    <div className="shop-page" style={{ '--silhouette-img': `url(${hotdogImg})` }}>
+
+      <nav className="shop-navbar">
+        <div className="shop-navbar-left">
+          <Link to="/" className="navbar-logo-link" aria-label="Go to homepage">
+            <img src={logo} alt="Coog Zoo" />
+          </Link>
+          <h1 className="shop-navbar-title">Shop Home Page</h1>
+        </div>
+        <div className="home-navbar-links">
+          <Link to="/tickets" className="home-navbar-link">Buy Tickets</Link>
+          <Link to="/membership" className="home-navbar-link">Memberships</Link>
+          <Link to="/account" className="home-navbar-link">Customer Login</Link>
+          <Link to="/login" className="shop-navbar-link">Staff Portal</Link>
+          <button
+            className={`cart-button ${cartHook.totalItems > 0 ? 'cart-button-active' : ''}`}
+            onClick={() => setCartOpen(true)}
+          >
+            <FaShoppingCart /> Cart {cartHook.totalItems > 0 && `(${cartHook.totalItems})`}
+          </button>
+        </div>
+      </nav>
+
+      <div className="shop-content-centered">
+        <p className="shop-subtitle">Browse zoo souvenirs, gifts, food, and snacks during your visit.</p>
+        <div className="shop-sections-grid">
           {shopSections.map(section => {
             const Icon = section.icon;
             return (
-              <div key={section.title} className="glass-panel" onClick={() => navigate(section.path)} style={{ padding: '40px 30px', borderRadius: '20px', cursor: 'pointer', textAlign: 'center' }}>
-                <div style={{ width: '70px', height: '70px', borderRadius: '50%', background: `${section.color}22`, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
+              <div key={section.title} className="shop-section-card" onClick={() => navigate(section.path)}>
+                <div className="shop-section-icon" style={{ background: `${section.color}33` }}>
                   <Icon size={30} color={section.color} />
                 </div>
-                <h2 style={{ marginTop: 0, marginBottom: '10px' }}>{section.title}</h2>
-                <p style={{ color: 'var(--color-text-muted)', marginBottom: '20px' }}>{section.description}</p>
-                <button className="glass-button" style={{ background: section.color, padding: '12px 28px', fontSize: '15px' }}>Browse</button>
+                <h2 className="shop-section-title">{section.title}</h2>
+                <p className="shop-section-desc">{section.description}</p>
+                <button className="shop-section-btn" style={{ background: section.color }}>Browse</button>
               </div>
             );
           })}
         </div>
       </div>
+
       <ShopCartPanel isOpen={cartOpen} onClose={() => setCartOpen(false)} {...cartHook} />
+        {/* Footer */}
+              <footer className="footer" style={{background: "rgb(123, 144, 79)"}}>
+                <div className="footer-container">
+                  <div className="footer-main">
+                    <div className="footer-section footer-brand">
+                      <div className="footer-logo">
+                        <div className="logo-placeholder">
+                          <img src={logo} alt="Coog Zoo" className="shop-navbar-logo" style={{ maxWidth: '120px', width: '100%', height: 'auto' }} />
+                        </div>
+                      </div>
+                      <p className="footer-description" style={{color:"white"}}>
+                        Discover amazing wildlife, attend exciting events, and support animal conservation at Coog Zoo.
+                      </p>
+                    </div>
+        
+                    <div className="footer-section">
+                      <h3 className="footer-title">Contact Us</h3>
+                      <div className="footer-contact-info">
+                        <div className="contact-item">
+                          <FaMapMarkerAlt className="contact-icon" style={{color:"white"}} />
+                          <div>
+                            <p>4302 University Dr</p>
+                            <p>Houston, TX 77004</p>
+                          </div>
+                        </div>
+                        <div className="contact-item">
+                          <FaPhone className="contact-icon" style={{color:"white"}} />
+                          <a href="tel:5555555555">555-555-5555</a>
+                        </div>
+                        <div className="contact-item">
+                          <FaEnvelope className="contact-icon" style={{color:"white"}}/>
+                          <a href="mailto:info@coogzoo.org">info@coogzoo.org</a>
+                        </div>
+                    </div>
+                 </div>
+               </div>
+        
+               <div className="footer-bottom">
+                  <div className="footer-bottom-content" style={{color:"white"}}>
+                    <p>&copy; {new Date().getFullYear()} Coog Zoo. All rights reserved.</p>
+                 </div>
+               </div>
+              </div>
+           </footer>
     </div>
   );
 }

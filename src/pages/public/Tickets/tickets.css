@@ -50,7 +50,7 @@
   flex-wrap: wrap;
   gap: 1rem;
   padding: 1rem 1.5rem;
-  background: rgba(121, 162, 128, 0.85);
+  background: rgb(123, 144, 79);
   backdrop-filter: blur(12px);
   border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: 12px;
@@ -68,7 +68,6 @@
 /* Member Banner Link Button */
 .member-banner .glass-button {
   background: rgba(255, 255, 255, 0.2);
-  border: 1px solid rgba(255, 255, 255, 0.3);
   color: white;
   padding: 0.5rem 1rem;
   border-radius: 8px;
@@ -90,23 +89,23 @@
   padding: 0;
   overflow: hidden;
   backdrop-filter: blur(12px);
-  border: 1px solid var(--glass-border);
+  border: 1px solid rgba(121, 162, 128, 0.35);
   border-radius: 12px;
   box-shadow: var(--glass-shadow);
-  background-color: white;
+  background-color: rgba(255, 255, 255, 0.5);
 }
 
 .table-header {
   display: grid;
   grid-template-columns: 2fr 1fr 1.5fr;
-  background: rgba(121, 162, 128, 0.12);
+  background: rgba(123, 144, 79, 0.08);
   border-bottom: 2px solid var(--color-primary);
   padding: 1rem;
   font-weight: 600;
 }
 
 .header-cell {
-  color: var(--color-secondary);
+  color: rgb(123, 144, 79);
   font-size: 0.85rem;
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -128,7 +127,7 @@
 .table-cell {
   display: flex;
   align-items: center;
-  color: #3d4f3e;
+  color: rgb(123, 144, 79);
 }
 
 .ticket-type {
@@ -136,7 +135,7 @@
 }
 
 .ticket-icon {
-  color: var(--color-primary);
+  color: rgb(123, 144, 79);
   font-size: 1.1rem;
 }
 
@@ -149,7 +148,7 @@
 .ticket-name {
   font-weight: 600;
   font-size: 0.95rem;
-  color: #3d4f3e;
+  color: var(--zoo-muted);
 }
 
 .ticket-age {
@@ -159,7 +158,7 @@
 
 .price {
   font-weight: 600;
-  color: var(--color-primary);
+  color: rgb(123, 144, 79);
   font-size: 1rem;
 }
 
@@ -173,7 +172,7 @@
   width: 28px;
   height: 28px;
   border-radius: 50%;
-  background: rgba(121, 162, 128, 0.15);
+  background: rgba(123, 144, 79, 0.15);
   border: 1px solid var(--glass-border);
   color: var(--color-secondary);
   cursor: pointer;
@@ -290,7 +289,7 @@
 
 /* Calendar Card  */
 .calendar-card {
-  background: rgba(255, 255, 255, 0.8);
+  background: rgba(255, 255, 255, 0.5);
   border: 1px solid rgba(121, 162, 128, 0.35);
   border-radius: 12px;
   padding: 1rem;
@@ -318,11 +317,11 @@
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  color: var(--color-secondary);
+  color: #ffbf69;
 }
 
 .calendar-icon {
-  color: var(--color-primary);
+  color: rgb(123, 144, 79);
 }
 
 .calendar-header {
@@ -357,7 +356,7 @@
 .current-month {
   text-align: center;
   font-weight: 700;
-  color: #d19233;
+  color: rgb(123, 144, 79);
   font-size: 0.9rem;
   margin: 0;
 }
@@ -367,8 +366,8 @@
   display: grid;
   grid-template-columns: repeat(7, 1fr);
   gap: 3px;
-  background-color: rgba(121, 162, 128, 0.15);
-  border: 1px solid rgba(121, 162, 128, 0.3);
+  background-color: rgba(123, 144, 79, 0.15);
+  border: 1px solid rgba(123, 144, 79, 0.3);
   border-radius: 8px;
   overflow: hidden;
   padding: 4px;
@@ -380,7 +379,7 @@
   text-align: center;
   font-size: 0.65rem;
   font-weight: 600;
-  color: #79a280;
+  color: rgb(123, 144, 79);
   padding: 0.3rem;
 }
 
@@ -391,7 +390,7 @@
   justify-content: center;
   border-radius: 6px;
   font-size: 0.7rem;
-  color: #4a6741;
+  color: #1f2937;
   background: rgba(255, 255, 255, 0.75);
   border: 1px solid rgba(121, 162, 128, 0.25);
   cursor: pointer;
@@ -412,7 +411,7 @@
 }
 
 .calendar-day.selected {
-  background: #79a280;
+  background: rgb(123, 144, 79);
   border-color: #79a280;
 }
 
@@ -458,7 +457,7 @@
   font-size: 0.9rem;
   font-weight: 600;
   margin-bottom: 0.75rem;
-  color: #d19233;
+  color: #ffbf69;
 }
 
 .time-slots-grid {
@@ -472,7 +471,7 @@
   background: rgba(255, 255, 255, 0.7);
   border: 1px solid rgba(121, 162, 128, 0.35);
   border-radius: 6px;
-  color: #4a6741;
+  color: #1f2937;
   cursor: pointer;
   font-size: 0.8rem;
   transition: all 0.2s ease;
@@ -486,7 +485,7 @@
 }
 
 .time-slot.selected {
-  background: #79a280;
+  background: rgb(123, 144, 79);
   border-color: #79a280;
   color: white;
 }
@@ -516,13 +515,13 @@
 .total-tickets, 
 .total-price {
   margin: 0.25rem 0;
-  color: #4a6741;
+  color: #1f2937;
   font-size: 0.85rem;
 }
 
 .total-price {
   font-weight: 700;
-  color: #79a280;
+  color: rgb(123, 144, 79);
   font-size: 1rem;
 }
 

@@ -320,7 +320,7 @@ export default function Tickets() {
           </div>
 
           {/* Event Tickets */}
-          <div className="glass-panel" style={{ padding: '24px', backgroundColor: 'white' }}>
+          <div className="glass-panel" style={{ padding: '24px', backgroundColor: 'rgba(255,255,255,0.5)' }}>
             <h2 style={{ marginBottom: '4px' }}>Event Tickets</h2>
             <p style={{ color: 'var(--color-secondary)', fontSize: '0.85rem', marginBottom: '16px' }}>
               Event tickets include zoo admission — no separate admission ticket needed.
@@ -347,7 +347,7 @@ export default function Tickets() {
                       display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap',
                     }}>
                       <div style={{ flex: 1, minWidth: '180px' }}>
-                        <div style={{ fontWeight: 600, marginBottom: '4px' }}>{event.title || event.event_name}</div>
+                        <div style={{ color: 'var(--zoo-muted)', fontWeight: 600, marginBottom: '4px' }}>{event.title || event.event_name}</div>
                         <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
                           <span><FaCalendarAlt style={{ marginRight: '4px', verticalAlign: 'middle' }} />
                             {new Date(event.event_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
@@ -363,24 +363,24 @@ export default function Tickets() {
                         </div>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <span style={{ fontWeight: 600, color: 'var(--color-primary)', fontSize: '1rem' }}>
+                        <span style={{ fontWeight: 600, color: 'rgb(123, 144, 79)', fontSize: '1rem' }}>
                           ${(event.ticket_price_cents / 100).toFixed(2)}
                         </span>
                         {inCart ? (
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <button className="glass-button" style={{ padding: '6px 10px', fontSize: '0.8rem' }}
+                            <button className="glass-button" style={{ color: 'var(--color-secondary)', border: 'none', background: 'rgba(123, 144, 79, 0.15)', padding: '6px 10px', fontSize: '0.8rem' }}
                               onClick={() => cartHook.updateEventQty(event.event_id, -1)}>
                               <FaMinus size={10} />
                             </button>
                             <span style={{ fontWeight: 700, minWidth: '20px', textAlign: 'center' }}>{inCart.quantity}</span>
-                            <button className="glass-button" style={{ padding: '6px 10px', fontSize: '0.8rem', background: 'var(--color-primary)' }}
+                            <button className="glass-button" style={{ color: 'var(--color-secondary)', border: 'none', background: 'rgba(123, 144, 79, 0.15)', padding: '6px 10px', fontSize: '0.8rem' }}
                               onClick={() => cartHook.updateEventQty(event.event_id, 1)}>
                               <FaPlus size={10} />
                             </button>
                           </div>
                         ) : (
                           <button className="glass-button"
-                            style={{ background: 'var(--color-primary)', padding: '8px 14px', fontSize: '0.85rem', whiteSpace: 'nowrap' }}
+                            style={{ color: 'var(--color-secondary)', border: 'none', background: 'rgba(123, 144, 79, 0.15)', padding: '8px 14px', fontSize: '0.85rem', whiteSpace: 'nowrap' }}
                             onClick={() => handleAddEventToCart(event)}>
                             <FaPlus style={{ marginRight: '5px' }} /> Add
                           </button>
@@ -435,23 +435,23 @@ export default function Tickets() {
               <div className="total-tickets"><span>Total Tickets: </span><span className="total-number">{getTotalTickets()}</span></div>
               <div className="total-price"><span>Total Price: </span><span className="price-amount">${getTotalPrice().toFixed(2)}</span></div>
               <button className="checkout-button glass-button" onClick={handleAddAdmissionToCart}>
-                <FaShoppingCart style={{ marginRight: '8px' }} /> Add to Cart
+                <FaShoppingCart style={{ marginRight: '8px', color: '#1f2937' }} /> Add to Cart
               </button>
             </div>
           </div>
 
           {/* Cart summary mini-widget */}
           {cartHook.totalItems > 0 && (
-            <div className="glass-panel" style={{ padding: '16px', marginTop: '16px', cursor: 'pointer' }} onClick={() => setCartOpen(true)}>
+            <div className="glass-panel" style={{ padding: '16px', marginTop: '16px', cursor: 'pointer', background: 'rgba(255, 255, 255, 0.5)' }} onClick={() => setCartOpen(true)}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 600 }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 600, color: '#ffbf69' }}>
                   <FaShoppingCart /> {cartHook.totalItems} item{cartHook.totalItems !== 1 ? 's' : ''} in cart
                 </span>
-                <span style={{ fontWeight: 700, color: 'var(--color-primary)' }}>
+                <span style={{ fontWeight: 700, color: 'rgb(123, 144, 79)' }}>
                   ${(cartHook.totalCents / 100).toFixed(2)}
                 </span>
               </div>
-              <button className="glass-button" style={{ width: '100%', marginTop: '10px', background: 'var(--color-primary)', padding: '10px', fontWeight: 600 }}>
+              <button className="glass-button" style={{ color: 'white', width: '100%', marginTop: '10px', background: 'rgb(123, 144, 79)', padding: '10px', fontWeight: 600 }}>
                 View Cart & Checkout
               </button>
             </div>
@@ -464,10 +464,10 @@ export default function Tickets() {
         <button onClick={() => setCartOpen(true)} style={{
           position: 'fixed', bottom: '24px', right: '24px',
           width: '60px', height: '60px', borderRadius: '50%',
-          background: 'var(--color-primary)', border: 'none',
+          background: 'rgb(123, 144, 79)', border: 'none',
           color: 'white', cursor: 'pointer', fontSize: '22px',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          boxShadow: '0 4px 20px rgba(16,185,129,0.4)', zIndex: 100,
+          boxShadow: '0 4px 20px rgba(27, 27, 27, 0.4)', zIndex: 100,
         }}>
           <FaShoppingCart />
           <span style={{

@@ -182,11 +182,11 @@ export default function ShopCartPanel({
           background: 'rgba(0,0,0,0.5)', zIndex: 998,
         }} />
       )}
-
+      {/* Cart Panel */}
       <div style={{
         position: 'fixed', top: 0, right: 0, bottom: 0,
         width: '400px', maxWidth: '92vw',
-        background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
+        background: 'rgb(255, 245, 231)',
         borderLeft: '1px solid rgba(255,255,255,0.1)',
         transform: isOpen ? 'translateX(0)' : 'translateX(100%)',
         transition: 'transform 0.3s ease',
@@ -194,21 +194,21 @@ export default function ShopCartPanel({
       }}>
         {/* Header */}
         <div style={{
-          padding: '20px', borderBottom: '1px solid rgba(255,255,255,0.1)',
+          padding: '20px', background: 'rgba(255, 255, 255, 0.3)', borderBottom: '1px solid rgba(121, 162, 128, 0.35)',
           display: 'flex', justifyContent: 'space-between', alignItems: 'center',
         }}>
-          <h2 style={{ margin: 0, fontSize: '20px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <h2 style={{ margin: 0, fontSize: '20px', display: 'flex', alignItems: 'center', gap: '10px', color: 'var(--zoo-muted)' }}>
             <FaShoppingCart /> Your Cart ({totalItems})
           </h2>
           <button onClick={onClose} style={{
-            background: 'none', border: 'none', color: 'white', cursor: 'pointer', fontSize: '20px',
+            background: 'none', border: 'none', color: 'var(--zoo-muted)', cursor: 'pointer', fontSize: '20px',
           }}><FaTimes /></button>
         </div>
 
         {/* Body */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '15px' }}>
           {!hasItems ? (
-            <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--color-text-muted)' }}>
+            <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--zoo-muted)' }}>
               <FaShoppingCart size={48} style={{ opacity: 0.3, marginBottom: '15px' }} />
               <p>Your cart is empty</p>
               <p style={{ fontSize: '13px' }}>Add tickets or shop items to get started!</p>
@@ -216,19 +216,19 @@ export default function ShopCartPanel({
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
 
-              {/* ── Admission Tickets ── */}
+              {/*Admission Tickets Panel*/}
               {cart.admission && admissionCount > 0 && (
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                    <h4 style={{ margin: 0, fontSize: '13px', textTransform: 'uppercase', color: 'var(--color-text-muted)', letterSpacing: '0.5px' }}>
+                    <h4 style={{ margin: 0, fontSize: '13px', textTransform: 'uppercase', color: 'rgb(123, 144, 79)', letterSpacing: '0.5px' }}>
                       <FaTicketAlt style={{ marginRight: '6px' }} />Admission Tickets
                     </h4>
                     <button onClick={clearAdmission} style={{ background: 'none', border: 'none', color: '#f87171', cursor: 'pointer', fontSize: '11px' }}>
                       <FaTrash size={10} /> Remove
                     </button>
                   </div>
-                  <div style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', padding: '12px' }}>
-                    <div style={{ fontSize: '12px', color: 'var(--color-text-muted)', marginBottom: '8px' }}>
+                  <div style={{ background: 'rgba(255,255,255,0.3)', border: '1px solid rgba(121, 162, 128, 0.35)', borderRadius: '12px', padding: '12px' }}>
+                    <div style={{ fontSize: '12px', color: 'var(--zoo-muted)', marginBottom: '8px' }}>
                       <FaCalendarAlt style={{ marginRight: '4px' }} />
                       {cart.admission.date}{cart.admission.time ? ` at ${cart.admission.time}` : ''}
                     </div>
@@ -238,10 +238,10 @@ export default function ShopCartPanel({
                       const Icon = label?.icon || FaUser;
                       return (
                         <div key={type} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 0' }}>
-                          <span style={{ fontSize: '14px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span style={{ fontSize: '14px', display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--zoo-muted)' }}>
                             <Icon size={12} /> {label?.name || type} x{qty}
                           </span>
-                          <span style={{ fontWeight: 600, color: 'var(--color-primary)', fontSize: '14px' }}>
+                          <span style={{ fontWeight: 600, color: 'rgb(123, 144, 79)', fontSize: '14px' }}>
                             {fmt(TICKET_PRICES[type] * qty)}
                           </span>
                         </div>
@@ -254,17 +254,17 @@ export default function ShopCartPanel({
               {/* ── Event Tickets ── */}
               {eventItems.length > 0 && (
                 <div>
-                  <h4 style={{ margin: '0 0 8px', fontSize: '13px', textTransform: 'uppercase', color: 'var(--color-text-muted)', letterSpacing: '0.5px' }}>
+                  <h4 style={{ margin: '0 0 8px', fontSize: '13px', textTransform: 'uppercase', color: 'rgb(123, 144, 79)', letterSpacing: '0.5px' }}>
                     <FaCalendarAlt style={{ marginRight: '6px' }} />Event Tickets
                   </h4>
                   {eventItems.map(event => (
                     <div key={event.event_id} style={{
-                      background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
+                      background: 'rgba(255,255,255,0.3)', border: '1px solid rgba(121, 162, 128, 0.35)',
                       borderRadius: '12px', padding: '12px', marginBottom: '8px',
                     }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
                         <div>
-                          <div style={{ fontWeight: 600, fontSize: '14px' }}>{event.title}</div>
+                          <div style={{ color: 'var(--zoo-muted)', fontWeight: 600, fontSize: '14px' }}>{event.title}</div>
                           <div style={{ fontSize: '12px', color: 'var(--color-text-muted)', marginTop: '2px' }}>
                             {event.date}
                             {event.venue && <span> &middot; {event.venue}</span>}
@@ -274,11 +274,11 @@ export default function ShopCartPanel({
                           background: 'none', border: 'none', color: '#f87171', cursor: 'pointer', fontSize: '14px', flexShrink: 0,
                         }}><FaTrash size={12} /></button>
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
-                        <button onClick={() => updateEventQty(event.event_id, -1)} style={qtyBtnStyle}><FaMinus size={10} /></button>
-                        <span style={{ fontWeight: 600, fontSize: '14px', minWidth: '20px', textAlign: 'center' }}>{event.quantity}</span>
-                        <button onClick={() => updateEventQty(event.event_id, 1)} style={qtyBtnStyle}><FaPlus size={10} /></button>
-                        <span style={{ marginLeft: 'auto', fontWeight: 600, color: 'var(--color-primary)' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px'}}>
+                        <button onClick={() => updateEventQty(event.event_id, -1)} style={{border: 'none',background: 'rgba(123, 144, 79, 0.15)', color: 'var(--color-secondary)'}}><FaMinus size={10} /></button>
+                        <span style={{color: 'var(--color-secondary)', fontWeight: 600, fontSize: '14px', minWidth: '20px', textAlign: 'center' }}>{event.quantity}</span>
+                        <button onClick={() => updateEventQty(event.event_id, 1)} style={{border: 'none',background: 'rgba(123, 144, 79, 0.15)', color: 'var(--color-secondary)'}}><FaPlus size={10} /></button>
+                        <span style={{ marginLeft: 'auto', fontWeight: 600, color: 'rgb(123, 144, 79)' }}>
                           {fmt(event.price_cents * event.quantity)}
                         </span>
                       </div>
@@ -295,7 +295,7 @@ export default function ShopCartPanel({
                   </h4>
                   {shopItems.map(item => (
                     <div key={item.item_id} style={{
-                      background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
+                      background: 'rgba(255,255,255,0.3)', border: '1px solid rgba(121, 162, 128, 0.35)',
                       borderRadius: '12px', padding: '12px', marginBottom: '8px',
                       display: 'flex', gap: '12px',
                     }}>
@@ -312,10 +312,10 @@ export default function ShopCartPanel({
                           }}><FaTrash size={12} /></button>
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px' }}>
-                          <button onClick={() => updateShopQty(item.item_id, -1)} style={qtyBtnStyle}><FaMinus size={10} /></button>
-                          <span style={{ fontWeight: 600, fontSize: '14px', minWidth: '20px', textAlign: 'center' }}>{item.quantity}</span>
-                          <button onClick={() => updateShopQty(item.item_id, 1)} style={qtyBtnStyle}><FaPlus size={10} /></button>
-                          <span style={{ marginLeft: 'auto', fontWeight: 600, color: 'var(--color-primary)' }}>
+                          <button onClick={() => updateShopQty(item.item_id, -1)} style={{border: 'none',background: 'rgba(123, 144, 79, 0.15)', color: 'var(--zoo-muted)'}}><FaMinus size={10} /></button>
+                          <span style={{color: 'var(--zoo-muted)', fontWeight: 600, fontSize: '14px', minWidth: '20px', textAlign: 'center' }}>{item.quantity}</span>
+                          <button onClick={() => updateShopQty(item.item_id, 1)} style={{border: 'none',background: 'rgba(123, 144, 79, 0.15)', color: 'var(--zoo-muted)'}}><FaPlus size={10} /></button>
+                          <span style={{ marginLeft: 'auto', fontWeight: 600, color: 'var(--zoo-accent)' }}>
                             {fmt(item.price_cents * item.quantity)}
                           </span>
                         </div>
@@ -329,22 +329,22 @@ export default function ShopCartPanel({
               {cart.membership && (
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                    <h4 style={{ margin: 0, fontSize: '13px', textTransform: 'uppercase', color: 'var(--color-text-muted)', letterSpacing: '0.5px' }}>
+                    <h4 style={{ margin: 0, fontSize: '13px', textTransform: 'uppercase', color: 'rgb(123, 144, 79)', letterSpacing: '0.5px' }}>
                       <FaTicketAlt style={{ marginRight: '6px' }} />Membership
                     </h4>
                     <button onClick={clearMembership} style={{ background: 'none', border: 'none', color: '#f87171', cursor: 'pointer', fontSize: '11px' }}>
                       <FaTrash size={10} /> Remove
                     </button>
                   </div>
-                  <div style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', padding: '12px' }}>
+                  <div style={{ background: 'rgba(255,255,255,0.3)', border: '1px solid rgba(121, 162, 128, 0.35)', borderRadius: '12px', padding: '12px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <div>
-                        <div style={{ fontWeight: 600, fontSize: '14px', textTransform: 'capitalize' }}>{cart.membership.plan_name} Plan</div>
+                        <div style={{ color: 'var(--zoo-muted)',fontWeight: 600, fontSize: '14px', textTransform: 'capitalize' }}>{cart.membership.plan_name} Plan</div>
                         <div style={{ fontSize: '12px', color: 'var(--color-text-muted)', marginTop: '2px' }}>
                           Annual - {Math.round(cart.membership.discount_rate * 100)}% discount on all purchases
                         </div>
                       </div>
-                      <span style={{ fontWeight: 600, color: 'var(--color-primary)', fontSize: '14px' }}>
+                      <span style={{ fontWeight: 600, color: 'var(--zoo-accent)', fontSize: '14px' }}>
                         {fmt(cart.membership.price_cents)}
                       </span>
                     </div>
@@ -357,22 +357,22 @@ export default function ShopCartPanel({
 
         {/* Footer */}
         {hasItems && (
-          <div style={{ padding: '20px', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '15px', fontSize: '18px', fontWeight: 700 }}>
+          <div style={{ background: 'rgba(255,255,255,0.3)', padding: '20px', borderTop: '1px solid rgba(121, 162, 128, 0.35)' }}>
+            <div style={{ color: 'var(--zoo-muted)', display: 'flex', justifyContent: 'space-between', marginBottom: '15px', fontSize: '18px', fontWeight: 700 }}>
               <span>Subtotal</span>
-              <span style={{ color: 'var(--color-primary)' }}>{fmt(totalCents)}</span>
+              <span style={{ color: 'rgb(123, 144, 79)' }}>{fmt(totalCents)}</span>
             </div>
             <button
               onClick={() => { onClose(); navigate('/checkout'); }}
               className="glass-button"
-              style={{ width: '100%', padding: '14px', background: 'var(--color-primary)', fontSize: '16px', fontWeight: 700 }}
+              style={{ width: '100%', padding: '14px', background: 'rgb(123, 144, 79)', fontSize: '16px', fontWeight: 700, color: 'white' }}
             >
               Proceed to Checkout
             </button>
             <button onClick={clearCart} style={{
-              width: '100%', padding: '10px', marginTop: '8px', background: 'none',
-              border: '1px solid rgba(255,255,255,0.15)', borderRadius: '10px',
-              color: 'var(--color-text-muted)', cursor: 'pointer', fontSize: '13px',
+              width: '100%', padding: '10px', marginTop: '8px', background: 'rgba(230, 227, 223, 0.8)',
+              border: '1px solid rgba(121, 162, 128, 0.35)', borderRadius: '10px',
+              color: 'var(--zoo-muted)', cursor: 'pointer', fontSize: '13px',
             }}>
               Clear Cart
             </button>

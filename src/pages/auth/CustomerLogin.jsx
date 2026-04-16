@@ -76,8 +76,9 @@ export default function CustomerLogin() {
       <div style={{ marginBottom: '24px', padding: '10px', borderRadius: '5px', display: 'inline-block' }}>
         <img src={logo} alt="Coog Zoo" style={{ maxWidth: '240px', height: 'auto' }} />
       </div>
-
+      {/*Glass Panel*/}
       <div className="glass-panel" style={{padding: '40px', width: '100%', maxWidth: '400px', textAlign: 'center', background: 'rgba(255, 255, 255, 0.5)', backdropFilter: 'blur(10px)' }}>
+        {/*Lock Icon*/}
         <div style={{
           background: 'rgb(123, 144, 79)', width: '60px', height: '60px', borderRadius: '50%',
           display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px',

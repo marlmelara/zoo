@@ -20,6 +20,7 @@
   align-items: center;
   justify-content: center;
   padding: 40px 20px 80px;
+  color: var(--zoo-text);
 }
 
 .donations-navbar {
@@ -95,7 +96,7 @@
 
 .donations-page .glass-button-ghost {
   background: rgba(230, 227, 223, 0.8);
-  border: 1px solid rgba(123, 144, 79, 0.22);
+  border: 1px solid rgba(121, 162, 128, 0.35);
 }
 
 .donations-page .glass-button:hover,
@@ -138,9 +139,9 @@
   border-radius: 18px;
   max-width: 900px;
   width: 100%;
-  background: rgba(255, 255, 255, .6);
+  background: rgba(255, 255, 255, 0.5);
   box-shadow: 0 24px 60px rgba(31, 41, 55, 0.08);
-  border: 1px solid rgba(123, 144, 79, 0.18);
+  border: 1px solid rgba(121, 162, 128, 0.35);
 }
 
 .donations-tabs {

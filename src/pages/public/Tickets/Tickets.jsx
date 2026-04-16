@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { FaCalendarAlt, FaUser, FaChild, FaMapMarkerAlt, FaPhone, FaEnvelope, FaMinus, FaPlus, FaClock, FaTicketAlt, FaShoppingCart, FaStar, FaArrowLeft } from 'react-icons/fa';
 import { FaPersonCane } from "react-icons/fa6";
 import { useAuth } from '../../../contexts/AuthContext';
@@ -182,28 +182,29 @@ export default function Tickets() {
   const weekDays = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
 
   return (
-    <div className="tickets-page">
-      <div style={{ padding: '16px 24px' }}>
-        <button 
-          onClick={() => navigate('/')} 
-          className="glass-button" 
-          style={{ 
-            padding: '8px 14px', 
-            fontSize: '14px', 
-            display: 'flex', 
-            alignItems: 'center', 
-            gap: '6px' 
-          }}
-        >
-          <FaArrowLeft size={12} /> Home
-      </button>
-      </div>
+    <div className="tickets-page" style={{ margin: 0, padding: 0 }}>
+      {/* Navigation Bar */}
+      <nav className="navbar">
+        <div className="navbar-container">
+          <Link to="/" className="navbar-logo-link" aria-label="Go to homepage">
+            <img src={logo} alt="Coog Zoo" />
+          </Link>
+          <div className="navbar-links">
+            <Link to="/tickets" className="navbar-link">Buy Tickets</Link>
+            <Link to="/shop" className="navbar-link">Shop</Link>
+            <Link to="/membership" className="navbar-link">Membership</Link>
+            <Link to="/account" className="navbar-link">Customer Login</Link>
+            <Link to="/login" className="navbar-link">Staff Portal</Link>
+          </div>
+        </div>
+      </nav>
+
       <div className="tickets-container">
         {/* Left Column */}
         <div className="tickets-left">
           <div className="page-header">
             <h1 className="page-title" style={{color: "#FFBF69"}}>Tickets & Membership</h1>
-            <p className="page-description">Plan your visit with admission options, family-friendly pricing, and membership package.</p>
+            <p className="page-description" style={{color: "#d19233"}}>Plan your visit with admission options, family-friendly pricing, and membership package.</p>
           </div>
 
           {/* Member / Welcome Banner */}
@@ -272,7 +273,7 @@ export default function Tickets() {
           <div className="glass-panel membership-card">
             <div className="membership-header">
               <h2 className="membership-title">Annual Membership Plans</h2>
-              <button className="glass-button" onClick={() => navigate('/membership')} style={{ marginLeft: 'auto' }}>
+              <button className="glass-button" onClick={() => navigate('/membership')} style={{ marginLeft: 'auto'}}>
                 Learn More
               </button>
             </div>
@@ -319,9 +320,9 @@ export default function Tickets() {
           </div>
 
           {/* Event Tickets */}
-          <div className="glass-panel" style={{ padding: '24px' }}>
+          <div className="glass-panel" style={{ padding: '24px', backgroundColor: 'white' }}>
             <h2 style={{ marginBottom: '4px' }}>Event Tickets</h2>
-            <p style={{ color: 'var(--color-text-muted)', fontSize: '0.85rem', marginBottom: '16px' }}>
+            <p style={{ color: 'var(--color-secondary)', fontSize: '0.85rem', marginBottom: '16px' }}>
               Event tickets include zoo admission — no separate admission ticket needed.
             </p>
             {eventsLoading ? (

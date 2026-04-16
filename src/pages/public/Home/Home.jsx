@@ -190,17 +190,17 @@ export default function Home() {
   return (
     <div className="home">
       {/* Navigation Bar */}
-      <nav className="home-navbar">
-        <div className="home-navbar-container">
+      <nav className="navbar">
+        <div className="navbar-container">
           <Link to="/" className="navbar-logo-link" aria-label="Go to homepage">
             <img src={logo} alt="Coog Zoo" />
           </Link>
-          <div className="home-navbar-links">
-            <Link to="/tickets" className="home-navbar-link">Buy Tickets</Link>
-            <Link to="/shop" className="home-navbar-link">Shop</Link>
-            <Link to="/membership" className="home-navbar-link">Membership</Link>
-            <Link to="/account" className="home-navbar-link">Customer Login</Link>
-            <Link to="/login" className="home-navbar-link">Staff Portal</Link>
+          <div className="navbar-links">
+            <Link to="/tickets" className="navbar-link">Buy Tickets</Link>
+            <Link to="/shop" className="navbar-link">Shop</Link>
+            <Link to="/membership" className="navbar-link">Membership</Link>
+            <Link to="/account" className="navbar-link">Customer Login</Link>
+            <Link to="/login" className="navbar-link">Staff Portal</Link>
           </div>
         </div>
       </nav>
@@ -278,7 +278,7 @@ export default function Home() {
       <div className="container">
         {/* Two Column Layout */}
         <div className="home-two-columns">
-          {/* Left Column - Today's Schedule (Static) */}
+          {/* Left Column - Today's Schedule */}
           <div className="home-left-column">
             <h2 className="section-title-home">Today's Schedule</h2>
             <div className="schedule-date-home">{formatDate()}</div>

@@ -144,7 +144,7 @@
   flex-wrap: wrap;
   justify-content: center;
   gap: 2rem;
-  background: #70a283;
+  background: rgb(123, 144, 79);
   border-radius: 0.75rem;
   padding: 1.5rem;
 }
@@ -531,7 +531,7 @@
 }
 
 .section-link {
-  color: #fb923c;
+  color: #ffbf69;
   font-size: 0.875rem;
   text-decoration: none;
   transition: color 0.2s ease;
@@ -548,7 +548,7 @@
 }
 
 .card-donations {
-  background-color: #70a283;
+  background-color: rgb(123, 144, 79);
 }
 
 .card-text {

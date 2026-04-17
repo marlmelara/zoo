@@ -8,9 +8,7 @@ import {
 import { FaPersonCane } from 'react-icons/fa6';
 import { useAuth } from '../../../contexts/AuthContext';
 import { createTransaction, createSaleItems } from '../../../api/transactions';
-import { createReceipt } from '../../../api/receipts';
-import { supabase } from '../../../lib/supabase';
-import { incrementEventTicketsSold } from '../../../api/transactions';
+import api from '../../../lib/api';
 import Navbar from '../../../components/Navbar';
 import './checkout.css';
 import logo from '../../../images/logo.png';
@@ -38,7 +36,7 @@ export default function Checkout() {
 
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, role, customerId } = useAuth();
+  const { user, role, customerId, signIn } = useAuth();
 
   // ── Load cart from unified localStorage ──
   const initialCart = readZooCart() || { admission: null, events: {}, shop: {}, membership: null };
@@ -99,11 +97,7 @@ export default function Checkout() {
     setAuthMode('logged-in');
 
     (async () => {
-      const { data } = await supabase
-        .from('customers')
-        .select('*')
-        .eq('customer_id', customerId)
-        .single();
+      const data = await api.get('/customers/me').catch(() => null);
 
       if (data) {
         setCustomer(data);
@@ -116,7 +110,7 @@ export default function Checkout() {
           confirmEmail: data.email || user.email || '',
           street:    data.billing_street || data.address || '',
           city:      data.billing_city || data.city || '',
-          state:     data.billing_state || data.state || 'Texas',
+          state:     data.billing_state || data.state || '',
           zip:       data.billing_zip || data.zip_code || '',
           phone:     data.billing_phone || data.phone || '',
         }));
@@ -128,7 +122,7 @@ export default function Checkout() {
             lastName:  data.last_name || '',
             street:    data.shipping_street || '',
             city:      data.shipping_city || '',
-            state:     data.shipping_state || 'Texas',
+            state:     data.shipping_state || '',
             zip:       data.shipping_zip || '',
             phone:     data.shipping_phone || '',
           });
@@ -157,11 +151,8 @@ export default function Checkout() {
     setLoginError('');
     try {
       setLoginLoading(true);
-      const { error } = await supabase.auth.signInWithPassword({
-        email: loginEmail, password: loginPassword,
-      });
-      if (error) throw error;
-      // Auth context will pick up the session — page will re-render with user
+      await signIn(loginEmail, loginPassword);
+      // Auth context updates user — page will re-render with user
     } catch (err) {
       setLoginError(err.message || 'Login failed.');
     } finally {
@@ -270,147 +261,16 @@ export default function Checkout() {
       // 1. Create donation record if donation flow
       let donationId = null;
       if (isDonation) {
-        const { data: don, error: donErr } = await supabase
-          .from('donations')
-          .insert([{
+        const don = await api.post('/donations', {
             donor_name: billing.firstName ? `${billing.firstName} ${billing.lastName}` : payment.cardName,
             amount_cents: donationAmountCents,
             customer_id: customerId || null,
-          }])
-          .select()
-          .single();
-        if (donErr) throw donErr;
+          });
         donationId = don.donation_id;
       }
 
-      // 2. Create transaction
-      const transaction = await createTransaction({
-        totalAmountCents: totalCents,
-        customerId: customerId || null,
-        guestEmail: authMode === 'guest' ? billing.email : null,
-        isDonation,
-        donationId,
-      });
-
-      // 3. Create tickets
-      if (ticketData) {
-        const ticketRows = [];
-        for (const [type, qty] of Object.entries(ticketData.quantities)) {
-          if (qty <= 0) continue;
-          const base = TICKET_PRICES[type];
-          const price = memberDiscount > 0 ? Math.round(base * (1 - memberDiscount)) : base;
-          for (let i = 0; i < qty; i++) {
-            ticketRows.push({
-              customer_id: customerId || null,
-              type,
-              price_cents: price,
-              transaction_id: transaction.transaction_id,
-              event_id: null, // admission only
-            });
-          }
-        }
-        if (ticketRows.length > 0) {
-          const { error: tickErr } = await supabase.from('tickets').insert(ticketRows);
-          if (tickErr) throw tickErr;
-        }
-      }
-
-      // 4. Create event tickets
-      if (eventTicketList.length > 0) {
-        const eventTicketRows = [];
-        for (const evt of eventTicketList) {
-          const base = evt.price_cents;
-          const price = memberDiscount > 0 ? Math.round(base * (1 - memberDiscount)) : base;
-          const quantity = evt.quantity || 1;
-          
-          for (let i = 0; i < quantity; i++) {
-            eventTicketRows.push({
-              customer_id: customerId || null,
-              type: 'event',
-              price_cents: price,
-              transaction_id: transaction.transaction_id,
-              event_id: evt.event_id,
-            });
-          }
-          
-          // Update tickets_sold count for this event
-          await incrementEventTicketsSold(evt.event_id, quantity);
-        }
-        const { error: evtErr } = await supabase.from('tickets').insert(eventTicketRows);
-        if (evtErr) throw evtErr;
-      }
-
-      // 5. Process shop + food items, update inventory
-      const allPurchasedItems = [];
-
-      for (const item of shopItems) {
-        const price = memberDiscount > 0 ? Math.round(item.price_cents * (1 - memberDiscount)) : item.price_cents;
-        allPurchasedItems.push({
-          transaction_id: transaction.transaction_id,
-          item_id: item.item_id,
-          quantity: item.quantity,
-          price_at_sale_cents: price,
-        });
-      }
-
-      if (allPurchasedItems.length > 0) {
-        await createSaleItems(allPurchasedItems);
-
-        // Update stock counts
-        for (const si of allPurchasedItems) {
-          const { data: inv, error: invErr } = await supabase
-            .from('inventory')
-            .select('stock_count')
-            .eq('item_id', si.item_id)
-            .single();
-          if (invErr) throw invErr;
-          const newStock = inv.stock_count - si.quantity;
-          if (newStock < 0) throw new Error(`Not enough stock for item ${si.item_id}`);
-          const { error: updErr } = await supabase
-            .from('inventory')
-            .update({ stock_count: newStock })
-            .eq('item_id', si.item_id);
-          if (updErr) throw updErr;
-        }
-      }
-
-      // 5b. Process membership purchase
-      if (membershipPlan && customerId) {
-        const startDate = new Date();
-        const endDate = new Date();
-        endDate.setDate(endDate.getDate() + (membershipPlan.duration_days || 365));
-        const { error: memErr } = await supabase
-          .from('customers')
-          .update({
-            is_member: true,
-            membership_type: membershipPlan.plan_name,
-            membership_start: startDate.toISOString().split('T')[0],
-            membership_end: endDate.toISOString().split('T')[0],
-          })
-          .eq('customer_id', customerId);
-        if (memErr) throw memErr;
-      }
-
-      // 6. Save billing/shipping to customer profile if logged in
-      if (customerId) {
-        await supabase.from('customers').update({
-          billing_street: billing.street,
-          billing_city:   billing.city,
-          billing_state:  billing.state,
-          billing_zip:    billing.zip,
-          billing_phone:  billing.phone,
-          shipping_same_as_billing: sameAsBilling,
-          ...(sameAsBilling ? {} : {
-            shipping_street: shipping.street,
-            shipping_city:   shipping.city,
-            shipping_state:  shipping.state,
-            shipping_zip:    shipping.zip,
-            shipping_phone:  shipping.phone,
-          }),
-        }).eq('customer_id', customerId);
-      }
-
-      // 7. Create receipt
+      // 2. Build receipt line items up front so they're written atomically
+      //    when the transaction + receipt are inserted on the server.
       const receiptItems = [];
       if (ticketData) {
         for (const [type, qty] of Object.entries(ticketData.quantities)) {
@@ -436,23 +296,125 @@ export default function Checkout() {
         receiptItems.push({ description: `Donation — ${donationData.fund}`, quantity: 1, unitPriceCents: donationAmountCents });
       }
 
-      try {
-        await createReceipt({
-          transactionId: transaction.transaction_id,
-          email: billing.email,
-          customerName: `${billing.firstName} ${billing.lastName}`.trim() || payment.cardName,
-          items: receiptItems,
-          subtotalCents: subtotalCents,
-          taxCents: taxCents,
-          totalCents: totalCents,
-          isDonation,
-          donationFund: donationData?.fund || null,
-        });
-      } catch (receiptErr) {
-        console.warn('Receipt creation failed (non-blocking):', receiptErr);
+      // 3. Create transaction + receipt atomically
+      const transaction = await createTransaction({
+        totalAmountCents: totalCents,
+        customerId: customerId || null,
+        guestEmail: authMode === 'guest' ? billing.email : null,
+        isDonation,
+        donationId,
+        receipt: {
+          email: billing.email || user?.email || '',
+          customer_name: `${billing.firstName} ${billing.lastName}`.trim() || payment.cardName,
+          line_items: receiptItems,
+          subtotal_cents: subtotalCents,
+          tax_cents: taxCents,
+          total_cents: totalCents,
+          is_donation: isDonation,
+          donation_fund: donationData?.fund || null,
+        },
+      });
+
+      // 3. Create tickets
+      if (ticketData) {
+        const ticketRows = [];
+        for (const [type, qty] of Object.entries(ticketData.quantities)) {
+          if (qty <= 0) continue;
+          const base = TICKET_PRICES[type];
+          const price = memberDiscount > 0 ? Math.round(base * (1 - memberDiscount)) : base;
+          for (let i = 0; i < qty; i++) {
+            ticketRows.push({
+              customer_id: customerId || null,
+              type,
+              price_cents: price,
+              transaction_id: transaction.transaction_id,
+              event_id: null, // admission only
+            });
+          }
+        }
+        if (ticketRows.length > 0) {
+          await api.post('/tickets', { tickets: ticketRows });
+        }
       }
 
-      // 8. Cleanup
+      // 4. Create event tickets
+      if (eventTicketList.length > 0) {
+        const eventTicketRows = [];
+        for (const evt of eventTicketList) {
+          const base = evt.price_cents;
+          const price = memberDiscount > 0 ? Math.round(base * (1 - memberDiscount)) : base;
+          const quantity = evt.quantity || 1;
+          
+          for (let i = 0; i < quantity; i++) {
+            eventTicketRows.push({
+              customer_id: customerId || null,
+              type: 'event',
+              price_cents: price,
+              transaction_id: transaction.transaction_id,
+              event_id: evt.event_id,
+            });
+          }
+          
+          // tickets_sold count is auto-incremented server-side in POST /api/tickets
+        }
+        await api.post('/tickets', { tickets: eventTicketRows });
+      }
+
+      // 5. Process shop + food items, update inventory
+      const allPurchasedItems = [];
+
+      for (const item of shopItems) {
+        const price = memberDiscount > 0 ? Math.round(item.price_cents * (1 - memberDiscount)) : item.price_cents;
+        allPurchasedItems.push({
+          transaction_id: transaction.transaction_id,
+          item_id: item.item_id,
+          quantity: item.quantity,
+          price_at_sale_cents: price,
+        });
+      }
+
+      if (allPurchasedItems.length > 0) {
+        await createSaleItems(allPurchasedItems);
+
+        // Update stock counts
+        for (const si of allPurchasedItems) {
+          await api.post(`/inventory/${si.item_id}/decrement`, { quantity: si.quantity });
+        }
+      }
+
+      // 5b. Process membership purchase
+      if (membershipPlan && customerId) {
+        const startDate = new Date();
+        const endDate = new Date();
+        endDate.setDate(endDate.getDate() + (membershipPlan.duration_days || 365));
+        await api.patch('/customers/me/membership', {
+            is_member: true,
+            membership_type: membershipPlan.plan_name,
+            membership_start: startDate.toISOString().split('T')[0],
+            membership_end: endDate.toISOString().split('T')[0],
+          });
+      }
+
+      // 6. Save billing/shipping to customer profile if logged in
+      if (customerId) {
+        await api.patch('/customers/me/billing', {
+          billing_street: billing.street,
+          billing_city:   billing.city,
+          billing_state:  billing.state,
+          billing_zip:    billing.zip,
+          billing_phone:  billing.phone,
+          shipping_same_as_billing: sameAsBilling,
+          ...(sameAsBilling ? {} : {
+            shipping_street: shipping.street,
+            shipping_city:   shipping.city,
+            shipping_state:  shipping.state,
+            shipping_zip:    shipping.zip,
+            shipping_phone:  shipping.phone,
+          }),
+        });
+      }
+
+      // Cleanup (receipt was written atomically with the transaction above)
       localStorage.removeItem('zooCart');
 
       setOrderTransaction(transaction);

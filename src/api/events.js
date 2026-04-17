@@ -1,57 +1,21 @@
-import { supabase } from '../lib/supabase';
-import { handleSupabaseResult } from '../utils/apiHandler';
+import api from '../lib/api';
 
-export async function getAdminEvents() {
-  const result = await supabase
-    .from('events')
-    .select('*')
-    .order('event_date', { ascending: true });
-
-  return handleSupabaseResult(result);
-}
-
-export async function getUpcomingEvents(limit = 6) {
-  const today = new Date().toISOString().split('T')[0];
-
-  const result = await supabase
-    .from('events')
-    .select('*')
-    .gte('event_date', today)
-    .order('event_date', { ascending: true })
-    .limit(limit);
-
-  return handleSupabaseResult(result);
-}
+export const getAdminEvents    = ()     => api.get('/events');
+export const getUpcomingEvents = (limit = 6) =>
+    api.get('/events').then(events => {
+        const today = new Date().toISOString().split('T')[0];
+        return events.filter(e => e.event_date >= today).slice(0, limit);
+    });
+export const getEventById      = (id)   => api.get(`/events/${id}`);
+export const createEvent       = (body) => api.post('/events', body);
+export const updateEvent       = (id, b) => api.patch(`/events/${id}`, b);
+export const deleteEvent       = (id)   => api.delete(`/events/${id}`);
 
 export async function getEventAssignments(eventId) {
-  const result = await supabase
-    .from('event_assignments')
-    .select(`
-      assignment_id,
-      employees (
-        first_name,
-        last_name,
-        departments!employees_dept_id_fkey(dept_name)
-      ),
-      animals (
-        name,
-        species_common_name
-      )
-    `)
-    .eq('event_id', eventId);
-
-  return handleSupabaseResult(result);
+    // Returns assignments via the events route (uses JOIN in Express)
+    return api.get(`/events/${eventId}`);
 }
 
-export async function assignResourceToEvent({
-  event_id,
-  employee_id = null,
-  animal_id = null,
-}) {
-  const result = await supabase
-    .from('event_assignments')
-    .insert([{ event_id, employee_id, animal_id }])
-    .select();
-
-  return handleSupabaseResult(result, null);
+export async function assignResourceToEvent({ event_id, employee_id = null, animal_id = null }) {
+    return api.post('/events/assignments', { event_id, employee_id, animal_id });
 }

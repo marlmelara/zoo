@@ -1,40 +1,14 @@
-import { supabase } from '../lib/supabase';
-import { handleSupabaseResult } from '../utils/apiHandler';
+import api from '../lib/api';
 
-export async function getAdminTickets() {
-  const result = await supabase
-    .from('tickets')
-    .select('*')
-    .order('ticket_id', { ascending: true });
+export const getAdminTickets  = ()     => api.get('/tickets');
+export const getMyTickets     = ()     => api.get('/tickets/my');
+export const createTickets    = (body) => api.post('/tickets', body);  // { tickets: [...] }
 
-  return handleSupabaseResult(result);
-}
-
-export async function getPublicTicketTypes() {
-  return [
-    {
-      id: 'general',
-      title: 'General Admission',
-      description: 'Standard zoo entry for one guest.',
-      price: 24.99,
-    },
-    {
-      id: 'child',
-      title: 'Child Admission',
-      description: 'Discounted entry for children.',
-      price: 17.99,
-    },
-    {
-      id: 'membership',
-      title: 'Membership',
-      description: 'Unlimited visits plus exclusive benefits.',
-      price: 89.99,
-    },
-    {
-      id: 'vip',
-      title: 'VIP Experience',
-      description: 'Premium access and special exhibit perks.',
-      price: 149.99,
-    },
-  ];
+// Static ticket types — no DB call needed
+export function getPublicTicketTypes() {
+    return [
+        { id: 'adult',  title: 'General Admission — Adult',  description: 'Standard zoo entry for adults.',     price: 24.99 },
+        { id: 'youth',  title: 'General Admission — Youth',  description: 'Discounted entry for children.',     price: 17.99 },
+        { id: 'senior', title: 'General Admission — Senior', description: 'Discounted entry for seniors 65+.', price: 19.99 },
+    ];
 }

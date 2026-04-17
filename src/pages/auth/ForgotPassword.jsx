@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { supabase } from '../../lib/supabase';
+import api from '../../lib/api';
 import { Mail } from 'lucide-react';
 
 export default function ForgotPassword() {
@@ -16,11 +16,9 @@ export default function ForgotPassword() {
     try {
       setLoading(true);
 
-      const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/reset-password`,
-      });
-
-      if (resetError) throw resetError;
+      // Verify the email exists — server returns 200 whether or not it exists
+      // (security best practice: don't confirm which emails are registered)
+      await api.post('/auth/forgot-password', { email });
 
       setSent(true);
     } catch (err) {

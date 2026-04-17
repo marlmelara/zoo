@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../../contexts/AuthContext';
-import { supabase } from '../../../lib/supabase';
+import api from '../../../lib/api';
 import {
     getPendingRequestsForManager,
     getAllSupplyRequests,
@@ -56,16 +56,13 @@ export default function ManagerDashboard() {
     const [vets, setVets] = useState([]);
     const [caretakers, setCaretakers] = useState([]);
 
-    // Event assignments state
-    const [eventAssignments, setEventAssignments] = useState({});
-    const [venues, setVenues] = useState([]);
 
     const isAdmin = role === 'admin';
 
     // Resolve employee profile directly from DB using auth user ID
     useEffect(() => {
         async function loadDashboard() {
-            if (!user?.id) return;
+            if (!user?.userId) return;
 
             let empId = employeeId;
             let depId = deptId;
@@ -73,18 +70,11 @@ export default function ManagerDashboard() {
             // If context IDs aren't ready yet, fetch directly
             if (!empId || !depId) {
                 try {
-                    const { data, error } = await supabase
-                        .from('employees')
-                        .select('employee_id, dept_id')
-                        .eq('user_id', user.id)
-                        .single();
-
-                    if (!error && data) {
-                        empId = data.employee_id;
-                        depId = data.dept_id;
-                        setResolvedEmpId(empId);
-                        setResolvedDeptId(depId);
-                    }
+                    const data = await api.get('/employees/me');
+                    empId = data.employee_id;
+                    depId = data.dept_id;
+                    setResolvedEmpId(empId);
+                    setResolvedDeptId(depId);
                 } catch (err) {
                     console.error('Error resolving employee:', err);
                 }
@@ -92,6 +82,8 @@ export default function ManagerDashboard() {
                 setResolvedEmpId(empId);
                 setResolvedDeptId(depId);
             }
+
+            if (!empId || !depId) return;
 
             // Now fetch everything with resolved IDs
             fetchOverview(depId);
@@ -105,29 +97,16 @@ export default function ManagerDashboard() {
         }
 
         loadDashboard();
-    }, [user?.id, employeeId, deptId]);
+    }, [user?.userId, employeeId, deptId]);
 
     async function fetchOverview(depId) {
-        const id = depId || resolvedDeptId || deptId;
         try {
-            const staffQuery = id
-                ? supabase.from('employees').select('*', { count: 'exact', head: true }).eq('dept_id', id)
-                : supabase.from('employees').select('*', { count: 'exact', head: true });
-
-            const promises = [
-                staffQuery,
-                supabase.from('supply_requests').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
-                supabase.from('operational_supplies').select('*', { count: 'exact', head: true }).lte('stock_count', 10),
-                supabase.from('events').select('*', { count: 'exact', head: true })
-            ];
-
-            const [staffRes, pendingRes, lowStockRes, eventsRes] = await Promise.all(promises);
-
+            const data = await api.get('/dashboard/stats');
             setOverviewStats({
-                staffCount: staffRes.count || 0,
-                pendingRequests: pendingRes.count || 0,
-                lowStockCount: lowStockRes.count || 0,
-                upcomingEvents: eventsRes.count || 0
+                staffCount: data.total_employees || 0,
+                pendingRequests: data.pending_requests || 0,
+                lowStockCount: data.low_stock_count || 0,
+                upcomingEvents: 0, // will be updated when events load
             });
         } catch (err) {
             console.error('Error fetching overview:', err);
@@ -179,12 +158,8 @@ export default function ManagerDashboard() {
         const empId = resolvedEmpId || employeeId;
         try {
             const request = pendingRequests.find(r => r.request_id === requestId);
+            // Server auto-restocks the supply when status === 'approved'
             await reviewSupplyRequest(requestId, empId, status);
-
-            // If approved, auto-restock the supply
-            if (status === 'approved' && request && request.supply_type === 'operational') {
-                await restockOperationalSupply(request.item_id, request.requested_quantity);
-            }
 
             // Log the activity
             await logActivity({
@@ -209,18 +184,11 @@ export default function ManagerDashboard() {
     async function fetchStaff(depId) {
         const id = depId || resolvedDeptId || deptId;
         try {
-            let query = supabase
-                .from('employees')
-                .select('*, departments!employees_dept_id_fkey(dept_name), vets(license_no, specialty), animal_caretakers(specialization_species)')
-                .order('employee_id', { ascending: true });
-
-            if (!isAdmin && id) {
-                query = query.eq('dept_id', id);
-            }
-
-            const { data, error } = await query;
-            if (error) throw error;
-            setStaff(data || []);
+            const data = await api.get('/employees');
+            const filtered = (!isAdmin && id)
+                ? data.filter(e => e.dept_id === id || e.dept_id === parseInt(id))
+                : data;
+            setStaff(filtered);
         } catch (err) {
             console.error('Error fetching staff:', err);
         } finally {
@@ -230,30 +198,9 @@ export default function ManagerDashboard() {
 
     async function fetchEvents() {
         try {
-            const [{ data, error }, { data: venueData }] = await Promise.all([
-                supabase.from('events').select('*').order('event_date', { ascending: false }),
-                supabase.from('venues').select('*').order('venue_name')
-            ]);
-
-            if (error) throw error;
+            // /events/with-assignments returns each event with venue_name + assignments[] embedded
+            const data = await api.get('/events/with-assignments');
             setEvents(data || []);
-            setVenues(venueData || []);
-
-            // Also fetch event assignments for each event
-            if (data?.length) {
-                const { data: assignments, error: aErr } = await supabase
-                    .from('event_assignments')
-                    .select('*, employees!event_assignments_employee_id_fkey(first_name, last_name), animals(name)');
-
-                if (!aErr && assignments) {
-                    const map = {};
-                    assignments.forEach(a => {
-                        if (!map[a.event_id]) map[a.event_id] = [];
-                        map[a.event_id].push(a);
-                    });
-                    setEventAssignments(map);
-                }
-            }
         } catch (err) {
             console.error('Error fetching events:', err);
         } finally {
@@ -263,26 +210,9 @@ export default function ManagerDashboard() {
 
     async function fetchAnimalsWithAssignments() {
         try {
-            const { data, error } = await supabase
-                .from('animals')
-                .select('*, animal_zones(zone_name)')
-                .order('animal_id', { ascending: true });
-
-            if (error) throw error;
-
-            // Fetch vet and caretaker assignments from junction tables
-            const [vtRes, ctRes] = await Promise.all([
-                supabase.from('vet_animal_assignments').select('*, employees!vet_animal_assignments_vet_id_fkey(first_name, last_name)'),
-                supabase.from('caretaker_animal_assignments').select('*, employees!caretaker_animal_assignments_caretaker_id_fkey(first_name, last_name)')
-            ]);
-
-            const animalsWithAssignments = (data || []).map(animal => ({
-                ...animal,
-                vet_assignments: (vtRes.data || []).filter(a => a.animal_id === animal.animal_id),
-                caretaker_assignments: (ctRes.data || []).filter(a => a.animal_id === animal.animal_id)
-            }));
-
-            setAllAnimals(animalsWithAssignments);
+            // Returns animals with zone_name (flat) + vet_assignments[] + caretaker_assignments[]
+            const data = await api.get('/animals/with-assignments');
+            setAllAnimals(data || []);
         } catch (err) {
             console.error('Error fetching animals:', err);
         } finally {
@@ -292,12 +222,12 @@ export default function ManagerDashboard() {
 
     async function fetchVetsAndCaretakers() {
         try {
-            const [vetRes, ctRes] = await Promise.all([
-                supabase.from('vets').select('employee_id, specialty, employees!vets_employee_id_fkey(first_name, last_name)'),
-                supabase.from('animal_caretakers').select('employee_id, specialization_species, assigned_animal_id, employees!animal_caretakers_employee_id_fkey(first_name, last_name)')
+            const [vetData, ctData] = await Promise.all([
+                api.get('/employees/vets'),
+                api.get('/employees/caretakers'),
             ]);
-            setVets(vetRes.data || []);
-            setCaretakers(ctRes.data || []);
+            setVets(vetData || []);
+            setCaretakers(ctData || []);
         } catch (err) {
             console.error('Error fetching vets/caretakers:', err);
         }
@@ -305,11 +235,7 @@ export default function ManagerDashboard() {
 
     async function handleAssignVet(animalId, vetEmployeeId) {
         try {
-            const { error } = await supabase.from('vet_animal_assignments').upsert(
-                { vet_id: vetEmployeeId, animal_id: animalId },
-                { onConflict: 'vet_id,animal_id' }
-            );
-            if (error) throw error;
+            await api.post(`/animals/${animalId}/vet-assign`, { vet_id: vetEmployeeId });
             await logActivity({
                 action_type: 'animal_vet_assigned',
                 description: `Assigned vet to animal #${animalId}`,
@@ -326,10 +252,7 @@ export default function ManagerDashboard() {
 
     async function handleRemoveVetAssignment(vetId, animalId) {
         try {
-            await supabase.from('vet_animal_assignments')
-                .delete()
-                .eq('vet_id', vetId)
-                .eq('animal_id', animalId);
+            await api.delete(`/animals/${animalId}/vet-assign/${vetId}`);
             fetchAnimalsWithAssignments();
         } catch (err) {
             console.error('Error removing vet:', err);
@@ -338,11 +261,7 @@ export default function ManagerDashboard() {
 
     async function handleAssignCaretaker(animalId, caretakerEmployeeId) {
         try {
-            const { error } = await supabase.from('caretaker_animal_assignments').upsert(
-                { caretaker_id: caretakerEmployeeId, animal_id: animalId },
-                { onConflict: 'caretaker_id,animal_id' }
-            );
-            if (error) throw error;
+            await api.post(`/animals/${animalId}/caretaker-assign`, { caretaker_id: caretakerEmployeeId });
             await logActivity({
                 action_type: 'animal_caretaker_assigned',
                 description: `Assigned caretaker to animal #${animalId}`,
@@ -359,10 +278,7 @@ export default function ManagerDashboard() {
 
     async function handleRemoveCaretakerAssignment(caretakerId, animalId) {
         try {
-            await supabase.from('caretaker_animal_assignments')
-                .delete()
-                .eq('caretaker_id', caretakerId)
-                .eq('animal_id', animalId);
+            await api.delete(`/animals/${animalId}/caretaker-assign/${caretakerId}`);
             fetchAnimalsWithAssignments();
         } catch (err) {
             console.error('Error removing caretaker:', err);
@@ -371,11 +287,7 @@ export default function ManagerDashboard() {
 
     async function handleAssignEmployeeToEvent(eventId, empIdToAssign) {
         try {
-            const { error } = await supabase.from('event_assignments').insert({
-                event_id: eventId,
-                employee_id: empIdToAssign
-            });
-            if (error) throw error;
+            await api.post(`/events/${eventId}/assign-employee`, { employee_id: empIdToAssign });
             await logActivity({
                 action_type: 'event_employee_assigned',
                 description: `Assigned employee #${empIdToAssign} to event #${eventId}`,
@@ -392,7 +304,7 @@ export default function ManagerDashboard() {
 
     async function handleRemoveEventAssignment(assignmentId) {
         try {
-            await supabase.from('event_assignments').delete().eq('assignment_id', assignmentId);
+            await api.delete(`/events/assignments/${assignmentId}`);
             fetchEvents();
         } catch (err) {
             console.error('Error removing assignment:', err);
@@ -520,7 +432,7 @@ export default function ManagerDashboard() {
                                 <div>
                                     <span style={{ fontWeight: 'bold' }}>{item.item_name}</span>
                                     <span style={{ fontSize: '12px', color: 'var(--color-text-muted)', marginLeft: '10px' }}>
-                                        {item.departments?.dept_name}
+                                        {item.dept_name}
                                     </span>
                                 </div>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -654,7 +566,7 @@ export default function ManagerDashboard() {
                                                 fontSize: '12px', padding: '4px 8px', borderRadius: '20px',
                                                 background: 'rgba(255,255,255,0.1)', color: 'var(--color-text-muted)'
                                             }}>
-                                                {person.departments?.dept_name || 'Unassigned'}
+                                                {person.dept_name || 'Unassigned'}
                                             </span>
                                         </div>
                                         <span style={{
@@ -767,7 +679,7 @@ export default function ManagerDashboard() {
                                                     </p>
                                                 )}
                                                 <p style={{ fontSize: '13px', color: 'var(--color-text-muted)', margin: '5px 0 0' }}>
-                                                    Zone: {animal.animal_zones?.zone_name || 'Unassigned'} | Age: {animal.age}
+                                                    Zone: {animal.zone_name || 'Unassigned'} | Age: {animal.age}
                                                 </p>
                                             </div>
 
@@ -782,7 +694,7 @@ export default function ManagerDashboard() {
                                                                     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                                                                     background: 'rgba(255,255,255,0.08)', padding: '4px 8px', borderRadius: '6px', fontSize: '13px'
                                                                 }}>
-                                                                    <span>{a.employees?.first_name} {a.employees?.last_name}</span>
+                                                                    <span>{a.first_name} {a.last_name}</span>
                                                                     <button
                                                                         onClick={() => handleRemoveVetAssignment(a.vet_id, animal.animal_id)}
                                                                         style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '0 2px', fontSize: '16px', lineHeight: 1 }}
@@ -808,7 +720,7 @@ export default function ManagerDashboard() {
                                                             .filter(v => !assignedVetIds.includes(v.employee_id))
                                                             .map(v => (
                                                                 <option key={v.employee_id} value={v.employee_id}>
-                                                                    {v.employees?.first_name} {v.employees?.last_name} — {v.specialty}
+                                                                    {v.first_name} {v.last_name} — {v.specialty}
                                                                 </option>
                                                             ))}
                                                     </select>
@@ -824,7 +736,7 @@ export default function ManagerDashboard() {
                                                                     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                                                                     background: 'rgba(255,255,255,0.08)', padding: '4px 8px', borderRadius: '6px', fontSize: '13px'
                                                                 }}>
-                                                                    <span>{a.employees?.first_name} {a.employees?.last_name}</span>
+                                                                    <span>{a.first_name} {a.last_name}</span>
                                                                     <button
                                                                         onClick={() => handleRemoveCaretakerAssignment(a.caretaker_id, animal.animal_id)}
                                                                         style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '0 2px', fontSize: '16px', lineHeight: 1 }}
@@ -850,7 +762,7 @@ export default function ManagerDashboard() {
                                                             .filter(c => !assignedCtIds.includes(c.employee_id))
                                                             .map(c => (
                                                                 <option key={c.employee_id} value={c.employee_id}>
-                                                                    {c.employees?.first_name} {c.employees?.last_name} — {c.specialization_species}
+                                                                    {c.first_name} {c.last_name} — {c.specialization_species}
                                                                 </option>
                                                             ))}
                                                     </select>
@@ -877,7 +789,7 @@ export default function ManagerDashboard() {
                     ) : (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
                             {events.map(event => {
-                                const assigned = eventAssignments[event.event_id] || [];
+                                const assigned = event.assignments || [];
                                 return (
                                     <div key={event.event_id} className="glass-panel" style={{ padding: '20px' }}>
                                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '10px' }}>
@@ -898,7 +810,7 @@ export default function ManagerDashboard() {
                                                 )}
                                                 {event.venue_id && (
                                                     <p style={{ fontSize: '13px', color: 'var(--color-text-muted)', margin: '4px 0' }}>
-                                                        📍 {venues.find(v => v.venue_id === event.venue_id)?.venue_name || 'Unknown venue'}
+                                                        📍 {event.venue_name || 'Unknown venue'}
                                                     </p>
                                                 )}
                                             </div>
@@ -919,7 +831,7 @@ export default function ManagerDashboard() {
                                                         background: 'rgba(255,255,255,0.08)', padding: '5px 10px', borderRadius: '8px', fontSize: '13px'
                                                     }}>
                                                         <Users size={14} />
-                                                        <span>{a.employees?.first_name} {a.employees?.last_name}</span>
+                                                        <span>{a.first_name} {a.last_name}</span>
                                                         <button
                                                             onClick={() => handleRemoveEventAssignment(a.assignment_id)}
                                                             style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '0 2px', fontSize: '16px', lineHeight: 1 }}
@@ -941,7 +853,7 @@ export default function ManagerDashboard() {
                                                         background: 'rgba(255,255,255,0.08)', padding: '5px 10px', borderRadius: '8px', fontSize: '13px'
                                                     }}>
                                                         <Cat size={14} />
-                                                        <span>{a.animals?.name}</span>
+                                                        <span>{a.animal_name}</span>
                                                         <button
                                                             onClick={() => handleRemoveEventAssignment(a.assignment_id)}
                                                             style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '0 2px', fontSize: '16px', lineHeight: 1 }}

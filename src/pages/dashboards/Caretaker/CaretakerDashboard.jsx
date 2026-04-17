@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../../contexts/AuthContext';
-import { supabase } from '../../../lib/supabase';
+import api from '../../../lib/api';
 import { getSuppliesByDepartment, createSupplyRequest, getMySupplyRequests } from '../../../api/supplies';
 import { logActivity } from '../../../api/activityLog';
 import {
@@ -35,24 +35,18 @@ export default function CaretakerDashboard() {
 
     useEffect(() => {
         async function loadDashboard() {
-            if (!user?.id) return;
+            if (!user?.userId) return;
 
             let empId = employeeId;
             let depId = deptId;
 
             if (!empId || !depId) {
                 try {
-                    const { data, error } = await supabase
-                        .from('employees')
-                        .select('employee_id, dept_id')
-                        .eq('user_id', user.id)
-                        .single();
-                    if (!error && data) {
-                        empId = data.employee_id;
-                        depId = data.dept_id;
-                        setResolvedEmpId(empId);
-                        setResolvedDeptId(depId);
-                    }
+                    const data = await api.get('/employees/me');
+                    empId = data.employee_id;
+                    depId = data.dept_id;
+                    setResolvedEmpId(empId);
+                    setResolvedDeptId(depId);
                 } catch (err) {
                     console.error('Error resolving employee:', err);
                 }
@@ -71,37 +65,12 @@ export default function CaretakerDashboard() {
             }
         }
         loadDashboard();
-    }, [user?.id, employeeId, deptId]);
+    }, [user?.userId, employeeId, deptId]);
 
     async function fetchMyAnimals(empId) {
-        const id = empId || resolvedEmpId || employeeId;
-        if (!id) { setAnimalsLoading(false); return; }
+        if (!empId && !resolvedEmpId && !employeeId) { setAnimalsLoading(false); return; }
         try {
-            // Caretakers are assigned via caretaker_animal_assignments junction table
-            const { data: assignments, error: ctError } = await supabase
-                .from('caretaker_animal_assignments')
-                .select('animal_id')
-                .eq('caretaker_id', id);
-
-            if (ctError || !assignments?.length) {
-                setAnimals([]);
-                setAnimalsLoading(false);
-                return;
-            }
-
-            const animalIds = assignments.map(a => a.animal_id).filter(Boolean);
-            if (animalIds.length === 0) {
-                setAnimals([]);
-                setAnimalsLoading(false);
-                return;
-            }
-
-            const { data, error } = await supabase
-                .from('animals')
-                .select('*, animal_zones(zone_name), health_records(record_id)')
-                .in('animal_id', animalIds);
-
-            if (error) throw error;
+            const data = await api.get('/animals/assigned/caretaker');
             setAnimals(data || []);
         } catch (err) {
             console.error('Error fetching caretaker animals:', err);
@@ -167,16 +136,10 @@ export default function CaretakerDashboard() {
     }
 
     async function fetchMyEvents(empId) {
-        const id = empId || resolvedEmpId || employeeId;
-        if (!id) { setEventsLoading(false); return; }
+        if (!empId && !resolvedEmpId && !employeeId) { setEventsLoading(false); return; }
         try {
-            const { data, error } = await supabase
-                .from('event_assignments')
-                .select('*, events(*)')
-                .eq('employee_id', id);
-
-            if (error) throw error;
-            setEvents((data || []).map(a => a.events).filter(Boolean));
+            const data = await api.get('/events/assigned');
+            setEvents(data || []);
         } catch (err) {
             console.error('Error fetching events:', err);
         } finally {
@@ -251,7 +214,7 @@ export default function CaretakerDashboard() {
                                     )}
                                     <div style={{ fontSize: '14px', color: 'var(--color-text-muted)' }}>
                                         <p>Age: {animal.age} years</p>
-                                        <p>Zone: {animal.animal_zones?.zone_name || 'Unassigned'}</p>
+                                        <p>Zone: {animal.zone_name || 'Unassigned'}</p>
                                     </div>
                                 </div>
                             ))}

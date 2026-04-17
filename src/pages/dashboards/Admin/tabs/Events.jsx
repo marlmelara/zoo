@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { getAdminEvents as fetchEventsApi } from '../../../../api/events';
-import { supabase } from '../../../../lib/supabase';
+import api from '../../../../lib/api';
 import { Calendar, Users, X, Plus, User, Cat, MapPin, Clock, Trash2, AlertTriangle } from 'lucide-react';
 
 export default function Events() {
@@ -45,18 +45,16 @@ export default function Events() {
   }
 
   async function loadVenues() {
-    const { data } = await supabase.from('venues').select('*').order('venue_name');
+    const data = await api.get('/venues');
     setVenues(data || []);
   }
 
   async function fetchResources() {
     try {
-      const { data: staffData } = await supabase
-        .from('employees')
-        .select('employee_id, first_name, last_name, departments!employees_dept_id_fkey(dept_name)');
-      const { data: animalData } = await supabase
-        .from('animals')
-        .select('animal_id, name, species_common_name');
+      const [staffData, animalData] = await Promise.all([
+        api.get('/employees'),
+        api.get('/animals'),
+      ]);
       setStaff(staffData || []);
       setAnimals(animalData || []);
     } catch (error) {
@@ -66,15 +64,7 @@ export default function Events() {
 
   async function fetchAssignments(eventId) {
     try {
-      const { data, error } = await supabase
-        .from('event_assignments')
-        .select(`
-          assignment_id,
-          employees (first_name, last_name, departments!employees_dept_id_fkey(dept_name)),
-          animals (name, species_common_name)
-        `)
-        .eq('event_id', eventId);
-      if (error) throw error;
+      const data = await api.get(`/events/${eventId}/assignments`);
       setAssignments(data || []);
     } catch (error) {
       console.error('Error fetching assignments:', error);
@@ -91,12 +81,10 @@ export default function Events() {
     e.preventDefault();
     if (!selectedEvent) return;
     try {
-      const { error } = await supabase.from('event_assignments').insert([{
-        event_id: selectedEvent.event_id,
+      await api.post(`/events/${selectedEvent.event_id}/assign`, {
         employee_id: assignmentForm.employee_id || null,
         animal_id: assignmentForm.animal_id || null,
-      }]);
-      if (error) throw error;
+      });
       setAssignmentForm({ employee_id: '', animal_id: '' });
       fetchAssignments(selectedEvent.event_id);
     } catch (error) {
@@ -106,26 +94,19 @@ export default function Events() {
 
   async function handleRemoveAssignment(assignmentId) {
     try {
-      const { error } = await supabase.from('event_assignments').delete().eq('assignment_id', assignmentId);
-      if (error) throw error;
+      await api.delete(`/events/assignments/${assignmentId}`);
       if (selectedEvent) fetchAssignments(selectedEvent.event_id);
     } catch (error) {
       console.error('Error removing assignment:', error);
     }
   }
 
-  // ── Scheduling conflict check ──
-  async function checkVenueConflict(venueId, eventDate, startTime, endTime) {
-    const { data: conflicts } = await supabase
-      .from('events')
-      .select('event_id, title, start_time, end_time')
-      .eq('venue_id', venueId)
-      .eq('event_date', eventDate);
-
-    if (!conflicts || conflicts.length === 0) return null;
-
+  // ── Scheduling conflict check (client-side using loaded events) ──
+  function checkVenueConflict(venueId, eventDate, startTime, endTime) {
+    const conflicts = events.filter(ev =>
+      ev.venue_id === parseInt(venueId) && ev.event_date === eventDate
+    );
     for (const ev of conflicts) {
-      // Overlapping if new start < existing end AND new end > existing start
       if (startTime < ev.end_time && endTime > ev.start_time) {
         return ev;
       }
@@ -145,7 +126,6 @@ export default function Events() {
       return;
     }
 
-    // Validate zoo hours (9am-5pm)
     if (start_time < '09:00' || end_time > '17:00') {
       setCreateError('Events must be within zoo hours: 9:00 AM - 5:00 PM.');
       return;
@@ -156,7 +136,6 @@ export default function Events() {
       return;
     }
 
-    // Minimum 2 hours
     const startMins = parseInt(start_time.split(':')[0]) * 60 + parseInt(start_time.split(':')[1]);
     const endMins = parseInt(end_time.split(':')[0]) * 60 + parseInt(end_time.split(':')[1]);
     if (endMins - startMins < 120) {
@@ -164,15 +143,12 @@ export default function Events() {
       return;
     }
 
-    // Check remaining time — if venue is occupied until X, can we fit?
-    // Also check if event would run past 5pm
     if (end_time > '17:00') {
       setCreateError('Event cannot extend past closing time (5:00 PM).');
       return;
     }
 
-    // Check venue conflict
-    const conflict = await checkVenueConflict(venue_id, event_date, start_time + ':00', end_time + ':00');
+    const conflict = checkVenueConflict(venue_id, event_date, start_time + ':00', end_time + ':00');
     if (conflict) {
       setCreateError(
         `Venue conflict: "${conflict.title}" is scheduled ${conflict.start_time?.slice(0, 5)} - ${conflict.end_time?.slice(0, 5)} at this venue on that date.`
@@ -180,7 +156,6 @@ export default function Events() {
       return;
     }
 
-    // Check venue capacity
     const venue = venues.find(v => v.venue_id === parseInt(venue_id));
     if (venue && max_capacity > venue.capacity) {
       setCreateError(`Max capacity cannot exceed venue capacity of ${venue.capacity}.`);
@@ -188,7 +163,7 @@ export default function Events() {
     }
 
     try {
-      const { error } = await supabase.from('events').insert([{
+      await api.post('/events', {
         title,
         description: createForm.description,
         event_date,
@@ -197,9 +172,7 @@ export default function Events() {
         end_time: end_time + ':00',
         max_capacity: parseInt(max_capacity),
         ticket_price_cents: Math.round(parseFloat(ticket_price_cents) * 100) || 0,
-        actual_attendance: 0,
-      }]);
-      if (error) throw error;
+      });
 
       setShowCreate(false);
       setCreateForm({
@@ -215,13 +188,7 @@ export default function Events() {
   // ── Delete event ──
   async function handleDeleteEvent(eventId) {
     try {
-      // Delete assignments first
-      await supabase.from('event_assignments').delete().eq('event_id', eventId);
-      // Delete tickets tied to this event
-      await supabase.from('tickets').delete().eq('event_id', eventId);
-      // Delete event
-      const { error } = await supabase.from('events').delete().eq('event_id', eventId);
-      if (error) throw error;
+      await api.delete(`/events/${eventId}`);
       setDeleteConfirm(null);
       setSelectedEvent(null);
       loadEvents();
@@ -351,29 +318,29 @@ export default function Events() {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '24px' }}>
               <div style={{ background: 'rgba(255,255,255,0.05)', padding: '12px', borderRadius: '10px' }}>
                 <h4 style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: 0, fontSize: '0.9rem' }}><User size={14} /> Personnel</h4>
-                {assignments.filter(a => a.employees).map(a => (
+                {assignments.filter(a => a.employee_id).map(a => (
                   <div key={a.assignment_id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.82rem', marginBottom: '4px' }}>
                     <span>
-                      {a.employees.first_name} {a.employees.last_name}
-                      <span style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', marginLeft: '4px' }}>({a.employees.departments?.dept_name})</span>
+                      {a.first_name} {a.last_name}
+                      <span style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', marginLeft: '4px' }}>({a.dept_name})</span>
                     </span>
                     <button onClick={() => handleRemoveAssignment(a.assignment_id)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '0 4px', fontSize: '14px', lineHeight: 1 }} title="Remove">&times;</button>
                   </div>
                 ))}
-                {assignments.filter(a => a.employees).length === 0 && <p style={{ fontSize: '0.75rem', color: 'gray' }}>None assigned.</p>}
+                {assignments.filter(a => a.employee_id).length === 0 && <p style={{ fontSize: '0.75rem', color: 'gray' }}>None assigned.</p>}
               </div>
               <div style={{ background: 'rgba(255,255,255,0.05)', padding: '12px', borderRadius: '10px' }}>
                 <h4 style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: 0, fontSize: '0.9rem' }}><Cat size={14} /> Animals</h4>
-                {assignments.filter(a => a.animals).map(a => (
+                {assignments.filter(a => a.animal_id).map(a => (
                   <div key={a.assignment_id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.82rem', marginBottom: '4px' }}>
                     <span>
-                      {a.animals.name}
-                      <span style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', marginLeft: '4px' }}>({a.animals.species_common_name})</span>
+                      {a.animal_name}
+                      <span style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', marginLeft: '4px' }}>({a.species_common_name})</span>
                     </span>
                     <button onClick={() => handleRemoveAssignment(a.assignment_id)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '0 4px', fontSize: '14px', lineHeight: 1 }} title="Remove">&times;</button>
                   </div>
                 ))}
-                {assignments.filter(a => a.animals).length === 0 && <p style={{ fontSize: '0.75rem', color: 'gray' }}>None assigned.</p>}
+                {assignments.filter(a => a.animal_id).length === 0 && <p style={{ fontSize: '0.75rem', color: 'gray' }}>None assigned.</p>}
               </div>
             </div>
 

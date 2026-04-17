@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../contexts/AuthContext';
 import { UserPlus } from 'lucide-react';
 import logo from '../../images/logo.png';
 
 export default function SignUp() {
   const navigate = useNavigate();
+  const { signUp } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [form, setForm] = useState({
@@ -44,46 +45,18 @@ export default function SignUp() {
     try {
       setLoading(true);
 
-      // 1. Create auth user in Supabase
-      const { data: authData, error: authError } = await supabase.auth.signUp({
+      await signUp({
         email: form.email,
         password: form.password,
-        options: {
-          data: { first_name: form.firstName, last_name: form.lastName },
-        },
+        firstName: form.firstName,
+        lastName: form.lastName,
+        phone: form.phone,
+        dateOfBirth: form.dateOfBirth,
+        address: form.address,
+        city: form.city,
+        state: form.state,
+        zipCode: form.zipCode,
       });
-
-      if (authError) throw authError;
-
-      const userId = authData.user?.id;
-      if (!userId) throw new Error('Account created but no user ID returned.');
-
-      // 2. Insert customer record linked to auth user
-      const { error: customerError } = await supabase
-        .from('customers')
-        .insert([{
-          user_id: userId,
-          first_name: form.firstName,
-          last_name: form.lastName,
-          email: form.email,
-          phone: form.phone || null,
-          date_of_birth: form.dateOfBirth || null,
-          is_member: false,
-          address: form.address || null,
-          city: form.city || null,
-          state: form.state || null,
-          zip_code: form.zipCode || null,
-        }]);
-
-      if (customerError) throw customerError;
-
-      // 3. Sign in automatically after account creation
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email: form.email,
-        password: form.password,
-      });
-
-      if (signInError) throw signInError;
 
       navigate('/dashboard/customer');
     } catch (err) {

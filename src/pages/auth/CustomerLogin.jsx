@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { Lock } from 'lucide-react';
 import logo from '../../images/logo_alt2.png';
@@ -11,7 +10,7 @@ export default function CustomerLogin() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const navigate = useNavigate();
-  const { user, role } = useAuth();
+  const { user, role, signIn } = useAuth();
 
   // If already logged in as customer, redirect to dashboard
   useEffect(() => {
@@ -25,24 +24,9 @@ export default function CustomerLogin() {
     setError('');
     try {
       setLoading(true);
+      const { data } = await signIn(email, password);
 
-      // Sign out any existing session first (enforce single session)
-      if (user) await supabase.auth.signOut();
-
-      const { data: authData, error: signInError } = await supabase.auth.signInWithPassword({ email, password });
-      if (signInError) throw signInError;
-
-      const userId = authData.user?.id;
-
-      // Check this user is a customer, not staff
-      const { data: custData } = await supabase
-        .from('customers')
-        .select('customer_id')
-        .eq('user_id', userId)
-        .single();
-
-      if (!custData) {
-        await supabase.auth.signOut();
+      if (data?.user?.role !== 'customer') {
         setError('This account is not a customer account. Please use the Staff Portal.');
         return;
       }

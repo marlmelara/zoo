@@ -1,38 +1,20 @@
-import { supabase } from '../lib/supabase';
-import { handleSupabaseResult } from '../utils/apiHandler';
+import api from '../lib/api';
 
 export async function getUpcomingEvents(limit = 100) {
-  const today = new Date().toISOString().split('T')[0];
-
-  const result = await supabase
-    .from('events')
-    .select(`
-      *,
-      tickets:tickets(count),
-      venues:venue_id (
-        venue_id,
-        venue_name,
-        location
-      )
-    `)
-    .gte('event_date', today)
-    .order('event_date', { ascending: true })
-    .limit(limit);
-
-  return handleSupabaseResult(result);
+    const events = await api.get('/events');
+    const today = new Date().toISOString().split('T')[0];
+    return events
+        .filter(e => e.event_date >= today)
+        .slice(0, limit);
 }
 
 export async function getHomeStats() {
-  const [animalsRes, eventsRes] = await Promise.all([
-    supabase.from('animals').select('*', { count: 'exact', head: true }),
-    supabase.from('events').select('*', { count: 'exact', head: true }),
-  ]);
-
-  if (animalsRes.error) throw animalsRes.error;
-  if (eventsRes.error) throw eventsRes.error;
-
-  return {
-    animals: animalsRes.count ?? 0,
-    events: eventsRes.count ?? 0,
-  };
+    const [animals, events] = await Promise.all([
+        api.get('/animals'),
+        api.get('/events'),
+    ]);
+    return {
+        animals: animals.length,
+        events:  events.length,
+    };
 }

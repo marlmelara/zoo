@@ -1,19 +1,19 @@
-import { supabase } from '../lib/supabase';
-import { handleSupabaseResult } from '../utils/apiHandler';
+import api from '../lib/api';
 
-export async function getStaff() {
-  const result = await supabase
-    .from('employees')
-    .select(`
-      employee_id,
-      first_name,
-      middle_name,
-      last_name,
-      role,
-      contact_info,
-      departments!employees_dept_id_fkey(dept_name)
-    `)
-    .order('employee_id', { ascending: true });
+export const getStaff                = ()       => api.get('/employees');
+export const getEmployeeById         = (id)     => api.get(`/employees/${id}`);
+export const createEmployee          = (body)   => api.post('/employees', body);
+export const updateEmployee          = (id, b)  => api.patch(`/employees/${id}`, b);
+export const deleteEmployee          = (id)     => api.delete(`/employees/${id}`);
+export const getDepartments          = ()       => api.get('/employees/departments/all');
+export const getEmployeesWithDepartments = ()   => api.get('/employees');
 
-  return handleSupabaseResult(result);
+// Replaces the create_zoo_user RPC
+export async function createZooUser({ email, password, first_name, last_name, dept_id, role,
+                                       license_no, specialty, specialization_species, office_location }) {
+    const result = await api.post('/employees', {
+        email, password, first_name, last_name, dept_id, role,
+        license_no, specialty, specialization_species, office_location,
+    });
+    return result.employee_id;
 }

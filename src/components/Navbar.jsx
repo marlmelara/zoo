@@ -3,14 +3,13 @@ import { Link, useNavigate } from 'react-router-dom';
 import { FaUserCircle, FaSignOutAlt } from 'react-icons/fa';
 import { useAuth } from '../contexts/AuthContext';
 import logo from '../images/logo.png';
-import { supabase } from '../lib/supabase';
 
 export default function Navbar() {
-  const { user, role, customerId } = useAuth();
+  const { user, role, customerId, signOut } = useAuth();
   const navigate = useNavigate();
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
+    await signOut();
     navigate('/');
   };
 

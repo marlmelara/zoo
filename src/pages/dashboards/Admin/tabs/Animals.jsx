@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
-import { supabase } from '../../../../lib/supabase';
+import api from '../../../../lib/api';
 import { Activity, Plus, X } from 'lucide-react';
 
 export default function Animals() {
@@ -31,11 +31,7 @@ export default function Animals() {
 
     async function fetchAnimals() {
         try {
-            const { data, error } = await supabase.from('animals').select(`
-    *,
-    animal_zones(zone_name)
-        `);
-            if (error) throw error;
+            const data = await api.get('/animals');
             setAnimals(data || []);
         } catch (error) {
             console.error('Error fetching animals:', error.message);
@@ -45,21 +41,15 @@ export default function Animals() {
     }
 
     async function fetchZones() {
-        const { data } = await supabase.from('animal_zones').select('*');
+        const data = await api.get('/animals/zones/all');
         if (data) setZones(data);
     }
 
     async function fetchMedicalHistory(animal) {
-        if (!animal.health_record_id) return;
+        if (!animal.animal_id) return;
         setHistoryLoading(true);
         try {
-            const { data, error } = await supabase
-                .from('medical_history')
-                .select('*')
-                .eq('record_id', animal.health_record_id)
-                .order('date_treated', { ascending: false });
-
-            if (error) throw error;
+            const data = await api.get(`/animals/${animal.animal_id}/medical-history`);
             setMedicalHistory(data || []);
         } catch (error) {
             console.error('Error fetching history:', error);
@@ -71,50 +61,29 @@ export default function Animals() {
     async function handleHistorySubmit(e) {
         e.preventDefault();
         try {
-            const { error } = await supabase.from('medical_history').insert([{
-                record_id: selectedAnimal.health_record_id,
+            await api.post(`/animals/${selectedAnimal.animal_id}/medical-history`, {
                 ...historyForm,
                 animal_age_at_treatment: parseInt(historyForm.animal_age_at_treatment)
-            }]);
-
-            if (error) throw error;
-
+            });
             setShowHistoryForm(false);
             setHistoryForm({ injury: '', disease: '', date_treated: '', animal_age_at_treatment: '' });
             fetchMedicalHistory(selectedAnimal);
         } catch (error) {
-            console.error("Error adding medical record", error);
+            console.error('Error adding medical record', error);
         }
     }
 
     async function handleSubmit(e) {
         e.preventDefault();
         try {
-            // 1. Create a Health Record first (required for animal)
-            // Ideally this would be a transaction, but we'll do sequential for now
-            const { data: healthRecord, error: healthError } = await supabase
-                .from('health_records')
-                .insert([{ vet_id: null }]) // No vet assigned initially
-                .select()
-                .single();
-
-            if (healthError) throw healthError;
-
-            // 2. Create Animal
-            const { error: animalError } = await supabase
-                .from('animals')
-                .insert([{
-                    ...formData,
-                    age: parseInt(formData.age),
-                    zone_id: parseInt(formData.zone_id),
-                    health_record_id: healthRecord.record_id
-                }]);
-
-            if (animalError) throw animalError;
-
+            await api.post('/animals', {
+                ...formData,
+                age: parseInt(formData.age),
+                zone_id: parseInt(formData.zone_id),
+            });
             setShowForm(false);
             setFormData({ name: '', species_common_name: '', species_binomial: '', age: '', zone_id: '' });
-            fetchAnimals(); // Refresh list
+            fetchAnimals();
         } catch (error) {
             console.error('Error adding animal:', error);
             alert('Failed to add animal. See console.');
@@ -200,7 +169,7 @@ export default function Animals() {
                             <p style={{ color: 'var(--color-primary)', fontSize: '14px', marginBottom: '15px' }}>{animal.species_common_name}</p>
                             <div style={{ fontSize: '14px', color: 'var(--color-text-muted)', marginBottom: '15px' }}>
                                 <p>Age: {animal.age} years</p>
-                                <p>Zone: {animal.animal_zones?.zone_name || 'Unassigned'}</p>
+                                <p>Zone: {animal.zone_name || 'Unassigned'}</p>
                             </div>
                             <button
                                 className="glass-button"

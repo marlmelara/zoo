@@ -1,11 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { supabase } from '../../lib/supabase';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { Lock } from 'lucide-react';
 import logo from '../../images/logo_alt2.png';
-
-const SUPER_ADMINS = ['admin@zoo.com', 'pablovelazquezbremont@gmail.com'];
 
 export default function Login() {
     const [email, setEmail] = useState('');
@@ -13,7 +10,7 @@ export default function Login() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const navigate = useNavigate();
-    const { user, role } = useAuth();
+    const { user, role, signIn } = useAuth();
 
     // If already logged in as staff, redirect to dashboard
     useEffect(() => {
@@ -27,33 +24,14 @@ export default function Login() {
         setError('');
         try {
             setLoading(true);
+            const { data } = await signIn(email, password);
 
-            // Sign out any existing session first (enforce single session)
-            if (user) await supabase.auth.signOut();
-
-            const { data: authData, error: signInError } = await supabase.auth.signInWithPassword({ email, password });
-            if (signInError) throw signInError;
-
-            const userId = authData.user?.id;
-            const userEmail = authData.user?.email;
-
-            // Super admins bypass the employee check
-            if (!SUPER_ADMINS.includes(userEmail)) {
-                const { data: empData } = await supabase
-                    .from('employees')
-                    .select('employee_id')
-                    .eq('user_id', userId)
-                    .single();
-
-                if (!empData) {
-                    await supabase.auth.signOut();
-                    setError('This account is not a staff account. Please use the Customer Login.');
-                    return;
-                }
+            if (data?.user?.role === 'customer') {
+                setError('This account is not a staff account. Please use the Customer Login.');
+                return;
             }
 
             navigate('/dashboard');
-
         } catch (err) {
             setError(err.message || 'Invalid email or password.');
         } finally {

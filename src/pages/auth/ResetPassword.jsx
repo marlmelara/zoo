@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { supabase } from '../../lib/supabase';
+import api from '../../lib/api';
 import { KeyRound } from 'lucide-react';
 
 export default function ResetPassword() {
@@ -35,11 +35,11 @@ export default function ResetPassword() {
     try {
       setLoading(true);
 
-      const { error: updateError } = await supabase.auth.updateUser({
-        password: form.password,
-      });
-
-      if (updateError) throw updateError;
+      // Requires a reset token from the URL (set by forgot-password flow)
+      const params = new URLSearchParams(window.location.search);
+      const token = params.get('token');
+      if (!token) throw new Error('Invalid or missing reset token. Please request a new reset link.');
+      await api.post('/auth/reset-password', { token, password: form.password });
 
       setSuccess(true);
       setTimeout(() => navigate('/login'), 3000);

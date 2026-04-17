@@ -1,23 +1,17 @@
-import { supabase } from '../lib/supabase';
-import { handleSupabaseResult } from '../utils/apiHandler';
+import api from '../lib/api';
 
-export async function getInventoryItems() {
-  const result = await supabase
-    .from('inventory')
-    .select('*')
-    .order('item_id', { ascending: true });
-
-  return handleSupabaseResult(result);
-}
+export const getInventoryItems = ()          => api.get('/inventory');
+export const getInventoryItem  = (id)        => api.get(`/inventory/${id}`);
+export const createInventoryItem = (body)    => api.post('/inventory', body);
+export const updateInventoryItem = (id, b)   => api.patch(`/inventory/${id}`, b);
+export const getLowStockItems  = ()          => api.get('/inventory/low-stock');
+export const getShops          = ()          => api.get('/inventory/shops/all');
 
 export async function getShopItems(outletId) {
-  const { data, error } = await supabase
-    .from('inventory')
-    .select('*')
-    .gt('stock_count', 0)
-    .eq('outlet_id', outletId)
-    .order('item_id', { ascending: true });
+    const items = await api.get('/inventory');
+    return items.filter(i => i.outlet_id === outletId && i.stock_count > 0);
+}
 
-  if (error) throw error;
-  return data || [];
+export async function decrementStock(itemId, quantity) {
+    return api.post(`/inventory/${itemId}/decrement`, { quantity });
 }

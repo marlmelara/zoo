@@ -1,143 +1,38 @@
-import { supabase } from '../lib/supabase';
-import { handleSupabaseResult, sumCents } from '../utils/apiHandler';
+import api from '../lib/api';
 
-/* ── Role-to-Department mapping ── */
 export const ROLE_DEPT_MAP = {
-  admin: 'Administration',
-  manager: null, // manager picks their department
-  vet: 'Veterinary Services',
-  caretaker: 'Animal Care',
-  security: 'Security',
-  retail: 'Retail & Operations',
+    admin:     'Administration',
+    manager:   null,
+    vet:       'Veterinary Services',
+    caretaker: 'Animal Care',
+    security:  'Security',
+    retail:    'Retail & Operations',
 };
 
-/* ── Admin Dashboard Stats ── */
-export async function getAdminDashboardStats() {
-  const [
-    animalsRes,
-    staffRes,
-    customersRes,
-    inventoryRes,
-    eventsRes,
-    ticketsRes,
-    salesRes,
-  ] = await Promise.all([
-    supabase.from('animals').select('*', { count: 'exact', head: true }),
-    supabase.from('employees').select('*', { count: 'exact', head: true }),
-    supabase.from('customers').select('*', { count: 'exact', head: true }),
-    supabase.from('inventory').select('*', { count: 'exact', head: true }),
-    supabase.from('events').select('*', { count: 'exact', head: true }),
-    supabase.from('tickets').select('price_cents'),
-    supabase.from('sale_items').select('quantity, price_at_sale_cents'),
-  ]);
+export const getAdminDashboardStats     = () => api.get('/dashboard/stats');
+export const getEmployeesWithDepartments = () => api.get('/employees');
+export const getDepartments             = () => api.get('/employees/departments/all');
+export const getAnimalsWithZones        = () => api.get('/animals');
+export const getRecentTransactions      = () => api.get('/transactions');
 
-  if (animalsRes.error) throw animalsRes.error;
-  if (staffRes.error) throw staffRes.error;
-  if (customersRes.error) throw customersRes.error;
-  if (inventoryRes.error) throw inventoryRes.error;
-  if (eventsRes.error) throw eventsRes.error;
-
-  const tickets = handleSupabaseResult(ticketsRes);
-  const sales = handleSupabaseResult(salesRes);
-
-  const ticketRevenueCents = sumCents(tickets, 'price_cents');
-  const retailRevenueCents = sales.reduce(
-    (sum, s) => sum + s.quantity * s.price_at_sale_cents,
-    0
-  );
-
-  return {
-    totalAnimals: animalsRes.count ?? 0,
-    totalEmployees: staffRes.count ?? 0,
-    totalCustomers: customersRes.count ?? 0,
-    totalInventory: inventoryRes.count ?? 0,
-    totalEvents: eventsRes.count ?? 0,
-    ticketRevenueCents,
-    retailRevenueCents,
-    totalRevenueCents: ticketRevenueCents + retailRevenueCents,
-  };
+export async function createZooUser({ email, password, first_name, last_name, dept_id, role,
+                                       license_no, specialty, specialization_species, office_location }) {
+    const result = await api.post('/employees', {
+        email, password, first_name, last_name, dept_id, role,
+        license_no, specialty, specialization_species, office_location,
+    });
+    return result.employee_id;
 }
 
-/* ── Employee Directory ── */
-export async function getEmployeesWithDepartments() {
-  const result = await supabase
-    .from('employees')
-    .select('*, departments:departments!employees_dept_id_fkey(dept_name)')
-    .order('employee_id', { ascending: true });
-
-  return handleSupabaseResult(result);
-}
-
-/* ── Departments (for create-user form) ── */
-export async function getDepartments() {
-  const result = await supabase
-    .from('departments')
-    .select('*')
-    .order('dept_id', { ascending: true });
-
-  return handleSupabaseResult(result);
-}
-
-/* ── Create User via RPC ── */
-export async function createZooUser({ email, password, first_name, last_name, dept_id, role }) {
-  const { data, error } = await supabase.rpc('create_zoo_user', {
-    email_param: email,
-    password_param: password,
-    first_name_param: first_name,
-    last_name_param: last_name,
-    department_id_param: parseInt(dept_id),
-    role_param: role,
-  });
-
-  if (error) throw error;
-  return data;
-}
-/* ── Animals with Zones ── */
-export async function getAnimalsWithZones() {
-  const result = await supabase
-    .from('animals')
-    .select('*, animal_zones(zone_name)')
-    .order('animal_id', { ascending: true });
-
-  return handleSupabaseResult(result);
-}
-
-/* ── Financial Overview (Specifics) ── */
 export async function getFinancialRevenueBreakdown() {
-  const [ticketsRes, salesRes] = await Promise.all([
-    supabase.from('tickets').select('type, price_cents'),
-    supabase.from('sale_items').select('price_at_sale_cents, quantity'),
-  ]);
-
-  const tickets = handleSupabaseResult(ticketsRes);
-  const sales = handleSupabaseResult(salesRes);
-
-  const admissionRevenue = tickets
-    .filter(t => t.type === 'Admission')
-    .reduce((sum, t) => sum + t.price_cents, 0);
-  
-  const attractionRevenue = tickets
-    .filter(t => t.type === 'Attraction')
-    .reduce((sum, t) => sum + t.price_cents, 0);
-
-  const retailRevenue = sales.reduce(
-    (sum, s) => sum + s.quantity * s.price_at_sale_cents,
-    0
-  );
-
-  return [
-    { name: 'Admission', Revenue: admissionRevenue / 100 },
-    { name: 'Attractions', Revenue: attractionRevenue / 100 },
-    { name: 'Retail', Revenue: retailRevenue / 100 },
-  ];
+    const stats = await api.get('/dashboard/stats');
+    // Stats endpoint returns aggregated data; build chart-friendly format
+    return [
+        { name: 'Tickets',  Revenue: (stats.total_revenue ?? 0) / 100 },
+        { name: 'Donations', Revenue: (stats.total_donations ?? 0) / 100 },
+    ];
 }
-/* ── Recent Transactions ── */
-export async function getRecentTransactions() {
-  const result = await supabase
-    .from('transactions')
-    .select('*, customers(customer_id)')
-    .order('transaction_date', { ascending: false })
-    .limit(50);
 
-  return handleSupabaseResult(result);
-}
+export const tickets = {
+    getAll: () => api.get('/tickets'),
+};

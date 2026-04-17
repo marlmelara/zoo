@@ -1,60 +1,18 @@
-import { supabase } from '../lib/supabase';
-import { handleSupabaseResult } from '../utils/apiHandler';
+import api from '../lib/api';
 
 /**
- * Generate and store a receipt for a transaction.
- * In a production app this would trigger an email via an edge function or
- * third-party service. For this project we persist the receipt data so
- * customers can view / re-send from their dashboard.
+ * Receipt creation is now done atomically inside POST /api/transactions.
+ * These helpers remain for any direct receipt lookups needed by components.
  */
 export async function createReceipt({
-  transactionId,
-  email,
-  customerName,
-  items = [],      // [{ description, quantity, unitPriceCents }]
-  subtotalCents,
-  taxCents,
-  totalCents,
-  isDonation = false,
-  donationFund = null,
+    transactionId, email, customerName, items = [],
+    subtotalCents, taxCents, totalCents, isDonation = false, donationFund = null,
 }) {
-  const result = await supabase
-    .from('receipts')
-    .insert([{
-      transaction_id: transactionId,
-      email,
-      customer_name: customerName,
-      line_items: items,
-      subtotal_cents: subtotalCents,
-      tax_cents: taxCents,
-      total_cents: totalCents,
-      is_donation: isDonation,
-      donation_fund: donationFund,
-    }])
-    .select()
-    .single();
-
-  return handleSupabaseResult(result, null);
+    // This is now handled server-side inside createTransaction.
+    // Kept as a no-op to avoid breaking any callers that still reference it.
+    console.warn('createReceipt: receipts are now created inside createTransaction on the server.');
+    return null;
 }
 
-/* ── Fetch receipts for a customer email ── */
-export async function getReceiptsByEmail(email) {
-  const result = await supabase
-    .from('receipts')
-    .select('*')
-    .eq('email', email)
-    .order('created_at', { ascending: false });
-
-  return handleSupabaseResult(result);
-}
-
-/* ── Fetch a single receipt by transaction id ── */
-export async function getReceiptByTransaction(transactionId) {
-  const result = await supabase
-    .from('receipts')
-    .select('*')
-    .eq('transaction_id', transactionId)
-    .single();
-
-  return handleSupabaseResult(result, null);
-}
+export const getReceiptsByEmail      = (email) => api.get(`/receipts?email=${encodeURIComponent(email)}`);
+export const getReceiptByTransaction = (txnId) => api.get(`/receipts/transaction/${txnId}`);

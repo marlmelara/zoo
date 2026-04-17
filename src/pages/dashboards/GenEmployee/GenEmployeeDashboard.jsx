@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../../contexts/AuthContext';
-import { supabase } from '../../../lib/supabase';
+import api from '../../../lib/api';
 import { getSuppliesByDepartment, createSupplyRequest, getMySupplyRequests } from '../../../api/supplies';
 import { logActivity } from '../../../api/activityLog';
 import {
@@ -34,7 +34,7 @@ export default function GenEmployeeDashboard() {
     // Fetch profile directly using auth user ID — avoids context timing issues
     useEffect(() => {
         async function loadAll() {
-            if (!user?.id) {
+            if (!user?.userId) {
                 setProfileLoading(false);
                 setSuppliesLoading(false);
                 return;
@@ -42,13 +42,7 @@ export default function GenEmployeeDashboard() {
 
             try {
                 // Get employee record by auth user_id
-                const { data, error } = await supabase
-                    .from('employees')
-                    .select('*, departments!employees_dept_id_fkey(dept_name)')
-                    .eq('user_id', user.id)
-                    .single();
-
-                if (error) throw error;
+                const data = await api.get('/employees/me');
                 setProfile(data);
                 setResolvedEmpId(data.employee_id);
                 setResolvedDeptId(data.dept_id);
@@ -72,7 +66,7 @@ export default function GenEmployeeDashboard() {
         }
 
         loadAll();
-    }, [user?.id]);
+    }, [user?.userId]);
 
     // Keep resolved IDs in sync if context updates later
     useEffect(() => {
@@ -103,16 +97,10 @@ export default function GenEmployeeDashboard() {
     }
 
     async function fetchMyEvents(empId) {
-        const id = empId || resolvedEmpId || employeeId;
-        if (!id) { setEventsLoading(false); return; }
+        if (!empId && !resolvedEmpId && !employeeId) { setEventsLoading(false); return; }
         try {
-            const { data, error } = await supabase
-                .from('event_assignments')
-                .select('*, events(*)')
-                .eq('employee_id', id);
-
-            if (error) throw error;
-            setEvents((data || []).map(a => a.events).filter(Boolean));
+            const data = await api.get('/events/assigned');
+            setEvents(data || []);
         } catch (err) {
             console.error('Error fetching events:', err);
         } finally {
@@ -237,7 +225,7 @@ export default function GenEmployeeDashboard() {
                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
                                     <div style={{ background: 'rgba(255,255,255,0.05)', padding: '15px', borderRadius: '10px' }}>
                                         <p style={{ fontSize: '12px', color: 'var(--color-text-muted)', margin: '0 0 5px' }}>Department</p>
-                                        <p style={{ fontWeight: 600, margin: 0 }}>{profile.departments?.dept_name || 'Unassigned'}</p>
+                                        <p style={{ fontWeight: 600, margin: 0 }}>{profile.dept_name || 'Unassigned'}</p>
                                     </div>
                                     <div style={{ background: 'rgba(255,255,255,0.05)', padding: '15px', borderRadius: '10px' }}>
                                         <p style={{ fontSize: '12px', color: 'var(--color-text-muted)', margin: '0 0 5px' }}>Shift</p>

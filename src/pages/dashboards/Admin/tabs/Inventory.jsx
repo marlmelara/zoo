@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { supabase } from '../../../../lib/supabase';
+import api from '../../../../lib/api';
 import { ShoppingBag, Coffee, AlertTriangle, Package, ShoppingCart, Plus, Minus, Trash2 } from 'lucide-react';
 
 export default function Inventory() {
@@ -20,14 +20,7 @@ export default function Inventory() {
 
     async function fetchInventory() {
         try {
-            const { data, error } = await supabase
-                .from('shops')
-                .select(`
-          *,
-          inventory (*)
-        `);
-
-            if (error) throw error;
+            const data = await api.get('/inventory/with-shops');
             setOutlets(data || []);
         } catch (error) {
             console.error('Error fetching inventory:', error);
@@ -79,38 +72,20 @@ export default function Inventory() {
         if (cart.length === 0) return;
         setIsCheckout(true);
         try {
-            // 1. Create Transaction
-            const { data: txn, error: txnError } = await supabase.from('transactions')
-                .insert([{ total_amount_cents: cartTotal }])
-                .select()
-                .single();
-            if (txnError) throw txnError;
-
-            // 2. Create Sale Items
-            const saleItems = cart.map(item => ({
-                transaction_id: txn.transaction_id,
+            const sale_items = cart.map(item => ({
                 item_id: item.item_id,
                 quantity: item.quantity,
-                price_at_sale_cents: item.price_cents || 0
+                price_at_sale_cents: item.price_cents || 0,
             }));
-            const { error: salesError } = await supabase.from('sale_items').insert(saleItems);
-            if (salesError) throw salesError;
 
-            // 3. Update Inventory Stock (Safe RPC)
-            for (const item of cart) {
-                const { error: stockError } = await supabase.rpc('decrement_stock', {
-                    item_id_param: item.item_id,
-                    quantity_param: item.quantity
-                });
-                if (stockError) {
-                    console.error('Error decrementing stock for item', item.item_id, stockError);
-                    // In a real app we might want to rollback transaction, but for now just log
-                }
-            }
+            await api.post('/transactions', {
+                total_amount_cents: cartTotal,
+                sale_items,
+            });
 
             setCart([]);
             alert('Checkout successful!');
-            fetchInventory(); // Refresh stock
+            fetchInventory();
         } catch (error) {
             console.error('Checkout error:', error);
             alert('Checkout failed. ' + error.message);
@@ -122,15 +97,13 @@ export default function Inventory() {
     const handleAddItem = async (e) => {
         e.preventDefault();
         try {
-            const { error } = await supabase.from('inventory').insert([{
+            await api.post('/inventory', {
                 ...newItem,
                 stock_count: parseInt(newItem.stock_count),
                 restock_threshold: parseInt(newItem.restock_threshold),
-                price_cents: Math.round(parseFloat(newItem.price_cents) * 100), // Input as dollars/float
+                price_cents: Math.round(parseFloat(newItem.price_cents) * 100),
                 outlet_id: parseInt(newItem.outlet_id)
-            }]);
-
-            if (error) throw error;
+            });
 
             setShowAddForm(false);
             setNewItem({ outlet_id: '', item_name: '', stock_count: '', restock_threshold: 10, price_cents: '', description: '' });
@@ -142,18 +115,13 @@ export default function Inventory() {
     };
 
     const handleRestock = async (item) => {
-        const amountStr = prompt(`Restock ${item.item_name}. Enter quantity to add:`, "10");
+        const amountStr = prompt(`Restock ${item.item_name}. Enter quantity to add:`, '10');
         if (!amountStr) return;
         const amount = parseInt(amountStr);
         if (isNaN(amount) || amount <= 0) return;
 
         try {
-            // Simple increment, no need for complex RPC although we could make one
-            const { error } = await supabase.from('inventory')
-                .update({ stock_count: item.stock_count + amount })
-                .eq('item_id', item.item_id);
-
-            if (error) throw error;
+            await api.patch(`/inventory/${item.item_id}/restock`, { quantity: amount });
             fetchInventory();
         } catch (error) {
             console.error('Error restocking:', error);

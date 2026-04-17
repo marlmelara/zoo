@@ -1,12 +1,8 @@
-import { supabase } from '../lib/supabase';
-import { handleSupabaseResult } from '../utils/apiHandler';
+import api from '../lib/api';
 
-export async function createDonation(payload) {
-  const result = await supabase
-    .from('donations')
-    .insert([payload])
-    .select()
-    .single();
-
-  return handleSupabaseResult(result, null);
+export async function createDonation({ donor_name, amount_cents, customer_id = null }) {
+    return api.post('/donations', { donor_name, amount_cents, customer_id });
 }
+
+export const getMyDonations   = ()  => api.get('/donations/my');
+export const getAdminDonations = () => api.get('/donations');

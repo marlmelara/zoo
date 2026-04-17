@@ -3,7 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { FaCalendarAlt, FaUser, FaChild, FaMapMarkerAlt, FaPhone, FaEnvelope, FaMinus, FaPlus, FaClock, FaTicketAlt, FaShoppingCart, FaStar, FaArrowLeft } from 'react-icons/fa';
 import { FaPersonCane } from "react-icons/fa6";
 import { useAuth } from '../../../contexts/AuthContext';
-import { supabase } from '../../../lib/supabase';
+import api from '../../../lib/api';
 import { getUpcomingEvents } from '../../../api/public';
 import ShopCartPanel, { useZooCart } from '../../../components/ShopCart';
 import './tickets.css';
@@ -25,16 +25,14 @@ export default function Tickets() {
 
   useEffect(() => {
     if (!user || !customerId) return;
-    supabase.from('customers').select('first_name, membership_type, membership_end')
-      .eq('customer_id', customerId).single()
-      .then(({ data }) => {
-        if (data) {
-          setCustomerName(data.first_name || '');
-          if (data.membership_type && data.membership_end && new Date(data.membership_end) >= new Date()) {
-            setMembershipType(data.membership_type);
-          }
+    api.get('/customers/me')
+      .then(data => {
+        setCustomerName(data.first_name || '');
+        if (data.membership_type && data.membership_end && new Date(data.membership_end) >= new Date()) {
+          setMembershipType(data.membership_type);
         }
-      });
+      })
+      .catch(() => {});
   }, [user, customerId]);
 
   useEffect(() => {
@@ -135,7 +133,7 @@ export default function Tickets() {
       event_id: event.event_id,
       title: event.title || event.event_name,
       date: new Date(event.event_date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }),
-      venue: event.venues?.venue_name || null,
+      venue: event.venue_name || null,
       time: event.start_time ? `${formatTime(event.start_time)}${event.end_time ? ` – ${formatTime(event.end_time)}` : ''}` : null,
       price_cents: event.ticket_price_cents,
     });
@@ -356,8 +354,8 @@ export default function Tickets() {
                               {formatTime(event.start_time)} – {formatTime(event.end_time)}
                             </span>
                           )}
-                          {event.venues?.venue_name && (
-                            <span><FaMapMarkerAlt style={{ marginRight: '4px', verticalAlign: 'middle' }} />{event.venues.venue_name}</span>
+                          {event.venue_name && (
+                            <span><FaMapMarkerAlt style={{ marginRight: '4px', verticalAlign: 'middle' }} />{event.venue_name}</span>
                           )}
                         </div>
                       </div>

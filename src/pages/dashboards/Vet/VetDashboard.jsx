@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../../contexts/AuthContext';
-import { supabase } from '../../../lib/supabase';
+import api from '../../../lib/api';
 import { getSuppliesByDepartment, createSupplyRequest, getMySupplyRequests } from '../../../api/supplies';
 import { logActivity } from '../../../api/activityLog';
 import {
@@ -42,24 +42,18 @@ export default function VetDashboard() {
 
     useEffect(() => {
         async function loadDashboard() {
-            if (!user?.id) return;
+            if (!user?.userId) return;
 
             let empId = employeeId;
             let depId = deptId;
 
             if (!empId || !depId) {
                 try {
-                    const { data, error } = await supabase
-                        .from('employees')
-                        .select('employee_id, dept_id')
-                        .eq('user_id', user.id)
-                        .single();
-                    if (!error && data) {
-                        empId = data.employee_id;
-                        depId = data.dept_id;
-                        setResolvedEmpId(empId);
-                        setResolvedDeptId(depId);
-                    }
+                    const data = await api.get('/employees/me');
+                    empId = data.employee_id;
+                    depId = data.dept_id;
+                    setResolvedEmpId(empId);
+                    setResolvedDeptId(depId);
                 } catch (err) {
                     console.error('Error resolving employee:', err);
                 }
@@ -78,37 +72,12 @@ export default function VetDashboard() {
             }
         }
         loadDashboard();
-    }, [user?.id, employeeId, deptId]);
+    }, [user?.userId, employeeId, deptId]);
 
     async function fetchMyAnimals(empId) {
-        const id = empId || resolvedEmpId || employeeId;
-        if (!id) { setAnimalsLoading(false); return; }
+        if (!empId && !resolvedEmpId && !employeeId) { setAnimalsLoading(false); return; }
         try {
-            // Vet's animals via vet_animal_assignments junction table
-            const { data: assignments, error: vaError } = await supabase
-                .from('vet_animal_assignments')
-                .select('animal_id')
-                .eq('vet_id', id);
-
-            if (vaError || !assignments?.length) {
-                setAnimals([]);
-                setAnimalsLoading(false);
-                return;
-            }
-
-            const animalIds = assignments.map(a => a.animal_id).filter(Boolean);
-            if (animalIds.length === 0) {
-                setAnimals([]);
-                setAnimalsLoading(false);
-                return;
-            }
-
-            const { data, error } = await supabase
-                .from('animals')
-                .select('*, animal_zones(zone_name), health_records(record_id)')
-                .in('animal_id', animalIds);
-
-            if (error) throw error;
+            const data = await api.get('/animals/assigned/vet');
             setAnimals(data || []);
         } catch (err) {
             console.error('Error fetching vet animals:', err);
@@ -119,16 +88,9 @@ export default function VetDashboard() {
     }
 
     async function fetchMedicalHistory(animal) {
-        if (!animal.health_record_id) return;
         setHistoryLoading(true);
         try {
-            const { data, error } = await supabase
-                .from('medical_history')
-                .select('*')
-                .eq('record_id', animal.health_record_id)
-                .order('date_treated', { ascending: false });
-
-            if (error) throw error;
+            const data = await api.get(`/animals/${animal.animal_id}/medical-history`);
             setMedicalHistory(data || []);
         } catch (err) {
             console.error('Error fetching medical history:', err);
@@ -140,12 +102,10 @@ export default function VetDashboard() {
     async function handleHistorySubmit(e) {
         e.preventDefault();
         try {
-            const { error } = await supabase.from('medical_history').insert([{
-                record_id: selectedAnimal.health_record_id,
+            await api.post(`/animals/${selectedAnimal.animal_id}/medical-history`, {
                 ...historyForm,
                 animal_age_at_treatment: parseInt(historyForm.animal_age_at_treatment)
-            }]);
-            if (error) throw error;
+            });
             setShowHistoryForm(false);
             setHistoryForm({ injury: '', disease: '', date_treated: '', animal_age_at_treatment: '' });
             fetchMedicalHistory(selectedAnimal);
@@ -210,16 +170,10 @@ export default function VetDashboard() {
     }
 
     async function fetchMyEvents(empId) {
-        const id = empId || resolvedEmpId || employeeId;
-        if (!id) { setEventsLoading(false); return; }
+        if (!empId && !resolvedEmpId && !employeeId) { setEventsLoading(false); return; }
         try {
-            const { data, error } = await supabase
-                .from('event_assignments')
-                .select('*, events(*)')
-                .eq('employee_id', id);
-
-            if (error) throw error;
-            setEvents((data || []).map(a => a.events).filter(Boolean));
+            const data = await api.get('/events/assigned');
+            setEvents(data || []);
         } catch (err) {
             console.error('Error fetching events:', err);
         } finally {
@@ -289,7 +243,7 @@ export default function VetDashboard() {
                                     </p>
                                     <div style={{ fontSize: '14px', color: 'var(--color-text-muted)', marginBottom: '15px' }}>
                                         <p>Age: {animal.age} years</p>
-                                        <p>Zone: {animal.animal_zones?.zone_name || 'Unassigned'}</p>
+                                        <p>Zone: {animal.zone_name || 'Unassigned'}</p>
                                     </div>
                                     <button
                                         className="glass-button"

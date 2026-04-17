@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../contexts/AuthContext';
-import { supabase } from '../../../lib/supabase';
+import api from '../../../lib/api';
 import {
     User, Ticket, Heart, Calendar, MapPin, Phone, Mail,
     Star, Gift, ShoppingCart, RefreshCw, Clock, Package, Trash2, AlertTriangle
@@ -46,23 +46,17 @@ export default function CustomerDashboard() {
     const [eventsDateTo, setEventsDateTo] = useState('');
 
     useEffect(() => {
-        if (!user?.id) return;
+        if (!user?.userId) return;
         fetchProfile();
         fetchTickets();
         fetchDonations();
         fetchEvents();
         fetchPurchases();
-    }, [user?.id]);
+    }, [user?.userId]);
 
     async function fetchProfile() {
         try {
-            const { data, error } = await supabase
-                .from('customers')
-                .select('*')
-                .eq('user_id', user.id)
-                .single();
-
-            if (error) throw error;
+            const data = await api.get('/customers/me');
             setProfile(data);
             setEditForm(data || {});
         } catch (err) {
@@ -74,21 +68,7 @@ export default function CustomerDashboard() {
 
     async function fetchTickets() {
         try {
-            const { data: custData } = await supabase
-                .from('customers')
-                .select('customer_id')
-                .eq('user_id', user.id)
-                .single();
-
-            if (!custData) { setTicketsLoading(false); return; }
-
-            const { data, error } = await supabase
-                .from('tickets')
-                .select('*, events(title, event_date, description, start_time, end_time, venues(venue_name, location)), transactions(transaction_date)')
-                .eq('customer_id', custData.customer_id)
-                .order('ticket_id', { ascending: false });
-
-            if (error) throw error;
+            const data = await api.get('/tickets/my');
             setTickets(data || []);
         } catch (err) {
             console.error('Error fetching tickets:', err);
@@ -99,32 +79,7 @@ export default function CustomerDashboard() {
 
     async function fetchDonations() {
         try {
-            const { data: custData } = await supabase
-                .from('customers')
-                .select('customer_id, first_name, last_name')
-                .eq('user_id', user.id)
-                .single();
-
-            if (!custData) { setDonationsLoading(false); return; }
-
-            let { data, error } = await supabase
-                .from('donations')
-                .select('*')
-                .eq('customer_id', custData.customer_id)
-                .order('donation_date', { ascending: false });
-
-            if (error) throw error;
-
-            // Also match by donor name if no customer_id link
-            if ((!data || data.length === 0) && custData.first_name) {
-                const { data: byName } = await supabase
-                    .from('donations')
-                    .select('*')
-                    .ilike('donor_name', `%${custData.first_name}%${custData.last_name}%`)
-                    .order('donation_date', { ascending: false });
-                data = byName || [];
-            }
-
+            const data = await api.get('/donations/my');
             setDonations(data || []);
         } catch (err) {
             console.error('Error fetching donations:', err);
@@ -135,12 +90,7 @@ export default function CustomerDashboard() {
 
     async function fetchEvents() {
         try {
-            const { data, error } = await supabase
-                .from('events')
-                .select('*, venues(venue_name, location)')
-                .order('event_date', { ascending: false });
-
-            if (error) throw error;
+            const data = await api.get('/events');
             setEvents(data || []);
         } catch (err) {
             console.error('Error fetching events:', err);
@@ -151,23 +101,7 @@ export default function CustomerDashboard() {
 
     async function fetchPurchases() {
         try {
-            const { data: custData } = await supabase
-                .from('customers')
-                .select('customer_id')
-                .eq('user_id', user.id)
-                .single();
-
-            if (!custData) { setPurchasesLoading(false); return; }
-
-            // Get all non-donation transactions with their receipts
-            const { data, error } = await supabase
-                .from('transactions')
-                .select('*, receipts(*)')
-                .eq('customer_id', custData.customer_id)
-                .eq('is_donation', false)
-                .order('transaction_date', { ascending: false });
-
-            if (error) throw error;
+            const data = await api.get('/transactions/my');
             setPurchases(data || []);
         } catch (err) {
             console.error('Error fetching purchases:', err);
@@ -179,15 +113,7 @@ export default function CustomerDashboard() {
     async function handleDeleteAccount() {
         try {
             setDeleting(true);
-            // Delete customer record from DB
-            if (customerId) {
-                // Delete related records first
-                await supabase.from('tickets').delete().eq('customer_id', customerId);
-                await supabase.from('donations').update({ customer_id: null }).eq('customer_id', customerId);
-                await supabase.from('transactions').update({ customer_id: null }).eq('customer_id', customerId);
-                await supabase.from('customers').delete().eq('customer_id', customerId);
-            }
-            // Sign out and redirect home
+            await api.delete('/customers/me');
             await signOut();
             navigate('/');
         } catch (err) {
@@ -201,21 +127,16 @@ export default function CustomerDashboard() {
     async function handleProfileUpdate(e) {
         e.preventDefault();
         try {
-            const { error } = await supabase
-                .from('customers')
-                .update({
-                    first_name: editForm.first_name,
-                    last_name: editForm.last_name,
-                    phone: editForm.phone,
-                    address: editForm.address,
-                    city: editForm.city,
-                    state: editForm.state,
-                    zip_code: editForm.zip_code,
-                    date_of_birth: editForm.date_of_birth,
-                })
-                .eq('customer_id', profile.customer_id);
-
-            if (error) throw error;
+            await api.patch('/customers/me', {
+                first_name: editForm.first_name,
+                last_name: editForm.last_name,
+                phone: editForm.phone,
+                address: editForm.address,
+                city: editForm.city,
+                state: editForm.state,
+                zip_code: editForm.zip_code,
+                date_of_birth: editForm.date_of_birth,
+            });
             setEditing(false);
             fetchProfile();
         } catch (err) {
@@ -581,8 +502,7 @@ export default function CustomerDashboard() {
                                 if (purchaseDateTo && d > new Date(purchaseDateTo + 'T23:59:59')) return false;
                                 return true;
                             }).map(txn => {
-                                const receipt = txn.receipts?.[0] || null;
-                                const lineItems = receipt?.line_items || [];
+                                const lineItems = Array.isArray(txn.line_items) ? txn.line_items : (typeof txn.line_items === 'string' ? JSON.parse(txn.line_items || '[]') : []);
                                 return (
                                     <div key={txn.transaction_id} className="glass-panel" style={{ padding: '20px' }}>
                                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: lineItems.length > 0 ? '12px' : 0 }}>
@@ -613,10 +533,10 @@ export default function CustomerDashboard() {
                                                         </span>
                                                     </div>
                                                 ))}
-                                                {receipt && (
+                                                {(txn.subtotal_cents != null) && (
                                                     <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '8px', paddingTop: '8px', borderTop: '1px solid rgba(255,255,255,0.1)', fontSize: '12px', color: 'var(--color-text-muted)' }}>
-                                                        <span>Subtotal: ${(receipt.subtotal_cents / 100).toFixed(2)}</span>
-                                                        <span>Tax: ${(receipt.tax_cents / 100).toFixed(2)}</span>
+                                                        <span>Subtotal: ${(txn.subtotal_cents / 100).toFixed(2)}</span>
+                                                        <span>Tax: ${(txn.tax_cents / 100).toFixed(2)}</span>
                                                     </div>
                                                 )}
                                             </div>

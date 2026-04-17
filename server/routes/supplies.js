@@ -1,0 +1,122 @@
+import { Router } from '../lib/router.js';
+import db from '../db.js';
+import { requireAuth, requireRole } from '../middleware/auth.js';
+
+const router = Router();
+
+// GET /api/supplies — employees can see their dept supplies
+router.get('/', requireAuth, async (req, res) => {
+    try {
+        const { role, deptId, employeeId } = req.user;
+        let rows;
+        if (role === 'admin' || role === 'manager') {
+            [rows] = await db.query(
+                `SELECT os.*, d.dept_name FROM operational_supplies os
+                 LEFT JOIN departments d ON os.department_id = d.dept_id
+                 ORDER BY os.supply_id ASC`
+            );
+        } else {
+            [rows] = await db.query(
+                `SELECT os.*, d.dept_name FROM operational_supplies os
+                 LEFT JOIN departments d ON os.department_id = d.dept_id
+                 WHERE os.department_id = ?
+                 ORDER BY os.supply_id ASC`, [deptId]
+            );
+        }
+        return res.json(rows);
+    } catch (err) {
+        return res.status(500).json({ error: err.message });
+    }
+});
+
+// GET /api/supplies/requests — supply requests
+router.get('/requests', requireAuth, async (req, res) => {
+    try {
+        const { role, employeeId } = req.user;
+        let rows;
+        if (role === 'admin' || role === 'manager') {
+            [rows] = await db.query(
+                `SELECT sr.*,
+                        req.first_name AS req_first, req.last_name AS req_last,
+                        rev.first_name AS rev_first, rev.last_name AS rev_last
+                 FROM supply_requests sr
+                 LEFT JOIN employees req ON sr.requested_by = req.employee_id
+                 LEFT JOIN employees rev ON sr.reviewed_by  = rev.employee_id
+                 ORDER BY sr.created_at DESC`
+            );
+        } else {
+            [rows] = await db.query(
+                `SELECT sr.*,
+                        req.first_name AS req_first, req.last_name AS req_last
+                 FROM supply_requests sr
+                 LEFT JOIN employees req ON sr.requested_by = req.employee_id
+                 WHERE sr.requested_by = ?
+                 ORDER BY sr.created_at DESC`, [employeeId]
+            );
+        }
+        return res.json(rows);
+    } catch (err) {
+        return res.status(500).json({ error: err.message });
+    }
+});
+
+// POST /api/supplies/requests
+router.post('/requests', requireAuth, async (req, res) => {
+    const { supply_type, item_id, item_name, requested_quantity, reason } = req.body;
+    try {
+        const [result] = await db.query(
+            `INSERT INTO supply_requests
+             (requested_by, supply_type, item_id, item_name, requested_quantity, reason)
+             VALUES (?, ?, ?, ?, ?, ?)`,
+            [req.user.employeeId, supply_type, item_id, item_name,
+             requested_quantity, reason || null]
+        );
+        return res.status(201).json({ request_id: result.insertId });
+    } catch (err) {
+        return res.status(500).json({ error: err.message });
+    }
+});
+
+// PATCH /api/supplies/requests/:id — approve/deny
+router.patch('/requests/:id', requireRole('admin','manager'), async (req, res) => {
+    const { status } = req.body;
+    if (!['approved','denied'].includes(status)) {
+        return res.status(400).json({ error: 'Status must be approved or denied.' });
+    }
+    const conn = await db.getConnection();
+    try {
+        await conn.beginTransaction();
+        await conn.query(
+            `UPDATE supply_requests SET status=?, reviewed_by=?, reviewed_at=NOW()
+             WHERE request_id=?`,
+            [status, req.user.employeeId, req.params.id]
+        );
+        // If approved, restock the item
+        if (status === 'approved') {
+            const [reqRows] = await conn.query(
+                'SELECT * FROM supply_requests WHERE request_id = ?', [req.params.id]
+            );
+            const sr = reqRows[0];
+            if (sr.supply_type === 'retail') {
+                await conn.query(
+                    'UPDATE inventory SET stock_count = stock_count + ? WHERE item_id = ?',
+                    [sr.requested_quantity, sr.item_id]
+                );
+            } else {
+                await conn.query(
+                    'UPDATE operational_supplies SET stock_count = stock_count + ? WHERE supply_id = ?',
+                    [sr.requested_quantity, sr.item_id]
+                );
+            }
+        }
+        await conn.commit();
+        return res.json({ success: true });
+    } catch (err) {
+        await conn.rollback();
+        return res.status(500).json({ error: err.message });
+    } finally {
+        conn.release();
+    }
+});
+
+export default router;

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { supabase } from '../../../../lib/supabase';
+import api from '../../../../lib/api';
 import { Ticket, CreditCard } from 'lucide-react';
 
 export default function Tickets() {
@@ -20,28 +20,18 @@ export default function Tickets() {
             const totalCents = prices[ticketType] * quantity;
 
             // 1. Create Transaction
-            const { data: transaction, error: txnError } = await supabase
-                .from('transactions')
-                .insert([{ total_amount_cents: totalCents }])
-                .select() // vital to get ID back
-                .single();
-
-            if (txnError) throw txnError;
+            const txnData = await api.post('/transactions', { total_amount_cents: totalCents });
 
             // 2. Create Tickets linked to Transaction
             const ticketsToCreate = Array.from({ length: quantity }).map(() => ({
                 price_cents: prices[ticketType],
                 type: ticketType,
-                transaction_id: transaction.transaction_id
+                transaction_id: txnData.transaction_id
             }));
 
-            const { error: ticketError } = await supabase
-                .from('tickets')
-                .insert(ticketsToCreate);
+            await api.post('/tickets', { tickets: ticketsToCreate });
 
-            if (ticketError) throw ticketError;
-
-            setMessage(`Success! Purchase ID: ${transaction.transaction_id}`);
+            setMessage(`Success! Purchase ID: ${txnData.transaction_id}`);
             setQuantity(1);
         } catch (error) {
             console.error('Purchase failed:', error);

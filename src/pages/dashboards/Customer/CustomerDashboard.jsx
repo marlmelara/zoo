@@ -593,58 +593,38 @@ export default function CustomerDashboard() {
                                 Browse Tickets
                             </button>
                         </div>
-                    ) : (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                            {tickets.filter(ticket => {
-                                const d = ticket.transactions?.transaction_date ? new Date(ticket.transactions.transaction_date) : null;
-                                if (!d) return true;
-                                if (ticketDateFrom && d < new Date(ticketDateFrom + 'T00:00:00')) return false;
-                                if (ticketDateTo && d > new Date(ticketDateTo + 'T23:59:59')) return false;
-                                return true;
-                            }).map(ticket => {
-                                const isEvent = ticket.type === 'event' && ticket.events;
-                                const purchaseDate = ticket.transactions?.transaction_date;
-                                return (
+                    ) : (() => {
+                        const inRange = tickets.filter(ticket => {
+                            const d = ticket.transactions?.transaction_date ? new Date(ticket.transactions.transaction_date) : null;
+                            if (!d) return true;
+                            if (ticketDateFrom && d < new Date(ticketDateFrom + 'T00:00:00')) return false;
+                            if (ticketDateTo && d > new Date(ticketDateTo + 'T23:59:59')) return false;
+                            return true;
+                        });
+                        const eventTickets = inRange.filter(t => t.type === 'event' && t.events);
+                        const admissionTickets = inRange.filter(t => !(t.type === 'event' && t.events));
+
+                        const renderAdmission = (ticket) => {
+                            const purchaseDate = ticket.transactions?.transaction_date;
+                            return (
                                 <div key={ticket.ticket_id} className="glass-panel" style={{ padding: '20px' }}>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
                                         <div style={{ display: 'flex', alignItems: 'start', gap: '15px', flex: 1 }}>
                                             <div style={{
                                                 width: '45px', height: '45px', borderRadius: '10px',
-                                                background: isEvent ? 'rgba(245,158,11,0.2)' : 'rgba(16, 185, 129, 0.2)',
+                                                background: 'rgba(16, 185, 129, 0.2)',
                                                 display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
                                             }}>
-                                                {isEvent ? <Calendar size={22} color="#f59e0b" /> : <Ticket size={22} color="var(--color-primary)" />}
+                                                <Ticket size={22} color="var(--color-primary)" />
                                             </div>
                                             <div style={{ flex: 1 }}>
-                                                <h3 style={{ margin: '0 0 4px' }}>
-                                                    {isEvent ? ticket.events.title : 'General Admission'}
-                                                </h3>
+                                                <h3 style={{ margin: '0 0 4px' }}>General Admission</h3>
                                                 <span style={{
                                                     fontSize: '11px', padding: '2px 8px', borderRadius: '10px',
-                                                    background: isEvent ? 'rgba(245,158,11,0.15)' : 'rgba(255,255,255,0.1)',
-                                                    color: isEvent ? '#fbbf24' : 'inherit',
-                                                    textTransform: 'capitalize'
+                                                    background: 'rgba(255,255,255,0.1)', textTransform: 'capitalize'
                                                 }}>
-                                                    {isEvent ? 'Event' : ticketTypeLabel(ticket.type)}
+                                                    {ticketTypeLabel(ticket.type)}
                                                 </span>
-                                                {isEvent && (
-                                                    <div style={{ marginTop: '8px' }}>
-                                                        {ticket.events.description && (
-                                                            <p style={{ fontSize: '13px', color: 'var(--color-text-muted)', margin: '0 0 4px' }}>{ticket.events.description}</p>
-                                                        )}
-                                                        <p style={{ fontSize: '13px', color: 'var(--color-secondary)', fontWeight: 600, margin: '0 0 3px', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                                                            <Clock size={12} />
-                                                            {new Date(ticket.events.event_date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
-                                                            {ticket.events.start_time && ` · ${formatTime(ticket.events.start_time)}`}
-                                                            {ticket.events.end_time && ` – ${formatTime(ticket.events.end_time)}`}
-                                                        </p>
-                                                        {ticket.events.venues?.venue_name && (
-                                                            <p style={{ fontSize: '12px', color: 'var(--color-text-muted)', margin: '0', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                                                                <MapPin size={12} /> {ticket.events.venues.venue_name}{ticket.events.venues.location ? ` — ${ticket.events.venues.location}` : ''}
-                                                            </p>
-                                                        )}
-                                                    </div>
-                                                )}
                                                 {purchaseDate && (
                                                     <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '12px', color: 'var(--color-text-muted)', marginTop: '6px' }}>
                                                         <Clock size={11} />
@@ -663,16 +643,101 @@ export default function CustomerDashboard() {
                                         </div>
                                     </div>
                                 </div>
-                                );
-                            })}
-                            <div style={{ background: 'rgba(255,255,255,0.05)', padding: '15px', borderRadius: '10px', textAlign: 'right' }}>
-                                <span style={{ color: 'var(--color-text-muted)', marginRight: '15px' }}>Total Spent:</span>
-                                <span style={{ fontWeight: 'bold', fontSize: '20px', color: 'var(--color-primary)' }}>
-                                    ${(tickets.reduce((sum, t) => sum + t.price_cents, 0) / 100).toFixed(2)}
-                                </span>
+                            );
+                        };
+
+                        const renderEvent = (ticket) => {
+                            const ev = ticket.events;
+                            const purchaseDate = ticket.transactions?.transaction_date;
+                            return (
+                                <div key={ticket.ticket_id} className="glass-panel" style={{ padding: '20px' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
+                                        <div style={{ display: 'flex', alignItems: 'start', gap: '15px', flex: 1 }}>
+                                            <div style={{
+                                                width: '45px', height: '45px', borderRadius: '10px',
+                                                background: 'rgba(245,158,11,0.2)',
+                                                display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+                                            }}>
+                                                <Calendar size={22} color="#f59e0b" />
+                                            </div>
+                                            <div style={{ flex: 1 }}>
+                                                <h3 style={{ margin: '0 0 4px' }}>{ev.title}</h3>
+                                                <span style={{
+                                                    fontSize: '11px', padding: '2px 8px', borderRadius: '10px',
+                                                    background: 'rgba(245,158,11,0.15)', color: '#fbbf24', textTransform: 'capitalize'
+                                                }}>
+                                                    Event
+                                                </span>
+                                                <div style={{ marginTop: '8px' }}>
+                                                    {ev.description && (
+                                                        <p style={{ fontSize: '13px', color: 'var(--color-text-muted)', margin: '0 0 4px' }}>{ev.description}</p>
+                                                    )}
+                                                    {ev.event_date && (
+                                                        <p style={{ fontSize: '13px', color: 'var(--color-secondary)', fontWeight: 600, margin: '0 0 3px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                                            <Clock size={12} />
+                                                            {new Date(ev.event_date).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
+                                                            {ev.start_time && ` · ${formatTime(ev.start_time)}`}
+                                                            {ev.end_time && ` – ${formatTime(ev.end_time)}`}
+                                                        </p>
+                                                    )}
+                                                    {ev.venues?.venue_name && (
+                                                        <p style={{ fontSize: '12px', color: 'var(--color-text-muted)', margin: '0', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                                            <MapPin size={12} /> {ev.venues.venue_name}{ev.venues.location ? ` — ${ev.venues.location}` : ''}
+                                                        </p>
+                                                    )}
+                                                </div>
+                                                {purchaseDate && (
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '12px', color: 'var(--color-text-muted)', marginTop: '6px' }}>
+                                                        <Clock size={11} />
+                                                        Purchased {new Date(purchaseDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} at {new Date(purchaseDate).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                        <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: '12px' }}>
+                                            <p style={{ fontWeight: 'bold', fontSize: '18px', margin: 0, color: 'var(--color-primary)' }}>
+                                                ${(ticket.price_cents / 100).toFixed(2)}
+                                            </p>
+                                            <p style={{ fontSize: '11px', color: 'var(--color-text-muted)', margin: 0 }}>
+                                                Ticket #{ticket.ticket_id}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        };
+
+                        return (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                                {admissionTickets.length > 0 && (
+                                    <div>
+                                        <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '0 0 10px', fontSize: '1rem', color: 'var(--color-primary)' }}>
+                                            <Ticket size={18} /> Admission Tickets ({admissionTickets.length})
+                                        </h3>
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                            {admissionTickets.map(renderAdmission)}
+                                        </div>
+                                    </div>
+                                )}
+                                {eventTickets.length > 0 && (
+                                    <div>
+                                        <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '0 0 10px', fontSize: '1rem', color: '#fbbf24' }}>
+                                            <Calendar size={18} /> Event Tickets ({eventTickets.length})
+                                        </h3>
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                            {eventTickets.map(renderEvent)}
+                                        </div>
+                                    </div>
+                                )}
+                                <div style={{ background: 'rgba(255,255,255,0.05)', padding: '15px', borderRadius: '10px', textAlign: 'right' }}>
+                                    <span style={{ color: 'var(--color-text-muted)', marginRight: '15px' }}>Total Spent:</span>
+                                    <span style={{ fontWeight: 'bold', fontSize: '20px', color: 'var(--color-primary)' }}>
+                                        ${(inRange.reduce((sum, t) => sum + t.price_cents, 0) / 100).toFixed(2)}
+                                    </span>
+                                </div>
                             </div>
-                        </div>
-                    )}
+                        );
+                    })()}
                 </div>
             )}
 
@@ -829,9 +894,9 @@ export default function CustomerDashboard() {
                                                     {event.start_time && ` · ${formatTime(event.start_time)}`}
                                                     {event.end_time && ` – ${formatTime(event.end_time)}`}
                                                 </p>
-                                                {event.venues?.venue_name && (
+                                                {event.venue_name && (
                                                     <p style={{ fontSize: '13px', color: 'var(--color-text-muted)', margin: '3px 0 0', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                                                        <MapPin size={13} /> {event.venues.venue_name}{event.venues.location ? ` — ${event.venues.location}` : ''}
+                                                        <MapPin size={13} /> {event.venue_name}{event.venue_location ? ` — ${event.venue_location}` : ''}
                                                     </p>
                                                 )}
                                                 {event.ticket_price_cents > 0 && (
@@ -861,7 +926,7 @@ export default function CustomerDashboard() {
                                                             event_id: eid,
                                                             title: event.title,
                                                             date: eventDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }),
-                                                            venue: event.venues?.venue_name || null,
+                                                            venue: event.venue_name || null,
                                                             price_cents: event.ticket_price_cents,
                                                             quantity: existing ? existing.quantity + 1 : 1,
                                                         };

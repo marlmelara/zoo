@@ -21,6 +21,13 @@ router.get('/stats', requireRole('admin','manager'), async (req, res) => {
             `SELECT COALESCE(SUM(total_amount_cents),0) AS total_revenue
              FROM transactions WHERE is_donation = 0`
         );
+        const [[{ ticket_revenue }]] = await db.query(
+            'SELECT COALESCE(SUM(price_cents),0) AS ticket_revenue FROM tickets'
+        );
+        const [[{ retail_revenue }]] = await db.query(
+            `SELECT COALESCE(SUM(price_at_sale_cents * quantity),0) AS retail_revenue
+             FROM sale_items`
+        );
         const [[{ total_donations }]] = await db.query(
             `SELECT COALESCE(SUM(amount_cents),0) AS total_donations FROM donations`
         );
@@ -57,7 +64,7 @@ router.get('/stats', requireRole('admin','manager'), async (req, res) => {
 
         return res.json({
             total_customers, total_members, total_tickets,
-            total_revenue, total_donations,
+            total_revenue, ticket_revenue, retail_revenue, total_donations,
             total_animals, total_employees,
             low_stock_count, pending_requests,
             monthly_revenue: monthlyRevenue,

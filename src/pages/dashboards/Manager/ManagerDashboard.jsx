@@ -158,12 +158,8 @@ export default function ManagerDashboard() {
         const empId = resolvedEmpId || employeeId;
         try {
             const request = pendingRequests.find(r => r.request_id === requestId);
+            // Server auto-restocks the supply when status === 'approved'
             await reviewSupplyRequest(requestId, empId, status);
-
-            // If approved, auto-restock the supply
-            if (status === 'approved' && request && request.supply_type === 'operational') {
-                await restockOperationalSupply(request.item_id, request.requested_quantity);
-            }
 
             // Log the activity
             await logActivity({
@@ -436,7 +432,7 @@ export default function ManagerDashboard() {
                                 <div>
                                     <span style={{ fontWeight: 'bold' }}>{item.item_name}</span>
                                     <span style={{ fontSize: '12px', color: 'var(--color-text-muted)', marginLeft: '10px' }}>
-                                        {item.departments?.dept_name}
+                                        {item.dept_name}
                                     </span>
                                 </div>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>

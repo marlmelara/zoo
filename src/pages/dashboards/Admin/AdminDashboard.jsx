@@ -107,7 +107,7 @@ export default function AdminDashboard() {
 
     // Aggregate data for charts
     const departmentCounts = employees.reduce((acc, emp) => {
-        const deptName = emp.departments?.dept_name || 'Unassigned';
+        const deptName = emp.dept_name || 'Unassigned';
         if (!acc[deptName]) acc[deptName] = 0;
         acc[deptName]++;
         return acc;
@@ -119,7 +119,7 @@ export default function AdminDashboard() {
     }));
 
     const zoneCounts = animals.reduce((acc, animal) => {
-        const zoneName = animal.animal_zones?.zone_name || 'Unassigned';
+        const zoneName = animal.zone_name || 'Unassigned';
         if (!acc[zoneName]) acc[zoneName] = 0;
         acc[zoneName]++;
         return acc;
@@ -358,7 +358,7 @@ export default function AdminDashboard() {
                                     {employees.map(emp => (
                                         <tr key={emp.employee_id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                                             <td style={{ padding: '10px', color: 'var(--color-primary)' }}>{emp.first_name} {emp.last_name}</td>
-                                            <td style={{ padding: '10px' }}>{emp.departments?.dept_name || 'N/A'}</td>
+                                            <td style={{ padding: '10px' }}>{emp.dept_name || 'N/A'}</td>
                                             <td style={{ padding: '10px', textTransform: 'capitalize' }}>{emp.role}</td>
                                             <td style={{ padding: '10px' }}>${(emp.pay_rate_cents / 100).toFixed(2)}/hr</td>
                                         </tr>
@@ -457,7 +457,7 @@ export default function AdminDashboard() {
                                         <tr key={animal.animal_id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                                             <td style={{ padding: '10px', color: 'var(--color-secondary)' }}>{animal.name}</td>
                                             <td style={{ padding: '10px' }}>{animal.species_common_name}</td>
-                                            <td style={{ padding: '10px' }}>{animal.animal_zones?.zone_name || 'N/A'}</td>
+                                            <td style={{ padding: '10px' }}>{animal.zone_name || 'N/A'}</td>
                                             <td style={{ padding: '10px' }}>{animal.age} yrs</td>
                                         </tr>
                                     ))}

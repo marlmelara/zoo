@@ -8,7 +8,6 @@ import {
 import { FaPersonCane } from 'react-icons/fa6';
 import { useAuth } from '../../../contexts/AuthContext';
 import { createTransaction, createSaleItems } from '../../../api/transactions';
-import { createReceipt } from '../../../api/receipts';
 import api from '../../../lib/api';
 import './checkout.css';
 import logo from '../../../images/logo.png';
@@ -269,13 +268,50 @@ export default function Checkout() {
         donationId = don.donation_id;
       }
 
-      // 2. Create transaction
+      // 2. Build receipt line items up front so they're written atomically
+      //    when the transaction + receipt are inserted on the server.
+      const receiptItems = [];
+      if (ticketData) {
+        for (const [type, qty] of Object.entries(ticketData.quantities)) {
+          if (qty <= 0) continue;
+          const base = TICKET_PRICES[type];
+          const price = memberDiscount > 0 ? Math.round(base * (1 - memberDiscount)) : base;
+          receiptItems.push({ description: `${TICKET_LABELS[type].name} Ticket`, quantity: qty, unitPriceCents: price });
+        }
+      }
+      for (const evt of eventTicketList) {
+        const base = evt.price_cents;
+        const price = memberDiscount > 0 ? Math.round(base * (1 - memberDiscount)) : base;
+        receiptItems.push({ description: `Event: ${evt.title}`, quantity: evt.quantity || 1, unitPriceCents: price });
+      }
+      for (const item of shopItems) {
+        const price = memberDiscount > 0 ? Math.round(item.price_cents * (1 - memberDiscount)) : item.price_cents;
+        receiptItems.push({ description: item.item_name, quantity: item.quantity, unitPriceCents: price });
+      }
+      if (membershipPlan) {
+        receiptItems.push({ description: `${membershipPlan.plan_name.charAt(0).toUpperCase() + membershipPlan.plan_name.slice(1)} Membership (Annual)`, quantity: 1, unitPriceCents: membershipPlan.price_cents });
+      }
+      if (isDonation) {
+        receiptItems.push({ description: `Donation — ${donationData.fund}`, quantity: 1, unitPriceCents: donationAmountCents });
+      }
+
+      // 3. Create transaction + receipt atomically
       const transaction = await createTransaction({
         totalAmountCents: totalCents,
         customerId: customerId || null,
         guestEmail: authMode === 'guest' ? billing.email : null,
         isDonation,
         donationId,
+        receipt: {
+          email: billing.email || user?.email || '',
+          customer_name: `${billing.firstName} ${billing.lastName}`.trim() || payment.cardName,
+          line_items: receiptItems,
+          subtotal_cents: subtotalCents,
+          tax_cents: taxCents,
+          total_cents: totalCents,
+          is_donation: isDonation,
+          donation_fund: donationData?.fund || null,
+        },
       });
 
       // 3. Create tickets
@@ -378,49 +414,7 @@ export default function Checkout() {
         });
       }
 
-      // 7. Create receipt
-      const receiptItems = [];
-      if (ticketData) {
-        for (const [type, qty] of Object.entries(ticketData.quantities)) {
-          if (qty <= 0) continue;
-          const base = TICKET_PRICES[type];
-          const price = memberDiscount > 0 ? Math.round(base * (1 - memberDiscount)) : base;
-          receiptItems.push({ description: `${TICKET_LABELS[type].name} Ticket`, quantity: qty, unitPriceCents: price });
-        }
-      }
-      for (const evt of eventTicketList) {
-        const base = evt.price_cents;
-        const price = memberDiscount > 0 ? Math.round(base * (1 - memberDiscount)) : base;
-        receiptItems.push({ description: `Event: ${evt.title}`, quantity: evt.quantity || 1, unitPriceCents: price });
-      }
-      for (const item of shopItems) {
-        const price = memberDiscount > 0 ? Math.round(item.price_cents * (1 - memberDiscount)) : item.price_cents;
-        receiptItems.push({ description: item.item_name, quantity: item.quantity, unitPriceCents: price });
-      }
-      if (membershipPlan) {
-        receiptItems.push({ description: `${membershipPlan.plan_name.charAt(0).toUpperCase() + membershipPlan.plan_name.slice(1)} Membership (Annual)`, quantity: 1, unitPriceCents: membershipPlan.price_cents });
-      }
-      if (isDonation) {
-        receiptItems.push({ description: `Donation — ${donationData.fund}`, quantity: 1, unitPriceCents: donationAmountCents });
-      }
-
-      try {
-        await createReceipt({
-          transactionId: transaction.transaction_id,
-          email: billing.email,
-          customerName: `${billing.firstName} ${billing.lastName}`.trim() || payment.cardName,
-          items: receiptItems,
-          subtotalCents: subtotalCents,
-          taxCents: taxCents,
-          totalCents: totalCents,
-          isDonation,
-          donationFund: donationData?.fund || null,
-        });
-      } catch (receiptErr) {
-        console.warn('Receipt creation failed (non-blocking):', receiptErr);
-      }
-
-      // 8. Cleanup
+      // Cleanup (receipt was written atomically with the transaction above)
       localStorage.removeItem('zooCart');
 
       setOrderTransaction(transaction);

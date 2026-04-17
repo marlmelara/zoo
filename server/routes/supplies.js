@@ -38,23 +38,40 @@ router.get('/requests', requireAuth, async (req, res) => {
             [rows] = await db.query(
                 `SELECT sr.*,
                         req.first_name AS req_first, req.last_name AS req_last,
+                        reqd.dept_name AS req_dept_name,
                         rev.first_name AS rev_first, rev.last_name AS rev_last
                  FROM supply_requests sr
-                 LEFT JOIN employees req ON sr.requested_by = req.employee_id
-                 LEFT JOIN employees rev ON sr.reviewed_by  = rev.employee_id
+                 LEFT JOIN employees   req  ON sr.requested_by = req.employee_id
+                 LEFT JOIN departments reqd ON req.dept_id     = reqd.dept_id
+                 LEFT JOIN employees   rev  ON sr.reviewed_by  = rev.employee_id
                  ORDER BY sr.created_at DESC`
             );
         } else {
             [rows] = await db.query(
                 `SELECT sr.*,
-                        req.first_name AS req_first, req.last_name AS req_last
+                        req.first_name AS req_first, req.last_name AS req_last,
+                        reqd.dept_name AS req_dept_name
                  FROM supply_requests sr
-                 LEFT JOIN employees req ON sr.requested_by = req.employee_id
+                 LEFT JOIN employees   req  ON sr.requested_by = req.employee_id
+                 LEFT JOIN departments reqd ON req.dept_id     = reqd.dept_id
                  WHERE sr.requested_by = ?
                  ORDER BY sr.created_at DESC`, [employeeId]
             );
         }
-        return res.json(rows);
+        // Reshape so the frontend can use req.requester / req.reviewer directly.
+        const shaped = rows.map(r => ({
+            ...r,
+            requester: r.requested_by ? {
+                first_name: r.req_first,
+                last_name:  r.req_last,
+                departments: r.req_dept_name ? { dept_name: r.req_dept_name } : null,
+            } : null,
+            reviewer: r.reviewed_by ? {
+                first_name: r.rev_first,
+                last_name:  r.rev_last,
+            } : null,
+        }));
+        return res.json(shaped);
     } catch (err) {
         return res.status(500).json({ error: err.message });
     }

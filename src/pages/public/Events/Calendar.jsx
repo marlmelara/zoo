@@ -77,7 +77,7 @@ export default function Events() {
           id: event.event_id,
           title: event.title,
           date: event.event_date,
-          venue: event.venues?.venue_name
+          venue: event.venue_name
         }
       }
     });
@@ -211,10 +211,10 @@ export default function Events() {
                                 <span>{formatTime(eventTime)}</span>
                               </div>
                             )}
-                            {event.venues?.venue_name && (
+                            {event.venue_name && (
                               <div className="event-meta-item">
                                 <FaMapMarkerAlt className="meta-icon" />
-                                <span>{event.venues.venue_name}</span>
+                                <span>{event.venue_name}</span>
                               </div>
                             )}
                           </div>

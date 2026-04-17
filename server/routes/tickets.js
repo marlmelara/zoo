@@ -13,12 +13,12 @@ router.get('/my', requireAuth, async (req, res) => {
         const [rows] = await db.query(
             `SELECT t.*,
                     e.title        AS event_title,
-                    e.event_date,
+                    e.event_date   AS event_date,
                     e.description  AS event_description,
-                    e.start_time,
-                    e.end_time,
-                    v.venue_name,
-                    v.location     AS venue_location,
+                    e.start_time   AS event_start_time,
+                    e.end_time     AS event_end_time,
+                    v.venue_name   AS event_venue_name,
+                    v.location     AS event_venue_location,
                     tr.transaction_date
              FROM tickets t
              LEFT JOIN events       e  ON t.event_id       = e.event_id
@@ -28,7 +28,30 @@ router.get('/my', requireAuth, async (req, res) => {
              ORDER BY t.ticket_id DESC`,
             [customerId]
         );
-        return res.json(rows);
+        // Nest event/venue/transaction for frontend convenience
+        const shaped = rows.map(r => ({
+            ticket_id:      r.ticket_id,
+            customer_id:    r.customer_id,
+            type:           r.type,
+            event_id:       r.event_id,
+            price_cents:    r.price_cents,
+            transaction_id: r.transaction_id,
+            events: r.event_id ? {
+                title:       r.event_title,
+                description: r.event_description,
+                event_date:  r.event_date,
+                start_time:  r.event_start_time,
+                end_time:    r.event_end_time,
+                venues: r.event_venue_name ? {
+                    venue_name: r.event_venue_name,
+                    location:   r.event_venue_location,
+                } : null,
+            } : null,
+            transactions: r.transaction_date ? {
+                transaction_date: r.transaction_date,
+            } : null,
+        }));
+        return res.json(shaped);
     } catch (err) {
         return res.status(500).json({ error: err.message });
     }

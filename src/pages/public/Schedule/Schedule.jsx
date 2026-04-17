@@ -136,6 +136,9 @@ export default function Schedule() {
           <Link to="/" className="navbar-logo-link" aria-label="Go to homepage">
             <img src={logo} alt="Coog Zoo" />
           </Link>
+          <div style={{ textAlign: 'center', flex: 1, padding: '0 20px' }}>
+            <h2 className="page-title" style={{ margin: 0, fontSize: '2.3rem' }}>Schedule of the Day</h2>
+          </div>
           <div className="navbar-links">
             <Link to="/tickets" className="navbar-link">Buy Tickets</Link>
             <Link to="/shop" className="navbar-link">Shop</Link>
@@ -147,18 +150,13 @@ export default function Schedule() {
       </nav>
 
       <div className="schedule-container">
-        {/* Hero Text */}
-        <div className="hero-text">
-          <h1 className="hero-title">Schedule of the Day</h1>
-          <p className="hero-subtitle">
-            Schedule updated each morning before we open at 9:00 a.m.<br />
-          </p>
-        </div>
-
         {/* Date Header */}
         <div className="date-header">
           <span className="updated-date">UPDATED {formatDate()}</span>
           <h2 className="schedule-title">🦁 The Daily Roar Guide 🦁</h2>
+          <h2 className="schedule-subtitle">
+            Schedule updated each morning before we open at 9:00 a.m.<br />
+          </h2>
         </div>
 
         {/* Schedule Table */}

@@ -67,8 +67,8 @@ export default function Membership() {
     return (
     <div className="membership-page">
 
-      <nav className="home-navbar">
-        <div className="home-navbar-container">
+      <nav className="navbar">
+        <div className="navbar-container">
           <Link to="/" className="navbar-logo-link" aria-label="Go to homepage">
             <img src={logo} alt="Coog Zoo" />
           </Link>
@@ -78,11 +78,11 @@ export default function Membership() {
               Become a Coog Zoo member today and enjoy 12 months of wildlife fun, along with member exclusive discounts and benefits!
             </p>
           </div>
-          <div className="home-navbar-links">
-            <Link to="/tickets" className="home-navbar-link">Buy Tickets</Link>
-            <Link to="/shop" className="home-navbar-link">Shop</Link>
-            <Link to="/account" className="home-navbar-link">Customer Login</Link>
-            <Link to="/login" className="home-navbar-link">Staff Portal</Link>
+          <div className="navbar-links">
+            <Link to="/tickets" className="navbar-link">Buy Tickets</Link>
+            <Link to="/shop" className="navbar-link">Shop</Link>
+            <Link to="/account" className="navbar-link">Customer Login</Link>
+            <Link to="/login" className="navbar-link">Staff Portal</Link>
           </div>
         </div>
       </nav>

@@ -7,22 +7,32 @@
  *   const router = Router();
  *   router.get('/path', handler);
  *   router.post('/path/:id', handler);
+ *   router.get('/stats', requireRole('admin'), handler);  // array middleware flattens
  *   export default router;
  */
 export function Router() {
     const routes = [];
 
     function register(method, path, handlers) {
+        // Flatten nested middleware arrays (e.g. requireRole returns [authFn, roleFn])
+        // and discard any non-function slots so handlers[i](req, res, next) never
+        // throws "handlers[i] is not a function".
+        const flatHandlers = handlers
+            .flat(Infinity)
+            .filter(h => typeof h === 'function');
+
+        // Build the URL-match regex.
+        // 1. Escape regex-special chars in the literal parts of the path
+        // 2. Turn each `:param` segment into an `([^/]+)` capture group
         const keys = [];
-        // Convert :param segments to capture groups
         const pattern = path
-            .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')  // escape regex special chars first
-            .replace(/\\:([^/]+)/g, (_, key) => {       // then un-escape and capture :params
+            .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')  // escape regex specials
+            .replace(/:([A-Za-z_][A-Za-z0-9_]*)/g, (_, key) => {
                 keys.push(key);
                 return '([^/]+)';
             });
         const regex = new RegExp(`^${pattern}$`);
-        routes.push({ method: method.toUpperCase(), regex, keys, handlers });
+        routes.push({ method: method.toUpperCase(), regex, keys, handlers: flatHandlers });
     }
 
     return {

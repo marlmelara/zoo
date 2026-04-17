@@ -12,6 +12,7 @@ import { createReceipt } from '../../../api/receipts';
 import { supabase } from '../../../lib/supabase';
 import { incrementEventTicketsSold } from '../../../api/transactions';
 import './checkout.css';
+import logo from '../../../images/logo.png';
 
 // ── Constants ──
 const TICKET_PRICES = {
@@ -464,6 +465,69 @@ export default function Checkout() {
     }
   };
 
+  // Shared Navbar component
+  const CheckoutNavbar = () => (
+    <nav className="checkout-navbar">
+      <div className="checkout-navbar-container">
+        <Link to="/" className="checkout-logo-link" aria-label="Go to homepage">
+          <img src={logo} alt="Coog Zoo" />
+        </Link>
+        <div className="checkout-navbar-links">
+          <Link to="/tickets" className="checkout-navbar-link">Buy Tickets</Link>
+          <Link to="/shop" className="checkout-navbar-link">Shop</Link>
+          <Link to="/membership" className="checkout-navbar-link">Membership</Link>
+          <Link to="/account" className="checkout-navbar-link">Customer Login</Link>
+          <Link to="/login" className="checkout-navbar-link">Staff Portal</Link>
+        </div>
+      </div>
+    </nav>
+  );
+
+  const CheckoutFooter = () => (
+      <footer className="footer">
+        <div className="footer-container">
+          <div className="footer-main">
+            <div className="footer-section footer-brand">
+              <div className="footer-logo">
+                <div className="logo-placeholder">
+                  <img src={logo} style={{ maxWidth: '200px', width: '100%', height: 'auto' }} alt="Coog Zoo" />
+                </div>
+              </div>
+              <p className="footer-description" style={{color:"white"}}>
+                Discover amazing wildlife, attend exciting events, and support animal conservation at Coog Zoo.
+              </p>
+            </div>
+
+            <div className="footer-section">
+              <h3 className="footer-title">Contact Us</h3>
+              <div className="footer-contact-info">
+                <div className="contact-item">
+                  <FaMapMarkerAlt className="contact-icon" style={{color:"white"}} />
+                  <div>
+                    <p>4302 University Dr</p>
+                    <p>Houston, TX 77004</p>
+                  </div>
+                </div>
+                <div className="contact-item">
+                  <FaPhone className="contact-icon" style={{color:"white"}} />
+                  <a href="tel:5555555555">555-555-5555</a>
+                </div>
+                <div className="contact-item">
+                  <FaEnvelope className="contact-icon" style={{color:"white"}}/>
+                  <a href="mailto:info@coogzoo.org">info@coogzoo.org</a>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="footer-bottom">
+            <div className="footer-bottom-content" style={{color:"white"}}>
+              <p>&copy; {new Date().getFullYear()} Coog Zoo. All rights reserved.</p>
+            </div>
+          </div>
+        </div>
+      </footer>    
+  );
   // ══════════════════════════════════════
   // Order complete screen
   // ══════════════════════════════════════
@@ -503,6 +567,7 @@ export default function Checkout() {
             </div>
           </div>
         </div>
+        <CheckoutFooter />
       </div>
     );
   }
@@ -514,6 +579,7 @@ export default function Checkout() {
   if (!isDonation && !hasCartItems) {
     return (
       <div className="checkout-page">
+        <CheckoutNavbar />
         <div className="checkout-wrapper">
           <div className="checkout-empty glass-panel">
             <FaTimesCircle size={48} style={{ color: '#ef4444', marginBottom: '12px' }} />
@@ -526,6 +592,7 @@ export default function Checkout() {
             </button>
           </div>
         </div>
+          <CheckoutFooter />
       </div>
     );
   }
@@ -535,6 +602,7 @@ export default function Checkout() {
   // ══════════════════════════════════════
   return (
     <div className="checkout-page">
+      <CheckoutNavbar />
       <div className="checkout-wrapper">
         {/* ── Left column: forms ── */}
         <div className="checkout-forms">
@@ -909,7 +977,8 @@ export default function Checkout() {
             )}
           </div>
         </div>
-      </div>   
+      </div>
+      <CheckoutFooter />   
     </div>
   );
 }

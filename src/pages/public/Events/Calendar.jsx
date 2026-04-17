@@ -4,6 +4,7 @@ import { FaCalendarAlt, FaTicketAlt, FaCheckCircle,
   FaExclamationTriangle, FaMapMarkerAlt, FaClock, 
   FaPhone, FaEnvelope } from 'react-icons/fa';
 import { getUpcomingEvents } from '../../../api/public';
+import Navbar from '../../../components/Navbar';
 import logo from '../../../images/logo.png';
 import './calendar.css';
 
@@ -135,23 +136,7 @@ export default function Events() {
   return (
     <div className="events-page">
       {/* Navigation Bar */}
-      <nav className="navbar">
-        <div className="navbar-container">
-          <Link to="/" className="navbar-logo-link" aria-label="Go to homepage">
-            <img src={logo} alt="Coog Zoo" />
-          </Link>
-          <div style={{ textAlign: 'center', flex: 1, padding: '0 20px' }}>
-            <h2 className="page-title" style={{ margin: 0}}>Event Calendar</h2>
-          </div>
-          <div className="navbar-links">
-            <Link to="/tickets" className="navbar-link">Buy Tickets</Link>
-            <Link to="/shop" className="navbar-link">Shop</Link>
-            <Link to="/membership" className="navbar-link">Membership</Link>
-            <Link to="/account" className="navbar-link">Customer Login</Link>
-            <Link to="/login" className="navbar-link">Staff Portal</Link>
-          </div>
-        </div>
-      </nav>
+      <Navbar />
 
       <div className="events-container" style = {{padding: '2rem'}}>
         <div className="results-count">

@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { FaCalendarAlt, FaUser, FaChild, FaMapMarkerAlt, FaPhone, FaEnvelope, FaMinus, FaPlus, FaClock, FaTicketAlt, FaShoppingCart, FaStar, FaArrowLeft } from 'react-icons/fa';
 import { FaPersonCane } from "react-icons/fa6";
 import { useAuth } from '../../../contexts/AuthContext';
+import Navbar from '../../../components/Navbar';
 import { supabase } from '../../../lib/supabase';
 import { getUpcomingEvents } from '../../../api/public';
 import ShopCartPanel, { useZooCart } from '../../../components/ShopCart';
@@ -184,22 +185,7 @@ export default function Tickets() {
   return (
     <div className="tickets-page" style={{ margin: 0, padding: 0 }}>
       {/* Navigation Bar */}
-      <nav className="navbar">
-        <div className="navbar-container">
-          <Link to="/" className="navbar-logo-link" aria-label="Go to homepage">
-            <img src={logo} alt="Coog Zoo" />
-          </Link>
-          <div style={{ textAlign: 'center', flex: 1, padding: '0 20px' }}>
-            <h2 className="page-title" style={{ margin: 0 }}>Tickets & Membership</h2>
-          </div>
-          <div className="navbar-links">
-            <Link to="/shop" className="navbar-link">Shop</Link>
-            <Link to="/membership" className="navbar-link">Membership</Link>
-            <Link to="/account" className="navbar-link">Customer Login</Link>
-            <Link to="/login" className="navbar-link">Staff Portal</Link>
-          </div>
-        </div>
-      </nav>
+      <Navbar />
 
       <div className="tickets-container">
         {/* Left Column */}

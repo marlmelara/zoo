@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { FaClock, FaMapMarkerAlt, FaPhone, FaEnvelope } from 'react-icons/fa';
 import logo from '../../../images/logo.png';
 import './animals.css';
+import Navbar from '../../../components/Navbar';
 
 // Import all animal images
 import stVincentAmazonParrot from '../../../images/animals_amazon_parrot.jpg';
@@ -77,20 +79,8 @@ export default function AnimalGallery() {
 
   return (
     <main className="animals-page">
-      <nav className="animals-navbar">
-        <div className="animals-navbar-container">
-          <Link to="/" className="navbar-logo-link" aria-label="Go to homepage">
-            <img src={logo} alt="Coog Zoo" />
-          </Link>
-          <div className="animals-navbar-links">
-            <Link to="/tickets" className="animals-navbar-link">Buy Tickets</Link>
-            <Link to="/shop" className="animals-navbar-link">Shop</Link>
-            <Link to="/membership" className="animals-navbar-link">Membership</Link>
-            <Link to="/account" className="animals-navbar-link">Customer Login</Link>
-            <Link to="/login" className="animals-navbar-link">Staff Portal</Link>
-          </div>
-        </div>
-      </nav>
+      {/* Navigation Bar */}
+      <Navbar />
 
       <div className="animals-page-inner">
         <h1 className="animals-title">Our Animals</h1>
@@ -118,6 +108,50 @@ export default function AnimalGallery() {
         ))}
       </section>
       </div>
+      {/* Footer */}
+            <footer className="footer" style={{background: "rgb(123, 144, 79)"}}>
+              <div className="footer-container">
+                <div className="footer-main">
+                  <div className="footer-section footer-brand">
+                    <div className="footer-logo">
+                      <div className="logo-placeholder">
+                        <img src={logo} style={{ maxWidth: '200px', width: '100%', height: 'auto' }} alt="Coog Zoo" />
+                      </div>
+                    </div>
+                    <p className="footer-description" style={{color:"white"}}>
+                      Discover amazing wildlife, attend exciting events, and support animal conservation at Coog Zoo.
+                    </p>
+                  </div>
+      
+                  <div className="footer-section">
+                    <h3 className="footer-title">Contact Us</h3>
+                    <div className="footer-contact-info">
+                      <div className="contact-item">
+                        <FaMapMarkerAlt className="contact-icon" style={{color:"white"}} />
+                        <div>
+                          <p>4302 University Dr</p>
+                          <p>Houston, TX 77004</p>
+                        </div>
+                      </div>
+                      <div className="contact-item">
+                        <FaPhone className="contact-icon" style={{color:"white"}} />
+                        <a href="tel:5555555555">555-555-5555</a>
+                      </div>
+                      <div className="contact-item">
+                        <FaEnvelope className="contact-icon" style={{color:"white"}}/>
+                        <a href="mailto:info@coogzoo.org">info@coogzoo.org</a>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+      
+                <div className="footer-bottom">
+                  <div className="footer-bottom-content" style={{color:"white"}}>
+                    <p>&copy; {new Date().getFullYear()} Coog Zoo. All rights reserved.</p>
+                  </div>
+                </div>
+              </div>
+            </footer>
     </main>
   );
 }

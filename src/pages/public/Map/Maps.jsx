@@ -1,10 +1,12 @@
 import React from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import './map.css';
+import { FaMapMarkerAlt, FaPhone, FaEnvelope } from 'react-icons/fa';
 import map from '../../../images/map.png';
 import pdf from '../../../images/map.pdf';
 import logo from '../../../images/logo.png';
-import { FaMapMarkerAlt, FaPhone, FaEnvelope } from 'react-icons/fa';
+import Navbar from '../../../components/Navbar';
+import './map.css';
+
 
 export default function Maps() {
   const navigate = useNavigate();
@@ -24,26 +26,7 @@ export default function Maps() {
   return (
     <div className="map-page-wrapper">
       {/* Navigation Bar */}
-      <nav className="home-navbar">
-        <div className="home-navbar-container">
-          <Link to="/" className="navbar-logo-link" aria-label="Go to homepage">
-            <img src={logo} alt="Coog Zoo" />
-          </Link>
-          <div style={{ textAlign: 'center', flex: 1, padding: '0 20px' }}>
-            <h2 className="page-title" style={{ margin: 0 }}>Zoo Map</h2>
-            <p className="page-description">
-              Plan your visit with our zoo map!
-            </p>
-          </div>
-          <div className="home-navbar-links">
-            <Link to="/tickets" className="home-navbar-link">Buy Tickets</Link>
-            <Link to="/shop" className="home-navbar-link">Shop</Link>
-            <Link to="/membership" className="home-navbar-link">Membership</Link>
-            <Link to="/account" className="home-navbar-link">Customer Login</Link>
-            <Link to="/login" className="home-navbar-link">Staff Portal</Link>
-          </div>
-        </div>
-      </nav>      
+      <Navbar />
       
       <div className="map-container">
         <img src={map} alt="Zoo Map" className="map-image" />

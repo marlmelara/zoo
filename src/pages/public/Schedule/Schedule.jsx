@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { FaClock, FaMapMarkerAlt, FaPhone, FaEnvelope } from 'react-icons/fa';
 import logo from '../../../images/logo.png';
+import Navbar from '../../../components/Navbar';
 import './schedule.css'; 
 
 export default function Schedule() {
@@ -131,23 +132,7 @@ export default function Schedule() {
   return (
     <div className="schedule-page">
       {/* Navigation Bar */}
-      <nav className="navbar">
-        <div className="navbar-container">
-          <Link to="/" className="navbar-logo-link" aria-label="Go to homepage">
-            <img src={logo} alt="Coog Zoo" />
-          </Link>
-          <div style={{ textAlign: 'center', flex: 1, padding: '0 20px' }}>
-            <h2 className="page-title" style={{ margin: 0, fontSize: '2.3rem' }}>Schedule of the Day</h2>
-          </div>
-          <div className="navbar-links">
-            <Link to="/tickets" className="navbar-link">Buy Tickets</Link>
-            <Link to="/shop" className="navbar-link">Shop</Link>
-            <Link to="/membership" className="navbar-link">Membership</Link>
-            <Link to="/account" className="navbar-link">Customer Login</Link>
-            <Link to="/login" className="navbar-link">Staff Portal</Link>
-          </div>
-        </div>
-      </nav>
+      <Navbar />
 
       <div className="schedule-container">
         {/* Date Header */}

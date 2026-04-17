@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { FaMapMarkerAlt, FaPhone, FaEnvelope } from 'react-icons/fa';
 import logo from '../../../images/logo.png';
+import Navbar from '../../../components/Navbar';
 import './donations.css';
 
 const TABS = [
@@ -54,23 +55,7 @@ export default function Donations() {
     <div className="donations-page">
       
       {/* Navigation Bar */}
-      <nav className="donations-navbar">
-        <div className="donations-navbar-container">
-          <Link to="/" className="navbar-logo-link" aria-label="Go to homepage">
-            <img src={logo} alt="Coog Zoo" />
-          </Link>
-          <div style={{ textAlign: 'center', flex: 1, padding: '0 20px' }}>
-            <h2 className="page-title" style={{ color: 'white', margin: 0 }}>Donations</h2>
-          </div>
-          <div className="donations-navbar-links">
-            <Link to="/tickets" className="donations-navbar-link">Buy Tickets</Link>
-            <Link to="/shop" className="donations-navbar-link">Shop</Link>
-            <Link to="/membership" className="donations-navbar-link">Membership</Link>
-            <Link to="/account" className="donations-navbar-link">Customer Login</Link>
-            <Link to="/login" className="donations-navbar-link">Staff Portal</Link>
-          </div>
-        </div>
-      </nav>
+      <Navbar />
 
       <div className="donations-page-inner">
         <section className="intro">

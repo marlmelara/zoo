@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Swiper, SwiperSlide } from 'swiper/react';
 import { Autoplay, Pagination, Navigation, EffectFade } from 'swiper/modules';
 import { getUpcomingEvents } from '../../../api/public';
+import Navbar from '../../../components/Navbar';
 import "./home.css"; 
 import logo from '../../../images/logo.png';
 
@@ -190,20 +191,7 @@ export default function Home() {
   return (
     <div className="home">
       {/* Navigation Bar */}
-      <nav className="navbar">
-        <div className="navbar-container">
-          <Link to="/" className="navbar-logo-link" aria-label="Go to homepage">
-            <img src={logo} alt="Coog Zoo" />
-          </Link>
-          <div className="navbar-links">
-            <Link to="/tickets" className="navbar-link">Buy Tickets</Link>
-            <Link to="/shop" className="navbar-link">Shop</Link>
-            <Link to="/membership" className="navbar-link">Membership</Link>
-            <Link to="/account" className="navbar-link">Customer Login</Link>
-            <Link to="/login" className="navbar-link">Staff Portal</Link>
-          </div>
-        </div>
-      </nav>
+      <Navbar />
 
       {/* Welcome Section */}
       <section className="welcome-section">

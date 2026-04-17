@@ -616,8 +616,10 @@ export default function Checkout() {
             <div className="glass-panel auth-banner">
               <p>Have an account? Sign in for faster checkout{!isDonation && ' and member discounts'}.</p>
               <div className="auth-banner-actions">
-                <button className="glass-button" onClick={() => setAuthMode('login')}>Sign In</button>
-                <button className="glass-button" onClick={() => setAuthMode('guest')}>
+                <button className="glass-button" onClick={() => setAuthMode('login')} style={{ background: 'rgb(123, 144, 79)', color:'white' }}>
+                  Sign In
+                </button>
+                <button className="glass-button" onClick={() => setAuthMode('guest')} style={{ background: 'rgb(123, 144, 79)', color:'white' }}>
                   Continue as Guest
                 </button>
               </div>

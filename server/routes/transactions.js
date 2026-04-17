@@ -18,7 +18,80 @@ router.get('/my', requireAuth, async (req, res) => {
              ORDER BY t.transaction_date DESC`,
             [customerId]
         );
-        return res.json(txns);
+        if (txns.length === 0) return res.json([]);
+
+        // Derive line items from tickets + sale_items for orders without receipts.
+        const txnIds = txns.map(t => t.transaction_id);
+        const [tkRows] = await db.query(
+            `SELECT tk.transaction_id, tk.type, tk.event_id, tk.price_cents,
+                    e.title AS event_title
+             FROM tickets tk
+             LEFT JOIN events e ON e.event_id = tk.event_id
+             WHERE tk.transaction_id IN (?)`,
+            [txnIds]
+        );
+        const [siRows] = await db.query(
+            `SELECT si.transaction_id, si.quantity, si.price_at_sale_cents,
+                    i.item_name
+             FROM sale_items si
+             LEFT JOIN inventory i ON i.item_id = si.item_id
+             WHERE si.transaction_id IN (?)`,
+            [txnIds]
+        );
+        const ticketsByTxn = {};
+        for (const t of tkRows) (ticketsByTxn[t.transaction_id] ||= []).push(t);
+        const saleItemsByTxn = {};
+        for (const s of siRows) (saleItemsByTxn[s.transaction_id] ||= []).push(s);
+
+        const ticketTypeLabel = (type) => {
+            switch (type) {
+                case 'adult':  return 'Adult';
+                case 'youth':  return 'Youth';
+                case 'child':  return 'Child';
+                case 'senior': return 'Senior';
+                case 'member': return 'Member';
+                default:       return type ? type.charAt(0).toUpperCase() + type.slice(1) : 'General';
+            }
+        };
+
+        const shaped = txns.map(t => {
+            // Prefer the stored receipt line_items when present.
+            let lineItems = t.line_items;
+            if (typeof lineItems === 'string') {
+                try { lineItems = JSON.parse(lineItems); } catch { lineItems = null; }
+            }
+            if (!Array.isArray(lineItems) || lineItems.length === 0) {
+                // Build line items from tickets + sale_items.
+                const derived = [];
+                const grouped = {};
+                for (const tk of (ticketsByTxn[t.transaction_id] || [])) {
+                    const key = tk.event_id
+                        ? `event-${tk.event_id}-${tk.price_cents}`
+                        : `adm-${tk.type}-${tk.price_cents}`;
+                    if (!grouped[key]) {
+                        grouped[key] = {
+                            description: tk.event_id
+                                ? `Event: ${tk.event_title || 'Ticket'}`
+                                : `${ticketTypeLabel(tk.type)} Ticket`,
+                            quantity: 0,
+                            unitPriceCents: tk.price_cents,
+                        };
+                    }
+                    grouped[key].quantity += 1;
+                }
+                derived.push(...Object.values(grouped));
+                for (const si of (saleItemsByTxn[t.transaction_id] || [])) {
+                    derived.push({
+                        description: si.item_name || 'Shop item',
+                        quantity: si.quantity,
+                        unitPriceCents: si.price_at_sale_cents,
+                    });
+                }
+                lineItems = derived;
+            }
+            return { ...t, line_items: lineItems };
+        });
+        return res.json(shaped);
     } catch (err) {
         return res.status(500).json({ error: err.message });
     }

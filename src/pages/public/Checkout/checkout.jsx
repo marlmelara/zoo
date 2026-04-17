@@ -239,6 +239,13 @@ export default function Checkout() {
   const handlePlaceOrder = async (e) => {
     e.preventDefault();
 
+    // Membership in cart requires a logged-in customer account.
+    if (membershipPlan && !customerId) {
+      alert('You must be signed in to purchase a membership. Please sign in or create an account.');
+      navigate('/account');
+      return;
+    }
+
     // Validation
     if (!isDonation) {
       if (!billing.firstName || !billing.lastName) return alert('Please enter your name.');
@@ -555,6 +562,16 @@ export default function Checkout() {
           <div className="checkout-header">
             <h1>{isDonation ? <><FaHeart style={{ color: '#ef4444' }} /> Make a Donation</> : <><FaShoppingCart /> Checkout</>}</h1>
           </div>
+
+          {/* Membership + other items — recommend buying membership first to unlock the discount */}
+          {membershipPlan && (ticketData || eventTicketList.length > 0 || shopItems.length > 0) && memberDiscount === 0 && (
+            <div className="glass-panel" style={{ padding: '14px 18px', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.35)', borderRadius: '10px', marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <FaCrown style={{ color: '#f59e0b', flexShrink: 0, fontSize: '20px' }} />
+              <div style={{ fontSize: '0.9rem', color: '#92400e' }}>
+                <strong>Tip: check out your membership first.</strong> Your member discount (10-20% off tickets & shop) only applies once the membership is active — so buy the membership on its own, then come back for tickets and shop items to save.
+              </div>
+            </div>
+          )}
 
           {/* Auth banner — only show if not logged in and not yet chosen */}
           {!user && authMode === null && (

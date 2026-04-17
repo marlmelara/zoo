@@ -56,10 +56,10 @@ export default function CustomerLogin() {
         <button style={{ background: 'none', border: 'none', color: 'white', fontSize: '18px', fontWeight: 'bold' }}>Home</button>
       </Link>
 
-      {/* Coog Zoo logo above panel */}
-      <div style={{ marginBottom: '24px', padding: '10px', borderRadius: '5px', display: 'inline-block' }}>
-        <img src={logo} alt="Coog Zoo" style={{ maxWidth: '240px', height: 'auto' }} />
-      </div>
+      {/* Coog Zoo logo above panel — click to go home */}
+      <Link to="/" style={{ marginBottom: '24px', padding: '10px', borderRadius: '5px', display: 'inline-block' }} aria-label="Go to homepage">
+        <img src={logo} alt="Coog Zoo" style={{ maxWidth: '240px', height: 'auto', cursor: 'pointer' }} />
+      </Link>
       {/*Glass Panel*/}
       <div className="glass-panel" style={{padding: '40px', width: '100%', maxWidth: '400px', textAlign: 'center', background: 'rgba(255, 255, 255, 0.5)', backdropFilter: 'blur(10px)' }}>
         {/*Lock Icon*/}

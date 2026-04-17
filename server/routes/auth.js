@@ -14,8 +14,12 @@ router.post('/signup', async (req, res) => {
     const { email, password, firstName, lastName, phone, dateOfBirth,
             address, city, state, zipCode } = req.body;
 
-    if (!email || !password || !firstName || !lastName) {
-        return res.status(400).json({ error: 'Missing required fields.' });
+    const required = { email, password, firstName, lastName, phone,
+                       dateOfBirth, address, city, state, zipCode };
+    for (const [k, v] of Object.entries(required)) {
+        if (!v || !String(v).trim()) {
+            return res.status(400).json({ error: `Missing required field: ${k}` });
+        }
     }
     if (password.length < 6) {
         return res.status(400).json({ error: 'Password must be at least 6 characters.' });

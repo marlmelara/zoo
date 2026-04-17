@@ -42,6 +42,18 @@ export default function SignUp() {
       return;
     }
 
+    const requiredFields = {
+      firstName: 'First name', lastName: 'Last name', email: 'Email',
+      phone: 'Phone', dateOfBirth: 'Date of birth',
+      address: 'Street address', city: 'City', state: 'State', zipCode: 'Zip code',
+    };
+    for (const [key, label] of Object.entries(requiredFields)) {
+      if (!form[key] || !String(form[key]).trim()) {
+        setError(`${label} is required.`);
+        return;
+      }
+    }
+
     try {
       setLoading(true);
 
@@ -165,7 +177,7 @@ export default function SignUp() {
           </div>
 
           <div>
-            <label style={labelStyle}>Phone <span style={{ color: 'var(--color-text-muted)', fontWeight: 'normal' }}>(optional)</span></label>
+            <label style={labelStyle}>Phone <span style={{ color: '#ef4444' }}>*</span></label>
             <input
               type="tel"
               name="phone"
@@ -173,24 +185,26 @@ export default function SignUp() {
               value={form.phone}
               onChange={handleChange}
               placeholder="(123) 456-7890"
+              required
               style={inputStyle}
             />
           </div>
 
           <div>
-            <label style={labelStyle}>Date of Birth <span style={{ color: 'var(--color-text-muted)', fontWeight: 'normal' }}>(optional)</span></label>
+            <label style={labelStyle}>Date of Birth <span style={{ color: '#ef4444' }}>*</span></label>
             <input
               type="date"
               name="dateOfBirth"
               className="glass-input"
               value={form.dateOfBirth}
               onChange={handleChange}
+              required
               style={inputStyle}
             />
           </div>
 
           <div>
-            <label style={labelStyle}>Street Address <span style={{ color: 'var(--color-text-muted)', fontWeight: 'normal' }}>(optional)</span></label>
+            <label style={labelStyle}>Street Address <span style={{ color: '#ef4444' }}>*</span></label>
             <input
               type="text"
               name="address"
@@ -198,13 +212,14 @@ export default function SignUp() {
               value={form.address}
               onChange={handleChange}
               placeholder="Street address"
+              required
               style={inputStyle}
             />
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
             <div>
-              <label style={labelStyle}>City <span style={{ color: 'var(--color-text-muted)', fontWeight: 'normal' }}>(optional)</span></label>
+              <label style={labelStyle}>City <span style={{ color: '#ef4444' }}>*</span></label>
               <input
                 type="text"
                 name="city"
@@ -212,16 +227,18 @@ export default function SignUp() {
                 value={form.city}
                 onChange={handleChange}
                 placeholder="City"
+                required
                 style={inputStyle}
               />
             </div>
             <div>
-              <label style={labelStyle}>State <span style={{ color: 'var(--color-text-muted)', fontWeight: 'normal' }}>(optional)</span></label>
+              <label style={labelStyle}>State <span style={{ color: '#ef4444' }}>*</span></label>
               <select
                 name="state"
                 className="glass-input"
                 value={form.state}
                 onChange={handleChange}
+                required
                 style={inputStyle}
               >
                 <option value="">Select a state</option>
@@ -232,7 +249,7 @@ export default function SignUp() {
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
             <div>
-              <label style={labelStyle}>Zip Code <span style={{ color: 'var(--color-text-muted)', fontWeight: 'normal' }}>(optional)</span></label>
+              <label style={labelStyle}>Zip Code <span style={{ color: '#ef4444' }}>*</span></label>
               <input
                 type="text"
                 name="zipCode"
@@ -240,6 +257,7 @@ export default function SignUp() {
                 value={form.zipCode}
                 onChange={handleChange}
                 placeholder="Zip code"
+                required
                 style={inputStyle}
               />
             </div>

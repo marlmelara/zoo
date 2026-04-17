@@ -37,6 +37,13 @@ export default function Tickets() {
   }, [user, customerId]);
 
   useEffect(() => {
+    // Only restore a saved membership into the cart for a logged-in user.
+    // Guests should never be able to carry a membership in their cart.
+    if (!user) {
+      localStorage.removeItem('selectedMembership');
+      if (cartHook.cart.membership) cartHook.clearMembership();
+      return;
+    }
     const saved = localStorage.getItem('selectedMembership');
     if (saved) {
       const plan = JSON.parse(saved);
@@ -47,7 +54,7 @@ export default function Tickets() {
         duration_days: plan.duration_days,
       });
     }
-  }, []);
+  }, [user]);
 
   const [selectedDate, setSelectedDate] = useState(null);
   const [selectedTime, setSelectedTime] = useState(null);
@@ -163,11 +170,13 @@ export default function Tickets() {
   }, [cartHook.cart.membership]);
 
   const handleSelectMembership = (plan) => {
-    localStorage.setItem('selectedMembership', JSON.stringify(plan));
     if (!user) {
+      // Don't persist the plan — guests must not carry a membership in cart.
+      alert('Please sign in or create an account to purchase a membership.');
       navigate('/account');
       return;
     }
+    localStorage.setItem('selectedMembership', JSON.stringify(plan));
     cartHook.setMembership({
       plan_name: plan.type,
       price_cents: plan.price_cents,

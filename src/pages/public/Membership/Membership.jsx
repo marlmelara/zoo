@@ -44,6 +44,7 @@ export default function Membership() {
 
   const handleChoosePlan = (plan) => {
     if (!user) {
+      alert('Please sign in or create an account to purchase a membership.');
       navigate('/account');
       return;
     }

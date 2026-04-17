@@ -59,12 +59,25 @@ export default function CustomerDashboard() {
             const data = await api.get('/customers/me');
             setProfile(data);
             setEditForm(data || {});
+            // If any required field is missing, force edit mode on the profile tab.
+            if (data && !isProfileComplete(data)) {
+                setActiveTab('My Profile');
+                setEditing(true);
+            }
         } catch (err) {
             console.error('Error fetching profile:', err);
         } finally {
             setProfileLoading(false);
         }
     }
+
+    function isProfileComplete(p) {
+        if (!p) return false;
+        const req = ['first_name', 'last_name', 'phone', 'date_of_birth',
+                     'address', 'city', 'state', 'zip_code'];
+        return req.every(k => p[k] && String(p[k]).trim() !== '');
+    }
+    const profileIncomplete = profile && !isProfileComplete(profile);
 
     async function fetchTickets() {
         try {
@@ -126,6 +139,17 @@ export default function CustomerDashboard() {
 
     async function handleProfileUpdate(e) {
         e.preventDefault();
+        const required = {
+            first_name: 'First name', last_name: 'Last name',
+            phone: 'Phone', date_of_birth: 'Date of birth',
+            address: 'Street address', city: 'City', state: 'State', zip_code: 'Zip code',
+        };
+        for (const [k, label] of Object.entries(required)) {
+            if (!editForm[k] || !String(editForm[k]).trim()) {
+                alert(`${label} is required.`);
+                return;
+            }
+        }
         try {
             await api.patch('/customers/me', {
                 first_name: editForm.first_name,
@@ -227,45 +251,55 @@ export default function CustomerDashboard() {
                     ) : editing ? (
                         <div className="glass-panel" style={{ padding: '30px' }}>
                             <h2 style={{ marginTop: 0 }}>Edit Profile</h2>
+                            {profileIncomplete && (
+                                <div style={{ marginBottom: '16px', padding: '12px 16px', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '10px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                    <AlertTriangle size={18} color="#f59e0b" />
+                                    <span style={{ fontSize: '0.9rem', color: '#fcd34d' }}>
+                                        Please complete all required profile information before continuing.
+                                    </span>
+                                </div>
+                            )}
                             <form onSubmit={handleProfileUpdate} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
                                 <div>
-                                    <label style={{ fontSize: '12px', color: 'black', display: 'block', marginBottom: '5px' }}>First Name</label>
+                                    <label style={{ fontSize: '12px', color: 'var(--color-text-muted)', display: 'block', marginBottom: '5px' }}>First Name <span style={{ color: '#ef4444' }}>*</span></label>
                                     <input className="glass-input" value={editForm.first_name || ''} onChange={e => setEditForm({ ...editForm, first_name: e.target.value })} required />
                                 </div>
                                 <div>
-                                    <label style={{ fontSize: '12px', color: 'var(--color-text-muted)', display: 'block', marginBottom: '5px' }}>Last Name</label>
+                                    <label style={{ fontSize: '12px', color: 'var(--color-text-muted)', display: 'block', marginBottom: '5px' }}>Last Name <span style={{ color: '#ef4444' }}>*</span></label>
                                     <input className="glass-input" value={editForm.last_name || ''} onChange={e => setEditForm({ ...editForm, last_name: e.target.value })} required />
                                 </div>
                                 <div>
-                                    <label style={{ fontSize: '12px', color: 'var(--color-text-muted)', display: 'block', marginBottom: '5px' }}>Phone</label>
-                                    <input className="glass-input" value={editForm.phone || ''} onChange={e => setEditForm({ ...editForm, phone: e.target.value })} />
+                                    <label style={{ fontSize: '12px', color: 'var(--color-text-muted)', display: 'block', marginBottom: '5px' }}>Phone <span style={{ color: '#ef4444' }}>*</span></label>
+                                    <input className="glass-input" type="tel" value={editForm.phone || ''} onChange={e => setEditForm({ ...editForm, phone: e.target.value })} required />
                                 </div>
                                 <div>
-                                    <label style={{ fontSize: '12px', color: 'var(--color-text-muted)', display: 'block', marginBottom: '5px' }}>Date of Birth</label>
-                                    <input className="glass-input" type="date" value={editForm.date_of_birth || ''} onChange={e => setEditForm({ ...editForm, date_of_birth: e.target.value })} />
+                                    <label style={{ fontSize: '12px', color: 'var(--color-text-muted)', display: 'block', marginBottom: '5px' }}>Date of Birth <span style={{ color: '#ef4444' }}>*</span></label>
+                                    <input className="glass-input" type="date" value={editForm.date_of_birth || ''} onChange={e => setEditForm({ ...editForm, date_of_birth: e.target.value })} required />
                                 </div>
                                 <div style={{ gridColumn: '1 / -1' }}>
-                                    <label style={{ fontSize: '12px', color: 'var(--color-text-muted)', display: 'block', marginBottom: '5px' }}>Street Address</label>
-                                    <input className="glass-input" value={editForm.address || ''} onChange={e => setEditForm({ ...editForm, address: e.target.value })} />
+                                    <label style={{ fontSize: '12px', color: 'var(--color-text-muted)', display: 'block', marginBottom: '5px' }}>Street Address <span style={{ color: '#ef4444' }}>*</span></label>
+                                    <input className="glass-input" value={editForm.address || ''} onChange={e => setEditForm({ ...editForm, address: e.target.value })} required />
                                 </div>
                                 <div>
-                                    <label style={{ fontSize: '12px', color: 'var(--color-text-muted)', display: 'block', marginBottom: '5px' }}>City</label>
-                                    <input className="glass-input" value={editForm.city || ''} onChange={e => setEditForm({ ...editForm, city: e.target.value })} />
+                                    <label style={{ fontSize: '12px', color: 'var(--color-text-muted)', display: 'block', marginBottom: '5px' }}>City <span style={{ color: '#ef4444' }}>*</span></label>
+                                    <input className="glass-input" value={editForm.city || ''} onChange={e => setEditForm({ ...editForm, city: e.target.value })} required />
                                 </div>
                                 <div>
-                                    <label style={{ fontSize: '12px', color: 'var(--color-text-muted)', display: 'block', marginBottom: '5px' }}>State</label>
-                                    <select className="glass-input" value={editForm.state || ''} onChange={e => setEditForm({ ...editForm, state: e.target.value })} style={{ padding: '12px', width: '100%', boxSizing: 'border-box' }}>
+                                    <label style={{ fontSize: '12px', color: 'var(--color-text-muted)', display: 'block', marginBottom: '5px' }}>State <span style={{ color: '#ef4444' }}>*</span></label>
+                                    <select className="glass-input" value={editForm.state || ''} onChange={e => setEditForm({ ...editForm, state: e.target.value })} required style={{ padding: '12px', width: '100%', boxSizing: 'border-box' }}>
                                         <option value="">Select a state</option>
                                         {US_STATES.map(s => <option key={s} value={s}>{s}</option>)}
                                     </select>
                                 </div>
                                 <div>
-                                    <label style={{ fontSize: '12px', color: 'var(--color-text-muted)', display: 'block', marginBottom: '5px' }}>Zip Code</label>
-                                    <input className="glass-input" value={editForm.zip_code || ''} onChange={e => setEditForm({ ...editForm, zip_code: e.target.value })} />
+                                    <label style={{ fontSize: '12px', color: 'var(--color-text-muted)', display: 'block', marginBottom: '5px' }}>Zip Code <span style={{ color: '#ef4444' }}>*</span></label>
+                                    <input className="glass-input" value={editForm.zip_code || ''} onChange={e => setEditForm({ ...editForm, zip_code: e.target.value })} required />
                                 </div>
                                 <div style={{ gridColumn: '1 / -1', display: 'flex', gap: '10px', marginTop: '10px' }}>
                                     <button type="submit" className="glass-button" style={{ background: 'var(--color-primary)', flex: 1 }}>Save Changes</button>
-                                    <button type="button" className="glass-button" onClick={() => { setEditing(false); setEditForm(profile); }} style={{ flex: 1 }}>Cancel</button>
+                                    {!profileIncomplete && (
+                                        <button type="button" className="glass-button" onClick={() => { setEditing(false); setEditForm(profile); }} style={{ flex: 1 }}>Cancel</button>
+                                    )}
                                 </div>
                             </form>
                         </div>

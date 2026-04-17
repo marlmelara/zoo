@@ -59,6 +59,9 @@ export default function Donations() {
           <Link to="/" className="navbar-logo-link" aria-label="Go to homepage">
             <img src={logo} alt="Coog Zoo" />
           </Link>
+          <div style={{ textAlign: 'center', flex: 1, padding: '0 20px' }}>
+            <h2 className="page-title" style={{ color: 'white', margin: 0 }}>Donations</h2>
+          </div>
           <div className="donations-navbar-links">
             <Link to="/tickets" className="donations-navbar-link">Buy Tickets</Link>
             <Link to="/shop" className="donations-navbar-link">Shop</Link>

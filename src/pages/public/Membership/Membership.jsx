@@ -2,8 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Link } from 'react-router-dom';
 import { FaCheck, FaStar, FaUsers, FaParking, FaTicketAlt, FaGift, FaClock, FaMap, FaMapMarkerAlt, FaPhone, FaEnvelope, FaArrowRight } from 'react-icons/fa';
-
-
+import Navbar from '../../../components/Navbar';
 import logo from '../../../images/logo.png';
 import './Membership.css';
 import { useZooCart } from '../../../components/ShopCart';
@@ -66,26 +65,7 @@ export default function Membership() {
 
     return (
     <div className="membership-page">
-
-      <nav className="home-navbar">
-        <div className="home-navbar-container">
-          <Link to="/" className="navbar-logo-link" aria-label="Go to homepage">
-            <img src={logo} alt="Coog Zoo" />
-          </Link>
-          <div style={{ textAlign: 'center', flex: 1, padding: '0 20px' }}>
-            <h2 className="page-title" style={{ margin: 0 }}>Memberships</h2>
-            <p className="page-description">
-              Become a Coog Zoo member today and enjoy 12 months of wildlife fun, along with member exclusive discounts and benefits!
-            </p>
-          </div>
-          <div className="home-navbar-links">
-            <Link to="/tickets" className="home-navbar-link">Buy Tickets</Link>
-            <Link to="/shop" className="home-navbar-link">Shop</Link>
-            <Link to="/account" className="home-navbar-link">Customer Login</Link>
-            <Link to="/login" className="home-navbar-link">Staff Portal</Link>
-          </div>
-        </div>
-      </nav>
+      <Navbar />
 
       <div style={{ minHeight: '2rem' }}></div>
         

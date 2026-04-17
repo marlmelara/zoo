@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { FaClock, FaMapMarkerAlt, FaPhone, FaEnvelope } from 'react-icons/fa';
 import logo from '../../../images/logo.png';
+import Navbar from '../../../components/Navbar';
 import './schedule.css'; 
 
 export default function Schedule() {
@@ -131,34 +132,16 @@ export default function Schedule() {
   return (
     <div className="schedule-page">
       {/* Navigation Bar */}
-      <nav className="navbar">
-        <div className="navbar-container">
-          <Link to="/" className="navbar-logo-link" aria-label="Go to homepage">
-            <img src={logo} alt="Coog Zoo" />
-          </Link>
-          <div className="navbar-links">
-            <Link to="/tickets" className="navbar-link">Buy Tickets</Link>
-            <Link to="/shop" className="navbar-link">Shop</Link>
-            <Link to="/membership" className="navbar-link">Membership</Link>
-            <Link to="/account" className="navbar-link">Customer Login</Link>
-            <Link to="/login" className="navbar-link">Staff Portal</Link>
-          </div>
-        </div>
-      </nav>
+      <Navbar />
 
       <div className="schedule-container">
-        {/* Hero Text */}
-        <div className="hero-text">
-          <h1 className="hero-title">Schedule of the Day</h1>
-          <p className="hero-subtitle">
-            Schedule updated each morning before we open at 9:00 a.m.<br />
-          </p>
-        </div>
-
         {/* Date Header */}
         <div className="date-header">
           <span className="updated-date">UPDATED {formatDate()}</span>
           <h2 className="schedule-title">🦁 The Daily Roar Guide 🦁</h2>
+          <h2 className="schedule-subtitle">
+            Schedule updated each morning before we open at 9:00 a.m.<br />
+          </h2>
         </div>
 
         {/* Schedule Table */}

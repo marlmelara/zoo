@@ -25,11 +25,14 @@ export default function GiftShop() {
           <Link to="/" className="navbar-logo-link" aria-label="Go to homepage">
             <img src={logo} alt="Coog Zoo" />
           </Link>
+          
           <button onClick={() => navigate('/shop')} className="back-button">
             Back
           </button>
-          <h1 className="shop-navbar-title">Gift Shop</h1>
         </div>
+          <div style={{ textAlign: 'center', flex: 1, padding: '0 20px' }}>
+            <h2 className="page-title" style={{ margin: 0 }}>Gift Shop</h2>
+          </div>
         <div className="home-navbar-links">
           <Link to="/tickets" className="home-navbar-link">Buy Tickets</Link>
           <Link to="/membership" className="home-navbar-link">Memberships</Link>
@@ -45,7 +48,6 @@ export default function GiftShop() {
       </nav>
 
       <div className="shop-content">
-        <p className="shop-subtitle">Browse our catalogue of zoo-themed souvenirs, plush animals, and take-home trinkets!</p>
         <div className="items-grid">
           {items.map(item => (
             <div key={item.item_id} className="item-card">

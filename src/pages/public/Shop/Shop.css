@@ -3,9 +3,10 @@
   position: relative;
   color: white;
   min-height: 100vh;
-  background: linear-gradient(to bottom, #f7ead8 0%, #c9a87a 65%, #a8845a 100%);
+  background: rgb(255, 245, 231);
   display: flex;
   flex-direction: column;
+  
 }
 .shop-page::after {
   top: 0;
@@ -23,6 +24,13 @@
   opacity: 0.5;
   pointer-events: none;
   z-index: 0;
+}
+
+.page-title {
+  font-size: 2.5rem;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+  color: white;
 }
 
 .shop-navbar {
@@ -147,6 +155,7 @@
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 24px;
+  padding: 2rem 1rem;
 }
 
 .shop-section-card {
@@ -208,6 +217,7 @@
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
   gap: 20px;
+  padding: 2rem 1rem;
 }
 
 .item-card {
@@ -312,7 +322,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4px 20px rgba(123, 144, 79, 0.5);
+  box-shadow: rgba(27, 27, 27, 0.4) 0px 4px 20px;
   z-index: 100;
 }
 

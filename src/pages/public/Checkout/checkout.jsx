@@ -9,6 +9,7 @@ import { FaPersonCane } from 'react-icons/fa6';
 import { useAuth } from '../../../contexts/AuthContext';
 import { createTransaction, createSaleItems } from '../../../api/transactions';
 import api from '../../../lib/api';
+import Navbar from '../../../components/Navbar';
 import './checkout.css';
 import logo from '../../../images/logo.png';
 
@@ -354,8 +355,7 @@ export default function Checkout() {
             });
           }
           
-          // Update tickets_sold count for this event
-          await incrementEventTicketsSold(evt.event_id, quantity);
+          // tickets_sold count is auto-incremented server-side in POST /api/tickets
         }
         await api.post('/tickets', { tickets: eventTicketRows });
       }
@@ -427,24 +427,6 @@ export default function Checkout() {
       setSubmitting(false);
     }
   };
-
-  // Shared Navbar component
-  const CheckoutNavbar = () => (
-    <nav className="checkout-navbar">
-      <div className="checkout-navbar-container">
-        <Link to="/" className="checkout-logo-link" aria-label="Go to homepage">
-          <img src={logo} alt="Coog Zoo" />
-        </Link>
-        <div className="checkout-navbar-links">
-          <Link to="/tickets" className="checkout-navbar-link">Buy Tickets</Link>
-          <Link to="/shop" className="checkout-navbar-link">Shop</Link>
-          <Link to="/membership" className="checkout-navbar-link">Membership</Link>
-          <Link to="/account" className="checkout-navbar-link">Customer Login</Link>
-          <Link to="/login" className="checkout-navbar-link">Staff Portal</Link>
-        </div>
-      </div>
-    </nav>
-  );
 
   const CheckoutFooter = () => (
       <footer className="footer">
@@ -542,7 +524,7 @@ export default function Checkout() {
   if (!isDonation && !hasCartItems) {
     return (
       <div className="checkout-page">
-        <CheckoutNavbar />
+        <Navbar/>
         <div className="checkout-wrapper">
           <div className="checkout-empty glass-panel">
             <FaTimesCircle size={48} style={{ color: '#ef4444', marginBottom: '12px' }} />
@@ -565,7 +547,7 @@ export default function Checkout() {
   // ══════════════════════════════════════
   return (
     <div className="checkout-page">
-      <CheckoutNavbar />
+      <Navbar/>
       <div className="checkout-wrapper">
         {/* ── Left column: forms ── */}
         <div className="checkout-forms">
@@ -579,8 +561,10 @@ export default function Checkout() {
             <div className="glass-panel auth-banner">
               <p>Have an account? Sign in for faster checkout{!isDonation && ' and member discounts'}.</p>
               <div className="auth-banner-actions">
-                <button className="glass-button" onClick={() => setAuthMode('login')}>Sign In</button>
-                <button className="glass-button" onClick={() => setAuthMode('guest')}>
+                <button className="glass-button" onClick={() => setAuthMode('login')} style={{ background: 'rgb(123, 144, 79)', color:'white' }}>
+                  Sign In
+                </button>
+                <button className="glass-button" onClick={() => setAuthMode('guest')} style={{ background: 'rgb(123, 144, 79)', color:'white' }}>
                   Continue as Guest
                 </button>
               </div>

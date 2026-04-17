@@ -4,6 +4,7 @@ import { FaCalendarAlt, FaUser, FaChild, FaMapMarkerAlt, FaPhone, FaEnvelope, Fa
 import { FaPersonCane } from "react-icons/fa6";
 import { useAuth } from '../../../contexts/AuthContext';
 import api from '../../../lib/api';
+import Navbar from '../../../components/Navbar';
 import { getUpcomingEvents } from '../../../api/public';
 import ShopCartPanel, { useZooCart } from '../../../components/ShopCart';
 import './tickets.css';
@@ -182,28 +183,11 @@ export default function Tickets() {
   return (
     <div className="tickets-page" style={{ margin: 0, padding: 0 }}>
       {/* Navigation Bar */}
-      <nav className="navbar">
-        <div className="navbar-container">
-          <Link to="/" className="navbar-logo-link" aria-label="Go to homepage">
-            <img src={logo} alt="Coog Zoo" />
-          </Link>
-          <div className="navbar-links">
-            <Link to="/shop" className="navbar-link">Shop</Link>
-            <Link to="/membership" className="navbar-link">Membership</Link>
-            <Link to="/account" className="navbar-link">Customer Login</Link>
-            <Link to="/login" className="navbar-link">Staff Portal</Link>
-          </div>
-        </div>
-      </nav>
+      <Navbar />
 
       <div className="tickets-container">
         {/* Left Column */}
-        <div className="tickets-left">
-          <div className="page-header">
-            <h1 className="page-title" style={{color: "#FFBF69"}}>Tickets & Membership</h1>
-            <p className="page-description" style={{color: "#d19233"}}>Plan your visit with admission options, family-friendly pricing, and membership package.</p>
-          </div>
-
+        <div className="tickets-left" style = {{padding: '2rem'}}>
           {/* Member / Welcome Banner */}
           {user && role === 'customer' ? (
             <div className="member-banner glass-panel" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -215,7 +199,7 @@ export default function Tickets() {
                     <span style={{ textTransform: 'capitalize' }}>{membershipType}</span> member — enjoy your discounts!
                   </p>
                 ) : (
-                  <p style={{ margin: '4px 0 0', fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>
+                  <p style={{ margin: '4px 0 0', fontSize: '0.85rem', color: 'var(--color-text)' }}>
                     Become a member below for discounts on tickets and shop items!
                   </p>
                 )}

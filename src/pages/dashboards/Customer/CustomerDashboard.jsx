@@ -229,7 +229,7 @@ export default function CustomerDashboard() {
                             <h2 style={{ marginTop: 0 }}>Edit Profile</h2>
                             <form onSubmit={handleProfileUpdate} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
                                 <div>
-                                    <label style={{ fontSize: '12px', color: 'var(--color-text-muted)', display: 'block', marginBottom: '5px' }}>First Name</label>
+                                    <label style={{ fontSize: '12px', color: 'black', display: 'block', marginBottom: '5px' }}>First Name</label>
                                     <input className="glass-input" value={editForm.first_name || ''} onChange={e => setEditForm({ ...editForm, first_name: e.target.value })} required />
                                 </div>
                                 <div>
@@ -307,7 +307,7 @@ export default function CustomerDashboard() {
                                     <div style={{ background: 'rgba(255,255,255,0.05)', padding: '15px', borderRadius: '10px' }}>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '5px' }}>
                                             <Mail size={14} color="var(--color-text-muted)" />
-                                            <p style={{ fontSize: '12px', color: 'var(--color-text-muted)', margin: 0 }}>Email</p>
+                                            <p style={{ fontSize: '12px', color: 'var(--color-text-muted)', margin: 0}}>Email</p>
                                         </div>
                                         <p style={{ fontWeight: 600, margin: 0 }}>{profile.email || user?.email || 'Not set'}</p>
                                     </div>
@@ -567,7 +567,7 @@ export default function CustomerDashboard() {
                         </button>
                     </div>
                     {isMembershipActive && (
-                        <div style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)', borderRadius: '10px', padding: '10px 16px', marginBottom: '15px', fontSize: '0.85rem', color: '#6ee7b7' }}>
+                        <div style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)', borderRadius: '10px', padding: '10px 16px', marginBottom: '15px', fontSize: '0.85rem', color: 'black' }}>
                             <Star size={14} style={{ marginRight: '6px', verticalAlign: 'middle' }} />
                             As a <strong style={{ textTransform: 'capitalize' }}>{profile.membership_type}</strong> member, you get free general admission and discounted rates on event tickets!
                         </div>

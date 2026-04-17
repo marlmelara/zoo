@@ -26,8 +26,13 @@ export default function Shop() {
           <Link to="/" className="navbar-logo-link" aria-label="Go to homepage">
             <img src={logo} alt="Coog Zoo" />
           </Link>
-          <h1 className="shop-navbar-title">Shop Home Page</h1>
         </div>
+          <div style={{ textAlign: 'center', flex: 1, padding: '0 20px' }}>
+            <h2 className="page-title" style={{ margin: 0 }}>Food & Gift Shop</h2>
+            <p className="page-description">
+              Browse zoo souvenirs, gifts, food, and snacks during your visit.
+            </p>
+          </div>
         <div className="home-navbar-links">
           <Link to="/tickets" className="home-navbar-link">Buy Tickets</Link>
           <Link to="/membership" className="home-navbar-link">Memberships</Link>
@@ -43,7 +48,6 @@ export default function Shop() {
       </nav>
 
       <div className="shop-content-centered">
-        <p className="shop-subtitle">Browse zoo souvenirs, gifts, food, and snacks during your visit.</p>
         <div className="shop-sections-grid">
           {shopSections.map(section => {
             const Icon = section.icon;

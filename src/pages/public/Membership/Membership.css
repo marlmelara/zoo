@@ -1,7 +1,7 @@
 /* Membership Page Styles */
 .membership-page {
   min-height: 100vh;
-  background: linear-gradient(to bottom, #f7ead8, #d9c4a8, #a8845a)
+  background: rgb(255, 245, 231);
 }
 
 .membership-container {
@@ -63,7 +63,7 @@
   top: -12px;
   left: 50%;
   transform: translateX(-50%);
-  background: var(--color-primary);
+  background: var(--color-secondary);
   color: white;
   padding: 0.2rem 0.8rem;
   border-radius: 20px;
@@ -75,7 +75,7 @@
 .plan-name {
   font-size: 1.4rem;
   font-weight: 700;
-  color: #ba8b69;
+  color: var(--color-secondary);
   margin: 0;
 }
 
@@ -95,7 +95,7 @@
 .plan-price {
   font-size: 2rem;
   font-weight: 700;
-  color: var(--color-primary);
+  color: rgb(123, 144, 79);
 }
 
 .plan-period {
@@ -132,6 +132,8 @@
 .plan-button {
   width: 100%;
   margin-top: auto;
+  background: rgb(123, 144, 79);
+  color: white;
 }
 
 .plan-button-active {
@@ -199,7 +201,7 @@
 .membership-cta h2 {
   font-size: 1.5rem;
   font-weight: 700;
-  color: white; /* change to dark tan */
+  color: var(--color-secondary);/* change to dark tan */
   margin: 0;
 }
 
@@ -218,6 +220,8 @@
 .cta-button {
   padding: 0.75rem 2.5rem;
   font-size: 1rem;
+  background: rgb(123, 144, 79);
+  color: white;
 }
 
 /* Responsive */

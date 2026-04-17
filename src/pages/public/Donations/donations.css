@@ -23,6 +23,13 @@
   color: var(--zoo-text);
 }
 
+.page-title {
+  font-size: 2.5rem;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+  color: white;
+}
+
 .donations-navbar {
   width: 100%;
   background: var(--zoo-accent);

@@ -214,7 +214,7 @@ a {
 .footer-description {
   line-height: 1.6;
   margin-bottom: 1.5rem;
-  color: #cccccc;
+  color: #ffffff;
   font-size: 0.9rem;
 }
 
@@ -319,4 +319,25 @@ a {
   .contact-item {
     justify-content: center;
   }
+}
+
+/* User Dashboard Link */
+.user-dashboard-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.user-icon {
+  font-size: 1.1rem;
+}
+
+.logout-btn {
+  background: rgba(255, 255, 255, 0.15);
+  cursor: pointer;
+  border: none;
+}
+
+.logout-btn:hover {
+  background: rgba(220, 38, 38, 0.5);
 }

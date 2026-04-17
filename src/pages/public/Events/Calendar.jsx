@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { FaCalendarAlt, FaTicketAlt, FaCheckCircle, FaExclamationTriangle, FaMapMarkerAlt, FaClock, FaPhone, FaEnvelope } from 'react-icons/fa';
+import { FaCalendarAlt, FaTicketAlt, FaCheckCircle, 
+  FaExclamationTriangle, FaMapMarkerAlt, FaClock, 
+  FaPhone, FaEnvelope } from 'react-icons/fa';
 import { getUpcomingEvents } from '../../../api/public';
+import Navbar from '../../../components/Navbar';
 import logo from '../../../images/logo.png';
 import './calendar.css';
 
@@ -133,33 +136,12 @@ export default function Events() {
   return (
     <div className="events-page">
       {/* Navigation Bar */}
-      <nav className="navbar">
-        <div className="navbar-container">
-          <Link to="/" className="navbar-logo-link" aria-label="Go to homepage">
-            <img src={logo} alt="Coog Zoo" />
-          </Link>
-          <div className="navbar-links">
-            <Link to="/tickets" className="navbar-link">Buy Tickets</Link>
-            <Link to="/shop" className="navbar-link">Shop</Link>
-            <Link to="/membership" className="navbar-link">Membership</Link>
-            <Link to="/account" className="navbar-link">Customer Login</Link>
-            <Link to="/login" className="navbar-link">Staff Portal</Link>
-          </div>
-        </div>
-      </nav>
+      <Navbar />
 
-      <div className="events-container">
-        <div className="events-hero">
-          <h1 className="events-title">Don't Miss These Events</h1>
-          <p className="events-subtitle">
-            Discover exciting events, special programs, and unique experiences at Coog Zoo.
-          </p>
-        </div>
-
+      <div className="events-container" style = {{padding: '2rem'}}>
         <div className="results-count">
           Showing {events.length} {events.length === 1 ? 'event' : 'events'}
         </div>
-
         {loading ? (
           <div className="loading-state">Loading events...</div>
         ) : events.length === 0 ? (
@@ -252,7 +234,7 @@ export default function Events() {
       </div>
 
       {/* Footer */}
-      <footer className="footer" style={{background: "rgb(123, 144, 79)"}}>
+      <footer className="footer">
         <div className="footer-container">
           <div className="footer-main">
             <div className="footer-section footer-brand">
@@ -262,9 +244,9 @@ export default function Events() {
             <div className="footer-section">
               <h3 className="footer-title">Contact Us</h3>
               <div className="footer-contact-info">
-                <div className="contact-item" style={{color:"white"}}><FaMapMarkerAlt className="contact-icon" style={{color:"white"}} /><div><p>4302 University Dr</p><p>Houston, TX 77004</p></div></div>
-                <div className="contact-item" style={{color:"white"}} ><FaPhone className="contact-icon" style={{color:"white"}} /><a href="tel:5555555555">555-555-5555</a></div>
-                <div className="contact-item" style={{color:"white"}}><FaEnvelope className="contact-icon" style={{color:"white"}} /><a href="mailto:info@coogzoo.org">info@coogzoo.org</a></div>
+                <div className="contact-item"><FaMapMarkerAlt className="contact-icon" style={{color:"white"}} /><div><p>4302 University Dr</p><p>Houston, TX 77004</p></div></div>
+                <div className="contact-item"><FaPhone className="contact-icon" style={{color:"white"}} /><a href="tel:5555555555">555-555-5555</a></div>
+                <div className="contact-item"><FaEnvelope className="contact-icon" style={{color:"white"}} /><a href="mailto:info@coogzoo.org">info@coogzoo.org</a></div>
               </div>
             </div>
           </div>

@@ -29,6 +29,12 @@ export default function Maps() {
           <Link to="/" className="navbar-logo-link" aria-label="Go to homepage">
             <img src={logo} alt="Coog Zoo" />
           </Link>
+          <div style={{ textAlign: 'center', flex: 1, padding: '0 20px' }}>
+            <h2 className="page-title" style={{ margin: 0 }}>Zoo Map</h2>
+            <p className="page-description">
+              Plan your visit with our zoo map!
+            </p>
+          </div>
           <div className="home-navbar-links">
             <Link to="/tickets" className="home-navbar-link">Buy Tickets</Link>
             <Link to="/shop" className="home-navbar-link">Shop</Link>
@@ -40,7 +46,6 @@ export default function Maps() {
       </nav>      
       
       <div className="map-container">
-        <h1 className="map-title">Zoo Map</h1>
         <img src={map} alt="Zoo Map" className="map-image" />
         <button onClick={handleDownload} className="download-button">
           Download PDF

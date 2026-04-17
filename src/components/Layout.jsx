@@ -5,7 +5,7 @@ import {
     LayoutDashboard, Cat, Users, Calendar,
     ShoppingBag, Shield, Stethoscope, Heart, Briefcase
 } from 'lucide-react';
-import logo from '../images/logo.png';
+import logo from '../images/logo_alt2.png';
 
 export default function Layout() {
     const location = useLocation();
@@ -64,6 +64,7 @@ export default function Layout() {
             <aside
                 className="glass-panel"
                 style={{
+                    background: 'rgba(255, 255, 255, 0.5)',
                     width: '250px',
                     padding: '20px',
                     margin: '20px',
@@ -82,11 +83,8 @@ export default function Layout() {
                         }}
                     >
                         <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: '10px', textDecoration: 'none', color: 'white' }}>
-                            <img src={logo} alt="Home" style={{ width: '40px', height: '40px', objectFit: 'contain' }} />
-                            <h2 style={{ fontSize: '24px', margin: 0 }}>
-                                Coog<span style={{ color: 'var(--color-primary)' }}>Zoo</span>
-                            </h2>
-                        </Link>
+                            <img src={logo} alt="Home" style={{ width: '160px', height: 'auto', objectFit: 'contain' }} />
+                        </Link>                      
                     </div>
 
                     <nav style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -123,7 +121,7 @@ export default function Layout() {
                 <div
                     style={{
                         padding: '20px',
-                        background: 'rgba(0,0,0,0.2)',
+                        background: 'rgba(255, 255, 255, 0.5)',
                         borderRadius: '12px',
                     }}
                 >
@@ -176,7 +174,7 @@ export default function Layout() {
             </aside>
 
             <main style={{ flex: 1, padding: '20px 20px 20px 0', overflowY: 'auto' }}>
-                <div className="glass-panel" style={{ minHeight: 'calc(100vh - 40px)', padding: '40px' }}>
+                <div className="glass-panel" style={{ background: 'rgba(255, 255, 255, 0.5)', minHeight: 'calc(100vh - 40px)', padding: '40px' }}>
                     <Outlet />
                 </div>
             </main>

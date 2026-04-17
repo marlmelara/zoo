@@ -17,6 +17,11 @@ const pool = mysql.createPool({
     waitForConnections: true,
     connectionLimit:    10,
     timezone: '+00:00',   // store/read all DATETIMEs as UTC
+    // Return DATE/DATETIME/TIME as strings, not JS Date objects. The frontend
+    // concatenates `+'T00:00:00'` on date strings to build JS Dates; if we
+    // hand back Date objects mysql2 serializes them to full ISO strings,
+    // which breaks that concat and renders "Invalid Date".
+    dateStrings: true,
 });
 
 export default pool;

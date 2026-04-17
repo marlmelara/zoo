@@ -40,21 +40,34 @@ export const MOUNTS = [
     { prefix: '/api/dashboard',    router: dashboardRoutes },
 ];
 
-// ── Body reader ──────────────────────────────────────────────
+// ── Body reader — accepts whatever Vercel / Node hands us ─────
+// Returns an object no matter what; never rejects.
 export function readBody(req) {
-    return new Promise((resolve, reject) => {
+    // Vercel's Node runtime sometimes pre-populates req.body
+    if (req.body !== undefined && req.body !== null) {
+        if (typeof req.body === 'object' && !Buffer.isBuffer(req.body)) {
+            return Promise.resolve(req.body);
+        }
+        if (typeof req.body === 'string') {
+            try { return Promise.resolve(JSON.parse(req.body)); }
+            catch { return Promise.resolve({}); }
+        }
+        if (Buffer.isBuffer(req.body)) {
+            try { return Promise.resolve(JSON.parse(req.body.toString('utf8'))); }
+            catch { return Promise.resolve({}); }
+        }
+    }
+    // Otherwise read the raw IncomingMessage stream
+    return new Promise((resolve) => {
         const chunks = [];
-        req.on('data', (chunk) => chunks.push(chunk));
+        req.on('data', (c) => chunks.push(c));
         req.on('end', () => {
-            const raw = Buffer.concat(chunks).toString();
+            const raw = Buffer.concat(chunks).toString('utf8');
             if (!raw) return resolve({});
-            try {
-                resolve(JSON.parse(raw));
-            } catch {
-                resolve({});
-            }
+            try { resolve(JSON.parse(raw)); }
+            catch { resolve({}); }
         });
-        req.on('error', reject);
+        req.on('error', () => resolve({}));
     });
 }
 
@@ -104,31 +117,25 @@ export async function runHandlers(handlers, req, res) {
 }
 
 // ── The big one: dispatch a single request through the MOUNTS ─
-// Handles: URL parse, body parse, augment, health check, route
-// match, 404 + 500. Body parsing is skipped if req.body is
-// already an object (e.g. Vercel pre-parsed it).
+// Top-level try/catch guarantees we always return a JSON response —
+// never let Vercel's default HTML error page surface to the client.
 export async function dispatch(req, res) {
-    const { pathname, query } = parse(req.url, true);
-    req.query = query;
-
-    // Parse body only if not already parsed by the host runtime
-    const bodyIsPreparsed =
-        req.body &&
-        typeof req.body === 'object' &&
-        !Buffer.isBuffer(req.body) &&
-        !(req.body.on && typeof req.body.on === 'function');
-    if (!bodyIsPreparsed) {
-        req.body = await readBody(req);
-    }
-
+    // Augment first so error paths below can use res.json / res.status
     augmentReqRes(req, res);
 
-    // Health check (before MOUNT loop)
-    if (req.method === 'GET' && pathname === '/api/health') {
-        return res.json({ status: 'ok' });
-    }
-
     try {
+        const { pathname, query } = parse(req.url, true);
+        req.query = query;
+        req.body  = await readBody(req);
+
+        console.log('[dispatch]', req.method, pathname,
+                    'body-keys:', Object.keys(req.body || {}).length);
+
+        // Health check (before MOUNT loop)
+        if (req.method === 'GET' && pathname === '/api/health') {
+            return res.json({ status: 'ok' });
+        }
+
         for (const { prefix, router } of MOUNTS) {
             if (!pathname.startsWith(prefix)) continue;
 
@@ -143,12 +150,12 @@ export async function dispatch(req, res) {
         }
 
         res.statusCode = 404;
-        res.json({ error: `Route ${pathname} not found.` });
+        return res.json({ error: `Route ${pathname} not found.` });
     } catch (err) {
-        console.error(err);
+        console.error('[dispatch-error]', err);
         if (!res.headersSent) {
             res.statusCode = 500;
-            res.json({ error: err.message || 'Internal server error' });
+            return res.json({ error: err.message || 'Internal server error' });
         }
     }
 }

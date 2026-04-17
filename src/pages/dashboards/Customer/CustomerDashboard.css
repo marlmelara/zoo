@@ -1,0 +1,357 @@
+/* CustomerDashboard.css */
+
+.customer-dashboard {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+/* Dashboard Header */
+.dashboard-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.dashboard-title {
+  margin: 0;
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: var(--color-text-dark, #3d4f3e);
+}
+
+.dashboard-subtitle {
+  color: var(--color-text-muted);
+  margin: 0.25rem 0 0;
+  font-size: 0.9rem;
+}
+
+.membership-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border-radius: 2rem;
+  background: rgba(209, 146, 51, 0.15);
+  border: 1px solid rgba(209, 146, 51, 0.3);
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.membership-badge.premium { color: #f59e0b; background: rgba(245, 158, 11, 0.15); }
+.membership-badge.family { color: #3b82f6; background: rgba(59, 130, 246, 0.15); }
+.membership-badge.explorer { color: #10b981; background: rgba(16, 185, 129, 0.15); }
+
+/* Tab Navigation */
+.tab-navigation {
+  display: flex;
+  gap: 0.75rem;
+  margin-bottom: 2rem;
+  flex-wrap: wrap;
+}
+
+.tab-button {
+  padding: 0.6rem 1.2rem;
+  border-radius: 2rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.tab-button.active {
+  background: var(--color-primary);
+  color: white;
+  font-weight: 600;
+}
+
+.tab-button:not(.active) {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--color-text-muted);
+}
+
+.tab-button:not(.active):hover {
+  background: rgba(121, 162, 128, 0.2);
+  color: var(--color-text-dark);
+}
+
+/* Profile Avatar */
+.profile-avatar {
+  width: 70px;
+  height: 70px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Info Cards */
+.info-card {
+  background: rgba(255, 255, 255, 0.05);
+  padding: 1rem;
+  border-radius: 0.75rem;
+}
+
+.info-card-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.25rem;
+}
+
+.info-card-label span {
+  font-size: 0.7rem;
+  color: var(--color-text-muted);
+}
+
+.info-card-value {
+  font-weight: 600;
+  margin: 0;
+  color: var(--color-text-dark, #3d4f3e);
+}
+
+/* Section Headers */
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.section-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+  font-size: 1.3rem;
+  font-weight: 600;
+  color: var(--color-text-dark, #3d4f3e);
+}
+
+/* Form Grid */
+.form-grid-2col {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem;
+}
+
+.form-grid-full {
+  grid-column: span 2;
+}
+
+/* Empty State */
+.empty-state {
+  padding: 3rem;
+  text-align: center;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 1rem;
+  color: var(--color-text-muted);
+}
+
+.empty-state-icon {
+  margin-bottom: 1rem;
+  opacity: 0.3;
+}
+
+/* Filter Bar */
+.filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+.filter-label {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+
+.filter-input {
+  padding: 0.4rem 0.75rem;
+  font-size: 0.8rem;
+  width: auto;
+}
+
+/* Item Card */
+.item-card {
+  padding: 1.25rem;
+  margin-bottom: 0.75rem;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 0.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.item-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.item-icon {
+  width: 45px;
+  height: 45px;
+  border-radius: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.item-icon.event { background: rgba(245, 158, 11, 0.2); }
+.item-icon.ticket { background: rgba(16, 185, 129, 0.2); }
+.item-icon.donation { background: rgba(239, 68, 68, 0.2); }
+.item-icon.purchase { background: rgba(139, 92, 246, 0.2); }
+
+.item-title {
+  margin: 0 0 0.25rem;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.item-badge {
+  font-size: 0.7rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: 1rem;
+  display: inline-block;
+}
+
+.item-badge.event {
+  background: rgba(245, 158, 11, 0.2);
+  color: #fbbf24;
+}
+
+.item-price {
+  font-weight: bold;
+  font-size: 1.1rem;
+  color: var(--color-primary);
+  margin: 0;
+}
+
+.item-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  margin-top: 0.5rem;
+}
+
+/* Totals Bar */
+.totals-bar {
+  background: rgba(255, 255, 255, 0.05);
+  padding: 1rem;
+  border-radius: 0.75rem;
+  text-align: right;
+  margin-top: 1rem;
+}
+
+/* Delete Account Section */
+.delete-account-section {
+  margin-top: 2rem;
+  padding: 1.25rem;
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  border-radius: 0.75rem;
+  background: rgba(239, 68, 68, 0.05);
+}
+
+.delete-account-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.delete-account-title {
+  margin: 0 0 0.25rem;
+  color: #f87171;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1rem;
+}
+
+.delete-account-text {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+
+.delete-button {
+  background: rgba(239, 68, 68, 0.2);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  color: #f87171;
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+}
+
+.delete-button:hover {
+  background: rgba(239, 68, 68, 0.4);
+}
+
+/* Modal */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.modal-content {
+  max-width: 450px;
+  width: 100%;
+  padding: 1.5rem;
+  text-align: center;
+}
+
+.modal-buttons {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  margin-top: 1.5rem;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .customer-dashboard {
+    padding: 1rem;
+  }
+  
+  .dashboard-header {
+    flex-direction: column;
+    text-align: center;
+  }
+  
+  .form-grid-2col {
+    grid-template-columns: 1fr;
+  }
+  
+  .form-grid-full {
+    grid-column: span 1;
+  }
+  
+  .item-card-header {
+    flex-direction: column;
+  }
+}

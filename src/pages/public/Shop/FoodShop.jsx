@@ -29,8 +29,10 @@ export default function FoodShop() {
           <button onClick={() => navigate('/shop')} className="back-button">
             Back
           </button>
-          <h1 className="shop-navbar-title">Food & Snacks</h1>
         </div>
+          <div style={{ textAlign: 'center', flex: 1, padding: '0 20px' }}>
+            <h2 className="page-title" style={{ margin: 0 }}>Food & Snacks</h2>
+          </div>
         <div className="home-navbar-links">
           <Link to="/tickets" className="home-navbar-link">Buy Tickets</Link>
           <Link to="/membership" className="home-navbar-link">Memberships</Link>
@@ -46,7 +48,6 @@ export default function FoodShop() {
       </nav>
 
       <div className="shop-content">
-        <p className="shop-subtitle">Order snacks, meals, and drinks to enjoy during your visit!</p>
         <div className="items-grid">
           {items.map(item => (
             <div key={item.item_id} className="item-card">

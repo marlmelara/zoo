@@ -4,6 +4,10 @@ export const getAllOperationalSupplies    = ()       => api.get('/supplies');
 export const getSuppliesByDepartment     = (deptId) =>
     api.get('/supplies').then(rows => rows.filter(r => r.department_id === deptId));
 
+export const createOperationalSupply = (body)     => api.post('/supplies', body);
+export const deleteOperationalSupply = (supplyId) => api.delete(`/supplies/${supplyId}`);
+export const deleteInventoryItem     = (itemId)   => api.delete(`/inventory/${itemId}`);
+
 export const createSupplyRequest = (body) => api.post('/supplies/requests', body);
 export const getAllSupplyRequests = ()     => api.get('/supplies/requests');
 export const getMySupplyRequests  = ()    => api.get('/supplies/requests');

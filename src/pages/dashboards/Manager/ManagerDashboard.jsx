@@ -11,11 +11,15 @@ import {
 import { getRecentActivity, getDepartmentActivity, logActivity } from '../../../api/activityLog';
 import { setHealthStatus } from '../../../api/animals';
 import AnimalMedicalPanel from '../../../components/AnimalMedicalPanel';
+import { StatusFilter } from '../../../components/AnimalsPanel';
 import {
     LayoutDashboard, Users, ClipboardList, Calendar, Package,
     CheckCircle, XCircle, Clock, AlertTriangle, Shield, Activity,
     Cat, UserPlus, Heart, ChevronDown, ChevronUp, Stethoscope
 } from 'lucide-react';
+
+const MGR_GREEN      = 'rgb(123, 144, 79)';
+const MGR_GREEN_DARK = 'rgb(102, 122, 66)';
 
 function HealthBadge({ status }) {
     const s = status || 'healthy';
@@ -485,24 +489,19 @@ export default function ManagerDashboard() {
             {/* ═══════════ SUPPLY REQUESTS TAB ═══════════ */}
             {activeTab === 'Supply Requests' && (
                 <div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '14px' }}>
                         <h2 style={{ margin: 0 }}>Supply Requests</h2>
-                        <div style={{ display: 'flex', gap: '8px' }}>
-                            {['pending', 'approved', 'denied', 'all'].map(f => (
-                                <button
-                                    key={f}
-                                    className="glass-button"
-                                    onClick={() => setRequestFilter(f)}
-                                    style={{
-                                        padding: '6px 14px', fontSize: '12px',
-                                        background: requestFilter === f ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.03)',
-                                        textTransform: 'capitalize'
-                                    }}
-                                >
-                                    {f}
-                                </button>
-                            ))}
-                        </div>
+                        <StatusFilter
+                            label="Status"
+                            tabs={[
+                                { key: 'pending',  label: 'Pending'  },
+                                { key: 'approved', label: 'Approved' },
+                                { key: 'denied',   label: 'Denied'   },
+                                { key: 'all',      label: 'All'      },
+                            ]}
+                            value={requestFilter}
+                            onChange={setRequestFilter}
+                        />
                     </div>
 
                     {requestsLoading ? <p>Loading requests...</p> : filteredRequests.length === 0 ? (

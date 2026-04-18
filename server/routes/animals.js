@@ -7,8 +7,12 @@ const router = Router();
 // GET /api/animals — public (active only; admin can include inactive)
 router.get('/', async (req, res) => {
     try {
-        const { include_inactive } = req.query;
-        const where = include_inactive === '1' ? '' : ' WHERE a.is_active = 1';
+        const { include_inactive, status } = req.query;
+        let where = '';
+        if (status === 'active')        where = ' WHERE a.is_active = 1';
+        else if (status === 'departed' || status === 'inactive') where = ' WHERE a.is_active = 0';
+        else if (status === 'all')      where = '';
+        else where = include_inactive === '1' ? '' : ' WHERE a.is_active = 1';
         const [rows] = await db.query(
             `SELECT a.*, z.zone_name, z.location_description
              FROM animals a
@@ -39,20 +43,34 @@ router.get('/deactivated', requireRole('admin'), async (req, res) => {
     }
 });
 
-// POST /api/animals/:id/reactivate — admin: restore a soft-deleted animal
+// POST /api/animals/:id/reactivate — admin: restore a soft-deleted animal.
+// Clears departed_date so the animal reads as currently present.
 router.post('/:id/reactivate', requireRole('admin'), async (req, res) => {
     try {
-        await db.query('UPDATE animals SET is_active = 1 WHERE animal_id = ?', [req.params.id]);
+        await db.query(
+            `UPDATE animals
+                SET is_active = 1, departed_date = NULL,
+                    arrived_date = COALESCE(arrived_date, CURDATE())
+              WHERE animal_id = ?`,
+            [req.params.id]
+        );
         return res.json({ success: true });
     } catch (err) {
         return res.status(500).json({ error: err.message });
     }
 });
 
-// DELETE /api/animals/:id — soft-delete (deactivate)
+// DELETE /api/animals/:id — soft-delete. Stamps departed_date so the
+// Departed view can show *when* the animal left.
 router.delete('/:id', requireRole('admin','manager'), async (req, res) => {
     try {
-        await db.query('UPDATE animals SET is_active = 0 WHERE animal_id = ?', [req.params.id]);
+        await db.query(
+            `UPDATE animals
+                SET is_active = 0,
+                    departed_date = COALESCE(departed_date, CURDATE())
+              WHERE animal_id = ?`,
+            [req.params.id]
+        );
         return res.json({ success: true });
     } catch (err) {
         return res.status(500).json({ error: err.message });
@@ -249,16 +267,18 @@ router.post('/:id/care-log', requireRole('admin','manager','vet','caretaker'), a
 
 // POST /api/animals
 router.post('/', requireRole('admin', 'manager', 'vet', 'caretaker'), async (req, res) => {
-    const { name, species_common_name, species_binomial, age, zone_id } = req.body;
+    const { name, species_common_name, species_binomial, age, zone_id, arrived_date } = req.body;
     const conn = await db.getConnection();
     try {
         await conn.beginTransaction();
         const [hrResult] = await conn.query('INSERT INTO health_records (vet_id) VALUES (NULL)');
         const [result] = await conn.query(
-            `INSERT INTO animals (name, species_common_name, species_binomial, age, zone_id, health_record_id)
-             VALUES (?, ?, ?, ?, ?, ?)`,
+            `INSERT INTO animals
+             (name, species_common_name, species_binomial, age, zone_id, health_record_id, arrived_date)
+             VALUES (?, ?, ?, ?, ?, ?, ?)`,
             [name, species_common_name, species_binomial || null,
-             age || null, zone_id || null, hrResult.insertId]
+             age || null, zone_id || null, hrResult.insertId,
+             arrived_date || new Date().toISOString().slice(0, 10)]
         );
         await conn.commit();
         return res.status(201).json({ animal_id: result.insertId });
@@ -340,7 +360,8 @@ router.post('/:id/medical-history', requireRole('admin', 'manager', 'vet'), asyn
 
 // PATCH /api/animals/:id
 router.patch('/:id', requireRole('admin', 'manager', 'vet', 'caretaker'), async (req, res) => {
-    const fields = ['name', 'species_common_name', 'species_binomial', 'age', 'zone_id'];
+    const fields = ['name', 'species_common_name', 'species_binomial', 'age', 'zone_id',
+                    'arrived_date', 'departed_date'];
     const updates = []; const vals = [];
     for (const f of fields) {
         if (req.body[f] !== undefined) { updates.push(`${f} = ?`); vals.push(req.body[f]); }

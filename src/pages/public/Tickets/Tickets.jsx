@@ -140,6 +140,7 @@ export default function Tickets() {
     cartHook.addEvent({
       event_id: event.event_id,
       title: event.title || event.event_name,
+      description: event.description || null,
       date: new Date(event.event_date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }),
       venue: event.venue_name || null,
       time: event.start_time ? `${formatTime(event.start_time)}${event.end_time ? ` – ${formatTime(event.end_time)}` : ''}` : null,

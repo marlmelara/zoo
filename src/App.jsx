@@ -104,17 +104,21 @@ function App() {
               <Route element={<RoleRoute allowed={['admin']} />}>
                 <Route path="/dashboard/admin" element={<AdminDashboard />} />
                 <Route path="/dashboard/staff" element={<Staff />} />
-                <Route path="/dashboard/animals" element={<Animals />} />
               </Route>
 
               {/* Admin + Manager routes */}
               <Route element={<RoleRoute allowed={['admin', 'manager']} />}>
                 <Route path="/dashboard/manager" element={<ManagerDashboard />} />
+                <Route path="/dashboard/animals" element={<Animals />} />
               </Route>
 
-              {/* Admin-only: Inventory & Events pages */}
-              <Route element={<RoleRoute allowed={['admin']} />}>
+              {/* Admin + Manager: Inventory */}
+              <Route element={<RoleRoute allowed={['admin','manager']} />}>
                 <Route path="/dashboard/inventory" element={<Inventory />} />
+              </Route>
+
+              {/* Admin-only: Events */}
+              <Route element={<RoleRoute allowed={['admin']} />}>
                 <Route path="/dashboard/events" element={<Events />} />
               </Route>
 

@@ -1,317 +1,642 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import api from '../../../../lib/api';
-import { ShoppingBag, Coffee, AlertTriangle, Package, ShoppingCart, Plus, Minus, Trash2 } from 'lucide-react';
+import { useAuth } from '../../../../contexts/AuthContext';
+import {
+    ShoppingBag, AlertTriangle, Package, Plus, Trash2, Briefcase,
+    Stethoscope, PawPrint, Shield, Activity, ClipboardList,
+} from 'lucide-react';
+import { StatusFilter, DateRangeFilter } from '../../../../components/AnimalsPanel';
+import {
+    createOperationalSupply, deleteOperationalSupply, deleteInventoryItem,
+} from '../../../../api/supplies';
+import { getRecentActivity } from '../../../../api/activityLog';
+
+const GREEN      = 'rgb(123, 144, 79)';
+const GREEN_DARK = 'rgb(102, 122, 66)';
+
+// Inventory activity log only cares about these action_types.
+const INV_ACTIONS = new Set([
+    'supply_request_created', 'supply_request_approved', 'supply_request_denied',
+    'supply_restocked', 'inventory_updated',
+]);
+
+const DEPT_ICON = {
+    'Retail & Operations': <ShoppingBag size={14} />,
+    'Animal Care':         <PawPrint  size={14} />,
+    'Veterinary Services': <Stethoscope size={14} />,
+    'Administration':      <Briefcase  size={14} />,
+    'Security':            <Shield    size={14} />,
+};
 
 export default function Inventory() {
-    const [outlets, setOutlets] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [cart, setCart] = useState([]);
-    const [isCheckout, setIsCheckout] = useState(false);
+    const { role } = useAuth();
+    const canManage = role === 'admin' || role === 'manager';
 
-    // Add Item State
+    const [mainTab, setMainTab] = useState('items');       // items | activity
+    const [deptFilter, setDeptFilter] = useState('all');   // 'all' | 'retail' | dept_id (number as string)
+
+    // Items + shops + operational supplies
+    const [outlets, setOutlets] = useState([]);            // retail shops + their items
+    const [opsSupplies, setOpsSupplies] = useState([]);
+    const [departments, setDepartments] = useState([]);
+    const [loading, setLoading] = useState(true);
+
+    // Add-item form state
     const [showAddForm, setShowAddForm] = useState(false);
     const [newItem, setNewItem] = useState({
-        outlet_id: '', item_name: '', stock_count: '', restock_threshold: 10, price_cents: '', description: ''
+        kind: 'retail',    // 'retail' | 'operational'
+        outlet_id: '',
+        department_id: '',
+        item_name: '',
+        stock_count: '',
+        restock_threshold: 10,
+        price_cents: '',
+        description: '',
+        category: '',
     });
 
-    useEffect(() => {
-        fetchInventory();
-    }, []);
+    // Manage mode
+    const [manageMode, setManageMode] = useState(false);
+    const [selected, setSelected] = useState(() => new Set());
 
-    async function fetchInventory() {
+    // Activity log + date-range filter for the log tab
+    const [activity, setActivity] = useState([]);
+    const [activityLoading, setActivityLoading] = useState(false);
+    const [logFrom, setLogFrom] = useState('');
+    const [logTo, setLogTo]     = useState('');
+    const [searchTerm, setSearchTerm] = useState('');
+
+    useEffect(() => { fetchAll(); }, []);
+    useEffect(() => { if (mainTab === 'activity') loadActivity(); }, [mainTab]);
+
+    async function fetchAll() {
+        setLoading(true);
         try {
-            const data = await api.get('/inventory/with-shops');
-            setOutlets(data || []);
-        } catch (error) {
-            console.error('Error fetching inventory:', error);
+            const [shopData, opsData, depts] = await Promise.all([
+                api.get('/inventory/with-shops'),
+                api.get('/supplies'),
+                api.get('/employees/departments/all'),
+            ]);
+            setOutlets(shopData || []);
+            setOpsSupplies(opsData || []);
+            setDepartments(depts || []);
+        } catch (err) {
+            console.error('Error fetching inventory:', err);
         } finally {
             setLoading(false);
         }
     }
 
-    const [searchTerm, setSearchTerm] = useState('');
-
-    const filteredOutlets = outlets.filter(outlet => {
-        const matchesOutlet = outlet.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            outlet.type.toLowerCase().includes(searchTerm.toLowerCase());
-
-        const matchesItems = outlet.inventory?.some(item =>
-            item.item_name.toLowerCase().includes(searchTerm.toLowerCase())
-        );
-
-        return matchesOutlet || matchesItems;
-    });
-
-    const addToCart = (item) => {
-        setCart(prev => {
-            const existing = prev.find(i => i.item_id === item.item_id);
-            if (existing) {
-                return prev.map(i => i.item_id === item.item_id ? { ...i, quantity: i.quantity + 1 } : i);
-            }
-            return [...prev, { ...item, quantity: 1 }];
-        });
-    };
-
-    const removeFromCart = (itemId) => {
-        setCart(prev => prev.filter(i => i.item_id !== itemId));
-    };
-
-    const updateQuantity = (itemId, delta) => {
-        setCart(prev => prev.map(i => {
-            if (i.item_id === itemId) {
-                const newQty = i.quantity + delta;
-                return newQty > 0 ? { ...i, quantity: newQty } : i;
-            }
-            return i;
-        }));
-    };
-
-    const cartTotal = cart.reduce((sum, item) => sum + (item.price_cents || 0) * item.quantity, 0);
-
-    const handleCheckout = async () => {
-        if (cart.length === 0) return;
-        setIsCheckout(true);
+    async function loadActivity() {
+        setActivityLoading(true);
         try {
-            const sale_items = cart.map(item => ({
-                item_id: item.item_id,
-                quantity: item.quantity,
-                price_at_sale_cents: item.price_cents || 0,
-            }));
-
-            await api.post('/transactions', {
-                total_amount_cents: cartTotal,
-                sale_items,
-            });
-
-            setCart([]);
-            alert('Checkout successful!');
-            fetchInventory();
-        } catch (error) {
-            console.error('Checkout error:', error);
-            alert('Checkout failed. ' + error.message);
+            const data = await getRecentActivity(200);
+            setActivity(data || []);
+        } catch (err) {
+            console.error('Error loading activity log:', err);
         } finally {
-            setIsCheckout(false);
+            setActivityLoading(false);
         }
-    };
+    }
 
-    const handleAddItem = async (e) => {
+    // ── Derive a single flat "items" list across retail shops + operational supplies.
+    //   source-tagged so the UI can badge and the manage action knows which endpoint to hit.
+    const allItems = useMemo(() => {
+        const retail = outlets.flatMap(outlet =>
+            (outlet.inventory || []).map(i => ({
+                key: `r-${i.item_id}`,
+                source: 'retail',
+                id:    i.item_id,
+                name:  i.item_name,
+                description: i.description || null,
+                stock: i.stock_count,
+                threshold: i.restock_threshold,
+                price_cents: i.price_cents,
+                shop_name: outlet.name,
+                dept_bucket: 'retail',
+                dept_name: 'Retail & Operations',
+                is_low_stock: i.stock_count <= i.restock_threshold,
+            }))
+        );
+        const ops = opsSupplies.map(s => ({
+            key: `o-${s.supply_id}`,
+            source: 'operational',
+            id:    s.supply_id,
+            name:  s.item_name,
+            description: s.description || null,
+            stock: s.stock_count,
+            threshold: s.restock_threshold,
+            price_cents: null,
+            shop_name: null,
+            dept_bucket: String(s.department_id),
+            dept_name: s.dept_name || 'Operational',
+            is_low_stock: !!s.is_low_stock,
+        }));
+        return [...retail, ...ops];
+    }, [outlets, opsSupplies]);
+
+    const filteredItems = useMemo(() => {
+        const term = searchTerm.toLowerCase();
+        const out = allItems.filter(item => {
+            const inDept = deptFilter === 'all' || item.dept_bucket === deptFilter;
+            if (!inDept) return false;
+            if (!term) return true;
+            return item.name.toLowerCase().includes(term) ||
+                   item.dept_name.toLowerCase().includes(term);
+        });
+        // Low-stock first, then by how close to empty, then alphabetical.
+        out.sort((a, b) => {
+            if (a.is_low_stock !== b.is_low_stock) return a.is_low_stock ? -1 : 1;
+            if (a.is_low_stock && b.is_low_stock) return a.stock - b.stock;
+            return a.name.localeCompare(b.name);
+        });
+        return out;
+    }, [allItems, deptFilter, searchTerm]);
+
+    // Dept tabs for filter pills — Retail bucket + each real department except
+    // Administration (no inventory surface — admins don't hold stock).
+    const deptTabs = useMemo(() => ([
+        { key: 'all',    label: 'All' },
+        { key: 'retail', label: 'Retail' },
+        ...departments
+            .filter(d => d.dept_name !== 'Administration')
+            .map(d => ({ key: String(d.dept_id), label: d.dept_name })),
+    ]), [departments]);
+
+    // Activity log derived view — only inventory actions, filtered by dept + date range.
+    const filteredActivity = useMemo(() => {
+        const fromTs = logFrom ? new Date(logFrom + 'T00:00:00').getTime() : null;
+        const toTs   = logTo   ? new Date(logTo   + 'T23:59:59').getTime() : null;
+        return (activity || []).filter(a => {
+            if (!INV_ACTIONS.has(a.action_type)) return false;
+            const ts = new Date(a.created_at).getTime();
+            if (fromTs && ts < fromTs) return false;
+            if (toTs   && ts > toTs)   return false;
+            if (deptFilter === 'all') return true;
+            if (deptFilter === 'retail') {
+                return a.performer?.dept_name === 'Retail & Operations'
+                    || a.target_type === 'inventory';
+            }
+            return String(a.performer?.dept_id || '') === deptFilter;
+        });
+    }, [activity, deptFilter, logFrom, logTo]);
+
+    // ── Add / Delete handlers ──
+    async function handleAddItem(e) {
         e.preventDefault();
         try {
-            await api.post('/inventory', {
-                ...newItem,
-                stock_count: parseInt(newItem.stock_count),
-                restock_threshold: parseInt(newItem.restock_threshold),
-                price_cents: Math.round(parseFloat(newItem.price_cents) * 100),
-                outlet_id: parseInt(newItem.outlet_id)
-            });
-
+            if (newItem.kind === 'retail') {
+                await api.post('/inventory', {
+                    outlet_id: parseInt(newItem.outlet_id) || null,
+                    item_name: newItem.item_name,
+                    stock_count: parseInt(newItem.stock_count) || 0,
+                    restock_threshold: parseInt(newItem.restock_threshold) || 10,
+                    price_cents: Math.round(parseFloat(newItem.price_cents) * 100) || 0,
+                    category: newItem.category || null,
+                });
+            } else {
+                await createOperationalSupply({
+                    department_id: parseInt(newItem.department_id),
+                    item_name: newItem.item_name,
+                    stock_count: parseInt(newItem.stock_count) || 0,
+                    restock_threshold: parseInt(newItem.restock_threshold) || 10,
+                    category: newItem.category || null,
+                    description: newItem.description || null,
+                });
+            }
             setShowAddForm(false);
-            setNewItem({ outlet_id: '', item_name: '', stock_count: '', restock_threshold: 10, price_cents: '', description: '' });
-            fetchInventory();
-        } catch (error) {
-            console.error('Error adding item:', error);
-            alert('Failed to add item: ' + error.message);
+            setNewItem({ kind: newItem.kind, outlet_id: '', department_id: '',
+                         item_name: '', stock_count: '', restock_threshold: 10,
+                         price_cents: '', description: '', category: '' });
+            fetchAll();
+        } catch (err) {
+            alert('Failed to add item: ' + err.message);
         }
-    };
+    }
 
-    const handleRestock = async (item) => {
-        const amountStr = prompt(`Restock ${item.item_name}. Enter quantity to add:`, '10');
-        if (!amountStr) return;
-        const amount = parseInt(amountStr);
-        if (isNaN(amount) || amount <= 0) return;
-
+    async function handleRestock(item) {
+        const amt = window.prompt(`Restock ${item.name}. Enter quantity to add:`, '10');
+        if (!amt) return;
+        const qty = parseInt(amt);
+        if (!(qty > 0)) return;
         try {
-            await api.patch(`/inventory/${item.item_id}/restock`, { quantity: amount });
-            fetchInventory();
-        } catch (error) {
-            console.error('Error restocking:', error);
-            alert('Failed to restock: ' + error.message);
+            if (item.source === 'retail') {
+                await api.patch(`/inventory/${item.id}/restock`, { quantity: qty });
+            } else {
+                // operational supplies don't have a restock endpoint; fall back
+                // to approving a zero-round-trip manager restock via PATCH.
+                await api.patch(`/supplies/${item.id}`, { stock_count_delta: qty });
+            }
+            fetchAll();
+        } catch (err) {
+            alert('Restock failed: ' + err.message);
         }
-    };
+    }
+
+    function toggleSelect(key) {
+        setSelected(prev => {
+            const next = new Set(prev);
+            if (next.has(key)) next.delete(key); else next.add(key);
+            return next;
+        });
+    }
+    function exitManageMode() { setManageMode(false); setSelected(new Set()); }
+    function selectAllVisible() { setSelected(new Set(filteredItems.map(i => i.key))); }
+
+    async function handleDeleteSelected() {
+        if (selected.size === 0) return;
+        if (!window.confirm(`Permanently delete ${selected.size} item${selected.size === 1 ? '' : 's'}?`)) return;
+        const items = filteredItems.filter(i => selected.has(i.key));
+        const results = await Promise.allSettled(items.map(i =>
+            i.source === 'retail' ? deleteInventoryItem(i.id) : deleteOperationalSupply(i.id)
+        ));
+        const failed = results.filter(r => r.status === 'rejected').length;
+        if (failed) alert(`${failed} deletion${failed === 1 ? '' : 's'} failed.`);
+        exitManageMode();
+        fetchAll();
+    }
+
+    // ── Derived department options for add form ──
+    const selectedDept = departments.find(d => String(d.dept_id) === newItem.department_id);
 
     return (
-        <div style={{ display: 'flex', gap: '20px', alignItems: 'start' }}>
-            <div style={{ flex: 1 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '20px', marginBottom: '30px', flexWrap: 'wrap' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '20px', flex: 1 }}>
-                        <h1 style={{ margin: 0 }}>Inventory Management</h1>
+        <div>
+            {/* ══ Header ══ */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '20px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '20px', flex: 1 }}>
+                    <h1 style={{ margin: 0 }}>Inventory Management</h1>
+                    {mainTab === 'items' && (
                         <input
                             type="text"
-                            placeholder="Search outlets or items..."
+                            placeholder="Search items..."
                             className="glass-input"
                             style={{ maxWidth: '300px' }}
                             value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
+                            onChange={e => setSearchTerm(e.target.value)}
                         />
-                    </div>
-                    <button
-                        className="glass-button"
-                        onClick={() => setShowAddForm(!showAddForm)}
-                        style={{ background: showAddForm ? 'var(--color-accent)' : 'rgba(255,255,255,0.1)' }}
-                    >
-                        {showAddForm ? 'Cancel' : '+ Add Item'}
-                    </button>
+                    )}
                 </div>
+                {mainTab === 'items' && canManage && (
+                    <div style={{ display: 'flex', gap: '10px' }}>
+                        <button
+                            className="glass-button"
+                            onClick={() => setShowAddForm(v => !v)}
+                            style={{ background: showAddForm ? 'var(--color-accent)' : 'rgba(255,255,255,0.1)' }}
+                        >
+                            {showAddForm ? 'Cancel' : '+ Add Item'}
+                        </button>
+                        {manageMode ? (
+                            <button className="glass-button" onClick={exitManageMode}
+                                style={{ background: 'rgba(239,68,68,0.18)', color: '#b91c1c', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 600 }}>
+                                × Exit Removal
+                            </button>
+                        ) : (
+                            <button className="glass-button" onClick={() => setManageMode(true)}
+                                style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <Trash2 size={14} /> Manage Items
+                            </button>
+                        )}
+                    </div>
+                )}
+            </div>
 
-                {showAddForm && (
-                    <div className="glass-panel" style={{ padding: '20px', marginBottom: '30px', border: '1px solid var(--color-secondary)' }}>
-                        <h3>New Inventory Item</h3>
-                        <form onSubmit={handleAddItem} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+            {/* ══ Main tabs: Items / Activity Log ══ */}
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '18px', flexWrap: 'wrap' }}>
+                {[
+                    { key: 'items',    label: 'Inventory Items', icon: <Package size={14} /> },
+                    { key: 'activity', label: 'Activity Log',    icon: <ClipboardList size={14} /> },
+                ].map(t => {
+                    const active = mainTab === t.key;
+                    return (
+                        <button key={t.key} onClick={() => setMainTab(t.key)}
+                            className="glass-button"
+                            style={{
+                                background: active ? GREEN : 'rgba(255,255,255,0.55)',
+                                color:      active ? 'white' : GREEN_DARK,
+                                padding:    '10px 18px',
+                                fontSize:   '14px',
+                                fontWeight: active ? 700 : 500,
+                                display: 'flex', alignItems: 'center', gap: '8px',
+                                border: active ? 'none' : '1px solid rgba(121,162,128,0.25)',
+                            }}>
+                            {t.icon} {t.label}
+                        </button>
+                    );
+                })}
+            </div>
+
+            {/* ══ Department filter pills (both tabs share this) ══ */}
+            <div style={{ marginBottom: '20px' }}>
+                <StatusFilter
+                    label="Dept"
+                    tabs={deptTabs}
+                    value={deptFilter}
+                    onChange={setDeptFilter}
+                />
+            </div>
+
+            {/* ═══ Add form ═══ */}
+            {mainTab === 'items' && showAddForm && (
+                <div className="glass-panel" style={{ padding: '20px', marginBottom: '24px', border: `1px solid ${GREEN}` }}>
+                    <h3 style={{ marginTop: 0, color: GREEN_DARK }}>New Inventory Item</h3>
+                    <form onSubmit={handleAddItem} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                        <div style={{ gridColumn: '1 / -1', display: 'flex', gap: '10px' }}>
+                            {[{ k: 'retail', l: 'Retail / Shop Item' }, { k: 'operational', l: 'Operational Supply' }].map(o => (
+                                <button key={o.k} type="button"
+                                    onClick={() => setNewItem({ ...newItem, kind: o.k })}
+                                    style={{
+                                        padding: '8px 16px', fontSize: '13px', fontWeight: 600,
+                                        background: newItem.kind === o.k ? GREEN : 'rgba(255,255,255,0.55)',
+                                        color:      newItem.kind === o.k ? 'white' : GREEN_DARK,
+                                        border: newItem.kind === o.k ? 'none' : '1px solid rgba(121,162,128,0.25)',
+                                        borderRadius: '8px', cursor: 'pointer', flex: 1,
+                                    }}>{o.l}</button>
+                            ))}
+                        </div>
+                        {newItem.kind === 'retail' ? (
                             <div style={{ gridColumn: '1 / -1' }}>
-                                <label style={{ display: 'block', marginBottom: '5px' }}>Outlet</label>
-                                <select required className="glass-input" value={newItem.outlet_id} onChange={e => setNewItem({ ...newItem, outlet_id: e.target.value })}>
-                                    <option value="">Select Outlet...</option>
+                                <label style={labelStyle}>Outlet / Shop</label>
+                                <select required className="glass-input" value={newItem.outlet_id}
+                                    onChange={e => setNewItem({ ...newItem, outlet_id: e.target.value })}>
+                                    <option value="">Select shop...</option>
                                     {outlets.map(o => <option key={o.outlet_id} value={o.outlet_id}>{o.name} ({o.type})</option>)}
                                 </select>
                             </div>
-                            <div>
-                                <label style={{ display: 'block', marginBottom: '5px' }}>Item Name</label>
-                                <input required className="glass-input" value={newItem.item_name} onChange={e => setNewItem({ ...newItem, item_name: e.target.value })} />
-                            </div>
-                            <div>
-                                <label style={{ display: 'block', marginBottom: '5px' }}>Price ($)</label>
-                                <input required type="number" step="0.01" className="glass-input" value={newItem.price_cents} onChange={e => setNewItem({ ...newItem, price_cents: e.target.value })} />
-                            </div>
-                            <div>
-                                <label style={{ display: 'block', marginBottom: '5px' }}>Initial Stock</label>
-                                <input required type="number" className="glass-input" value={newItem.stock_count} onChange={e => setNewItem({ ...newItem, stock_count: e.target.value })} />
-                            </div>
-                            <div>
-                                <label style={{ display: 'block', marginBottom: '5px' }}>Low Stock Threshold</label>
-                                <input required type="number" className="glass-input" value={newItem.restock_threshold} onChange={e => setNewItem({ ...newItem, restock_threshold: e.target.value })} />
-                            </div>
+                        ) : (
                             <div style={{ gridColumn: '1 / -1' }}>
-                                <label style={{ display: 'block', marginBottom: '5px' }}>Description</label>
-                                <input className="glass-input" value={newItem.description} onChange={e => setNewItem({ ...newItem, description: e.target.value })} />
+                                <label style={labelStyle}>Department</label>
+                                <select required className="glass-input" value={newItem.department_id}
+                                    onChange={e => setNewItem({ ...newItem, department_id: e.target.value })}>
+                                    <option value="">Select department...</option>
+                                    {departments.map(d => <option key={d.dept_id} value={d.dept_id}>{d.dept_name}</option>)}
+                                </select>
                             </div>
-                            <div style={{ gridColumn: '1 / -1', marginTop: '10px' }}>
-                                <button type="submit" className="glass-button" style={{ background: 'var(--color-secondary)', width: '100%' }}>Save Item</button>
+                        )}
+                        <div>
+                            <label style={labelStyle}>Item Name</label>
+                            <input required className="glass-input" value={newItem.item_name}
+                                onChange={e => setNewItem({ ...newItem, item_name: e.target.value })} />
+                        </div>
+                        <div>
+                            <label style={labelStyle}>Category</label>
+                            <input className="glass-input" value={newItem.category}
+                                onChange={e => setNewItem({ ...newItem, category: e.target.value })}
+                                placeholder={newItem.kind === 'retail' ? 'Gift / Food / Misc' : 'e.g. Food, Cleaning'} />
+                        </div>
+                        {newItem.kind === 'retail' && (
+                            <div>
+                                <label style={labelStyle}>Price ($)</label>
+                                <input required type="number" step="0.01" className="glass-input"
+                                    value={newItem.price_cents}
+                                    onChange={e => setNewItem({ ...newItem, price_cents: e.target.value })} />
                             </div>
-                        </form>
-                    </div>
-                )}
-
-                {loading ? (
-                    <p>Loading inventory...</p>
-                ) : (
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '20px' }}>
-                        {filteredOutlets.map(outlet => (
-                            <div key={outlet.outlet_id} className="glass-panel" style={{ padding: '20px' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px', borderBottom: '1px solid var(--glass-border)', paddingBottom: '15px' }}>
-                                    {outlet.type === 'Food' ? <Coffee color="var(--color-primary)" /> : <ShoppingBag color="var(--color-secondary)" />}
-                                    <h2 style={{ margin: 0, fontSize: '20px' }}>{outlet.name}</h2>
-                                    <span style={{
-                                        marginLeft: 'auto',
-                                        fontSize: '12px',
-                                        padding: '4px 8px',
-                                        borderRadius: '12px',
-                                        background: 'rgba(255,255,255,0.1)'
-                                    }}>
-                                        {outlet.type}
-                                    </span>
-                                </div>
-
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-                                    {outlet.inventory?.map(item => (
-                                        <div key={item.item_id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(0,0,0,0.2)', padding: '10px', borderRadius: '8px' }}>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                                <Package size={16} color="var(--color-text-muted)" />
-                                                <div>
-                                                    <span style={{ display: 'block', fontWeight: 'bold' }}>{item.item_name}</span>
-                                                    {item.description && <span style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>{item.description}</span>}
-                                                </div>
-                                            </div>
-
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-                                                <div style={{ textAlign: 'right' }}>
-                                                    <span style={{ fontWeight: 'bold', fontSize: '18px', display: 'block' }}>{item.stock_count}</span>
-                                                    <span style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>Stock</span>
-                                                </div>
-                                                <div style={{ textAlign: 'right' }}>
-                                                    <span style={{ fontWeight: 'bold', fontSize: '18px', display: 'block' }}>${((item.price_cents || 0) / 100).toFixed(2)}</span>
-                                                    <span style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>Price</span>
-                                                </div>
-
-                                                <button
-                                                    onClick={() => handleRestock(item)}
-                                                    className="glass-button"
-                                                    style={{ padding: '5px 10px', fontSize: '12px', background: 'rgba(255,255,255,0.05)' }}
-                                                    title="Quick Restock"
-                                                >
-                                                    + Stock
-                                                </button>
-
-                                                {item.stock_count <= item.restock_threshold && (
-                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px', color: 'var(--color-accent)', background: 'rgba(244, 63, 94, 0.1)', padding: '5px 8px', borderRadius: '6px' }}>
-                                                        <AlertTriangle size={14} />
-                                                        <span style={{ fontSize: '12px', fontWeight: 'bold' }}>Low</span>
-                                                    </div>
-                                                )}
-
-                                                <button
-                                                    className="glass-button"
-                                                    style={{ padding: '5px', borderRadius: '50%' }}
-                                                    onClick={() => addToCart(item)}
-                                                    disabled={item.stock_count === 0}
-                                                >
-                                                    <Plus size={16} />
-                                                </button>
-                                            </div>
-                                        </div>
-                                    ))}
-                                    {outlet.inventory?.length === 0 && <p style={{ color: 'var(--color-text-muted)', textAlign: 'center' }}>No items in stock.</p>}
-                                </div>
+                        )}
+                        <div>
+                            <label style={labelStyle}>Initial Stock</label>
+                            <input required type="number" min="0" className="glass-input"
+                                value={newItem.stock_count}
+                                onChange={e => setNewItem({ ...newItem, stock_count: e.target.value })} />
+                        </div>
+                        <div>
+                            <label style={labelStyle}>Low-stock Threshold</label>
+                            <input required type="number" min="0" className="glass-input"
+                                value={newItem.restock_threshold}
+                                onChange={e => setNewItem({ ...newItem, restock_threshold: e.target.value })} />
+                        </div>
+                        {newItem.kind === 'operational' && (
+                            <div style={{ gridColumn: '1 / -1' }}>
+                                <label style={labelStyle}>Description</label>
+                                <input className="glass-input" value={newItem.description}
+                                    onChange={e => setNewItem({ ...newItem, description: e.target.value })} />
                             </div>
-                        ))}
-                    </div>
-                )}
-            </div>
-
-            {/* Cart Sidebar */}
-            <div className="glass-panel" style={{ width: '300px', padding: '20px', position: 'sticky', top: '20px', height: 'calc(100vh - 40px)', display: 'flex', flexDirection: 'column' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px', borderBottom: '1px solid var(--glass-border)', paddingBottom: '15px' }}>
-                    <ShoppingCart color="var(--color-accent)" />
-                    <h2 style={{ margin: 0 }}>POS Cart</h2>
+                        )}
+                        <div style={{ gridColumn: '1 / -1', marginTop: '6px' }}>
+                            <button type="submit" className="glass-button" style={{ background: GREEN, color: 'white', width: '100%', fontWeight: 600 }}>
+                                Save Item
+                            </button>
+                        </div>
+                    </form>
                 </div>
+            )}
 
-                <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                    {cart.length === 0 ? (
-                        <p style={{ color: 'var(--color-text-muted)', textAlign: 'center', marginTop: '20px' }}>Cart is empty.</p>
-                    ) : (
-                        cart.map(item => (
-                            <div key={item.item_id} style={{ background: 'rgba(255,255,255,0.05)', padding: '10px', borderRadius: '8px' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}>
-                                    <span style={{ fontWeight: 'bold' }}>{item.item_name}</span>
-                                    <button onClick={() => removeFromCart(item.item_id)} style={{ background: 'none', border: 'none', color: 'var(--color-accent)', cursor: 'pointer', padding: 0 }}><Trash2 size={14} /></button>
-                                </div>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'rgba(0,0,0,0.2)', borderRadius: '15px', padding: '2px 8px' }}>
-                                        <button onClick={() => updateQuantity(item.item_id, -1)} style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer', display: 'flex' }}><Minus size={12} /></button>
-                                        <span style={{ fontSize: '14px' }}>{item.quantity}</span>
-                                        <button onClick={() => updateQuantity(item.item_id, 1)} style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer', display: 'flex' }}><Plus size={12} /></button>
-                                    </div>
-                                    <span>${((item.price_cents || 0) * item.quantity / 100).toFixed(2)}</span>
-                                </div>
-                            </div>
-                        ))
-                    )}
-                </div>
+            {/* ══ ITEMS TAB ══ */}
+            {mainTab === 'items' && (
+                <ItemsList
+                    loading={loading}
+                    items={filteredItems}
+                    manageMode={manageMode}
+                    selected={selected}
+                    toggleSelect={toggleSelect}
+                    onRestock={handleRestock}
+                />
+            )}
 
-                <div style={{ borderTop: '1px solid var(--glass-border)', paddingTop: '20px', marginTop: 'auto' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '15px', fontSize: '18px', fontWeight: 'bold' }}>
-                        <span>Total:</span>
-                        <span>${(cartTotal / 100).toFixed(2)}</span>
-                    </div>
-                    <button
-                        className="glass-button"
-                        style={{ width: '100%', background: 'var(--color-accent)' }}
-                        onClick={handleCheckout}
-                        disabled={cart.length === 0 || isCheckout}
-                    >
-                        {isCheckout ? 'Processing...' : 'Checkout'}
-                    </button>
-                </div>
-            </div>
+            {/* ══ ACTIVITY LOG TAB ══ */}
+            {mainTab === 'activity' && (
+                <>
+                    <DateRangeFilter
+                        from={logFrom} to={logTo}
+                        onFrom={setLogFrom} onTo={setLogTo}
+                    />
+                    <ActivityLog
+                        loading={activityLoading}
+                        items={filteredActivity}
+                    />
+                </>
+            )}
+
+            {/* ══ Bulk action bar (items tab only) ══ */}
+            {mainTab === 'items' && manageMode && (
+                <BulkBar
+                    count={selected.size}
+                    onSelectAll={selectAllVisible}
+                    onDelete={handleDeleteSelected}
+                    onCancel={exitManageMode}
+                />
+            )}
         </div>
     );
 }
+
+// ═══════════════════════════════════════════════════════════════
+// Sub-components
+// ═══════════════════════════════════════════════════════════════
+
+function ItemsList({ loading, items, manageMode, selected, toggleSelect, onRestock }) {
+    if (loading) return <p style={{ color: GREEN_DARK }}>Loading inventory...</p>;
+    if (items.length === 0) return (
+        <div className="glass-panel" style={{ padding: '40px', textAlign: 'center', color: GREEN_DARK, background: 'rgba(255,255,255,0.55)' }}>
+            <Package size={40} style={{ opacity: 0.3, marginBottom: '10px' }} />
+            <p>No items in this view.</p>
+        </div>
+    );
+    return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', paddingBottom: manageMode ? '90px' : 0 }}>
+            {items.map(item => {
+                const checked = selected.has(item.key);
+                return (
+                    <div
+                        key={item.key}
+                        onClick={() => manageMode && toggleSelect(item.key)}
+                        style={{
+                            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                            background: 'rgba(255,255,255,0.6)',
+                            border: item.is_low_stock ? '1px solid rgba(239,68,68,0.45)' : '1px solid rgba(121,162,128,0.25)',
+                            borderRadius: '12px', padding: '14px 16px',
+                            cursor: manageMode ? 'pointer' : 'default',
+                            outline: checked ? '2px solid #ef4444' : 'none',
+                            transition: 'outline 150ms',
+                        }}
+                    >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
+                            {manageMode && (
+                                <input
+                                    type="checkbox"
+                                    checked={checked}
+                                    onChange={() => toggleSelect(item.key)}
+                                    onClick={e => e.stopPropagation()}
+                                    style={{ width: '18px', height: '18px', accentColor: '#ef4444' }}
+                                />
+                            )}
+                            <Package size={20} color={item.is_low_stock ? '#dc2626' : GREEN_DARK} />
+                            <div style={{ minWidth: 0 }}>
+                                <div style={{ fontWeight: 700, color: 'var(--color-text-dark)', fontSize: '15px' }}>{item.name}</div>
+                                <div style={{ display: 'flex', gap: '8px', alignItems: 'center', fontSize: '12px', color: GREEN_DARK, marginTop: '2px' }}>
+                                    <DeptBadge dept_name={item.dept_name} shop_name={item.shop_name} source={item.source} />
+                                    {item.description && <span style={{ opacity: 0.8 }}>· {item.description}</span>}
+                                </div>
+                            </div>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '18px', flexShrink: 0 }}>
+                            <div style={{ textAlign: 'right' }}>
+                                <div style={{ fontSize: '13px', color: 'var(--color-text-dark)' }}>
+                                    <strong style={{ fontSize: '18px' }}>{item.stock}</strong>
+                                    <span style={{ opacity: 0.7 }}> / thr {item.threshold}</span>
+                                </div>
+                                {item.is_low_stock ? (
+                                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', marginTop: '4px',
+                                                  color: '#dc2626', background: 'rgba(239,68,68,0.12)',
+                                                  padding: '3px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: 700 }}>
+                                        <AlertTriangle size={12} /> Low
+                                    </div>
+                                ) : null}
+                            </div>
+                            {item.source === 'retail' && item.price_cents != null && (
+                                <div style={{ textAlign: 'right', minWidth: '70px' }}>
+                                    <div style={{ fontWeight: 700, fontSize: '16px', color: GREEN_DARK }}>
+                                        ${((item.price_cents || 0) / 100).toFixed(2)}
+                                    </div>
+                                    <div style={{ fontSize: '10px', color: GREEN_DARK, opacity: 0.7 }}>Price</div>
+                                </div>
+                            )}
+                            {!manageMode && (
+                                <button onClick={e => { e.stopPropagation(); onRestock(item); }}
+                                    style={{
+                                        padding: '6px 14px', fontSize: '12px', fontWeight: 600,
+                                        background: GREEN, color: 'white', border: 'none',
+                                        borderRadius: '8px', cursor: 'pointer',
+                                        display: 'flex', alignItems: 'center', gap: '5px',
+                                    }}>
+                                    <Plus size={14} /> Restock
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                );
+            })}
+        </div>
+    );
+}
+
+function DeptBadge({ dept_name, shop_name, source }) {
+    const icon = DEPT_ICON[dept_name] || <Package size={12} />;
+    const label = source === 'retail' ? (shop_name || dept_name) : dept_name;
+    return (
+        <span style={{
+            display: 'inline-flex', alignItems: 'center', gap: '4px',
+            padding: '2px 8px', borderRadius: '8px',
+            background: 'rgba(121,162,128,0.15)', color: GREEN_DARK, fontWeight: 600,
+        }}>
+            {icon} {label}
+        </span>
+    );
+}
+
+function ActivityLog({ loading, items }) {
+    if (loading) return <p style={{ color: GREEN_DARK }}>Loading activity...</p>;
+    if (items.length === 0) return (
+        <div className="glass-panel" style={{ padding: '40px', textAlign: 'center', color: GREEN_DARK, background: 'rgba(255,255,255,0.55)' }}>
+            <Activity size={40} style={{ opacity: 0.3, marginBottom: '10px' }} />
+            <p>No inventory activity matches this filter.</p>
+        </div>
+    );
+    return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {items.map(a => (
+                <div key={a.log_id} style={{
+                    background: 'rgba(255,255,255,0.6)',
+                    border: '1px solid rgba(121,162,128,0.25)',
+                    borderRadius: '10px', padding: '12px 14px',
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'start', gap: '14px',
+                }}>
+                    <div style={{ minWidth: 0 }}>
+                        <div style={{ fontWeight: 600, color: 'var(--color-text-dark)', fontSize: '14px' }}>
+                            {a.description}
+                        </div>
+                        <div style={{ fontSize: '11px', color: GREEN_DARK, marginTop: '4px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                            <span style={{ padding: '1px 8px', borderRadius: '8px', background: 'rgba(121,162,128,0.15)', fontWeight: 600 }}>
+                                {a.action_type.replace(/_/g, ' ')}
+                            </span>
+                            {a.performer && (
+                                <span>by <strong>{a.performer.first_name} {a.performer.last_name}</strong>
+                                    {a.performer.dept_name ? ` · ${a.performer.dept_name}` : ''}
+                                </span>
+                            )}
+                        </div>
+                    </div>
+                    <div style={{ fontSize: '11px', color: GREEN_DARK, whiteSpace: 'nowrap' }}>
+                        {new Date(a.created_at).toLocaleString()}
+                    </div>
+                </div>
+            ))}
+        </div>
+    );
+}
+
+function BulkBar({ count, onSelectAll, onDelete, onCancel }) {
+    return (
+        <div style={{
+            position: 'fixed', bottom: '24px', left: '50%', transform: 'translateX(-50%)',
+            background: '#1a1f2e', border: '1px solid rgba(239,68,68,0.3)',
+            borderRadius: '14px', padding: '10px 14px',
+            display: 'flex', alignItems: 'center', gap: '14px',
+            boxShadow: '0 10px 30px rgba(0,0,0,0.5)', zIndex: 999,
+        }}>
+            <span style={{ fontSize: '13px', color: 'var(--color-text-muted)' }}>
+                <strong style={{ color: 'white' }}>{count}</strong> selected
+            </span>
+            <button onClick={onSelectAll}
+                style={{ background: 'rgba(255,255,255,0.08)', color: 'white', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '8px', padding: '8px 14px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
+                Select All
+            </button>
+            <button onClick={onDelete} disabled={count === 0}
+                style={{ background: count === 0 ? 'rgba(239,68,68,0.25)' : '#ef4444', color: 'white', border: 'none', borderRadius: '8px', padding: '8px 14px', fontSize: '12px', fontWeight: 700, cursor: count === 0 ? 'not-allowed' : 'pointer' }}>
+                Delete Selected
+            </button>
+            <button onClick={onCancel}
+                style={{ background: 'transparent', color: 'white', border: '1px solid rgba(255,255,255,0.18)', borderRadius: '8px', padding: '8px 14px', fontSize: '12px', cursor: 'pointer' }}>
+                Cancel
+            </button>
+        </div>
+    );
+}
+
+const labelStyle = {
+    display: 'block',
+    fontSize: '11px',
+    color: GREEN_DARK,
+    marginBottom: '4px',
+    fontWeight: 600,
+    textTransform: 'uppercase',
+    letterSpacing: '0.04em',
+};

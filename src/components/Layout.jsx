@@ -39,8 +39,10 @@ export default function Layout() {
         }
         if (role === 'manager') {
             return [
-                { name: 'Manager Panel', path: '/dashboard/manager', icon: <Briefcase size={18} /> },
-                { name: 'Hours',         path: '/dashboard/hours',   icon: <Clock size={18} /> },
+                { name: 'Manager Panel', path: '/dashboard/manager',   icon: <Briefcase size={18} /> },
+                { name: 'Animals',       path: '/dashboard/animals',   icon: <Cat size={18} /> },
+                { name: 'Inventory',     path: '/dashboard/inventory', icon: <ShoppingBag size={18} /> },
+                { name: 'Hours',         path: '/dashboard/hours',     icon: <Clock size={18} /> },
             ];
         }
         if (role === 'vet') {

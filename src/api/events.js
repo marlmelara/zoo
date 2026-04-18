@@ -1,6 +1,8 @@
 import api from '../lib/api';
 
-export const getAdminEvents    = ()     => api.get('/events');
+// Admin fetcher — asks the server for archived rows too so the Admin
+// Events page can filter between upcoming / past / archived / all.
+export const getAdminEvents    = ()     => api.get('/events?include_archived=1');
 export const getUpcomingEvents = (limit = 6) =>
     api.get('/events').then(events => {
         const today = new Date().toISOString().split('T')[0];

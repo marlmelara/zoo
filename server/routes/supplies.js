@@ -29,6 +29,39 @@ router.get('/', requireAuth, async (req, res) => {
     }
 });
 
+// POST /api/supplies — admin + manager can create a new operational supply.
+router.post('/', requireRole('admin','manager'), async (req, res) => {
+    const { department_id, item_name, stock_count, restock_threshold,
+            cost_to_restock_cents, category, description } = req.body;
+    if (!department_id || !item_name) {
+        return res.status(400).json({ error: 'department_id and item_name are required.' });
+    }
+    try {
+        const [result] = await db.query(
+            `INSERT INTO operational_supplies
+             (department_id, item_name, stock_count, restock_threshold,
+              cost_to_restock_cents, category, description)
+             VALUES (?, ?, ?, ?, ?, ?, ?)`,
+            [department_id, item_name, stock_count ?? 0,
+             restock_threshold ?? 10, cost_to_restock_cents ?? 500,
+             category || null, description || null]
+        );
+        return res.status(201).json({ supply_id: result.insertId });
+    } catch (err) {
+        return res.status(500).json({ error: err.message });
+    }
+});
+
+// DELETE /api/supplies/:id — admin + manager can remove an operational supply.
+router.delete('/:id', requireRole('admin','manager'), async (req, res) => {
+    try {
+        await db.query('DELETE FROM operational_supplies WHERE supply_id = ?', [req.params.id]);
+        return res.json({ success: true });
+    } catch (err) {
+        return res.status(500).json({ error: err.message });
+    }
+});
+
 // GET /api/supplies/requests — supply requests
 router.get('/requests', requireAuth, async (req, res) => {
     try {

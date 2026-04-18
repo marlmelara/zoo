@@ -583,13 +583,20 @@ export default function CustomerDashboard() {
                                         {lineItems.length > 0 && (
                                             <div style={{ background: 'rgba(0,0,0,0.05)', border: '1px solid rgba(0,0,0,0.08)', borderRadius: '8px', padding: '12px', color: 'var(--color-secondary)' }}>
                                                 {lineItems.map((item, idx) => (
-                                                    <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 0', borderBottom: idx < lineItems.length - 1 ? '1px solid rgba(0,0,0,0.06)' : 'none' }}>
-                                                        <span style={{ fontSize: '13px' }}>
-                                                            {item.description} <span style={{color: 'var(--color-secondary)'}}>x{item.quantity}</span>
-                                                        </span>
-                                                        <span style={{ fontSize: '13px', fontWeight: 600, color: '#6d8243' }}>
-                                                            ${((item.unitPriceCents * item.quantity) / 100).toFixed(2)}
-                                                        </span>
+                                                    <div key={idx} style={{ padding: '4px 0', borderBottom: idx < lineItems.length - 1 ? '1px solid rgba(0,0,0,0.06)' : 'none' }}>
+                                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                            <span style={{ fontSize: '13px' }}>
+                                                                {item.description} <span style={{ color: 'var(--color-text-muted)' }}>x{item.quantity}</span>
+                                                            </span>
+                                                            <span style={{ fontSize: '13px', fontWeight: 600, color: '#6d8243' }}>
+                                                                ${((item.unitPriceCents * item.quantity) / 100).toFixed(2)}
+                                                            </span>
+                                                        </div>
+                                                        {item.subtext && (
+                                                            <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '2px', paddingLeft: '2px' }}>
+                                                                {item.subtext}
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 ))}
                                                 {(txn.subtotal_cents != null) && (

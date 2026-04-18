@@ -123,22 +123,32 @@ router.post('/login', async (req, res) => {
             return res.status(401).json({ error: 'Invalid email or password.' });
         }
 
-        // Is this user a customer?
+        // Is this user a customer? (Must be active.)
         const [customers] = await db.query(
-            'SELECT customer_id, first_name, last_name FROM customers WHERE user_id = ?',
+            'SELECT customer_id, first_name, last_name, is_active FROM customers WHERE user_id = ?',
             [user.user_id]
         );
 
-        // Is this user an employee?
+        // Is this user an employee? (Must be active.)
         const [employees] = await db.query(
-            'SELECT employee_id, first_name, last_name, role, dept_id FROM employees WHERE user_id = ?',
+            'SELECT employee_id, first_name, last_name, role, dept_id, is_active FROM employees WHERE user_id = ?',
             [user.user_id]
         );
+
+        const activeCustomer = customers.find(c => c.is_active === 1);
+        const activeEmployee = employees.find(e => e.is_active === 1);
+        const inactiveMatch  = (!activeCustomer && !activeEmployee)
+            && (customers.length > 0 || employees.length > 0);
+        if (inactiveMatch) {
+            return res.status(403).json({
+                error: 'This account has been deactivated. Please contact an administrator to reactivate it.',
+            });
+        }
 
         let payload, responseUser;
 
-        if (employees.length > 0) {
-            const emp = employees[0];
+        if (activeEmployee) {
+            const emp = activeEmployee;
             payload = {
                 userId:     user.user_id,
                 employeeId: emp.employee_id,
@@ -151,8 +161,8 @@ router.post('/login', async (req, res) => {
                 role: emp.role, employeeId: emp.employee_id,
                 firstName: emp.first_name, lastName: emp.last_name,
             };
-        } else if (customers.length > 0) {
-            const cust = customers[0];
+        } else if (activeCustomer) {
+            const cust = activeCustomer;
             payload = {
                 userId:     user.user_id,
                 customerId: cust.customer_id,

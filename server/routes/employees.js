@@ -5,9 +5,12 @@ import { requireRole, requireAuth } from '../middleware/auth.js';
 
 const router = Router();
 
-// GET /api/employees — admin/manager (includes role-specific columns)
+// GET /api/employees — admin/manager (includes role-specific columns).
+// Active by default; pass ?include_inactive=1 to get everyone.
 router.get('/', requireRole('admin', 'manager'), async (req, res) => {
     try {
+        const { include_inactive } = req.query;
+        const where = include_inactive === '1' ? '' : ' WHERE e.is_active = 1';
         const [rows] = await db.query(
             `SELECT e.*, d.dept_name,
                     m.first_name AS manager_first, m.last_name AS manager_last,
@@ -20,9 +23,38 @@ router.get('/', requireRole('admin', 'manager'), async (req, res) => {
              LEFT JOIN vets          v  ON v.employee_id   = e.employee_id
              LEFT JOIN animal_caretakers ac ON ac.employee_id = e.employee_id
              LEFT JOIN managers      mg ON mg.employee_id  = e.employee_id
+             ${where}
              ORDER BY e.employee_id ASC`
         );
         return res.json(rows);
+    } catch (err) {
+        return res.status(500).json({ error: err.message });
+    }
+});
+
+// GET /api/employees/deactivated — admin: list soft-deleted employees
+router.get('/deactivated', requireRole('admin'), async (req, res) => {
+    try {
+        const { email } = req.query;
+        let sql = `SELECT e.*, d.dept_name FROM employees e
+                   LEFT JOIN departments d ON d.dept_id = e.dept_id
+                   LEFT JOIN users u ON u.user_id = e.user_id
+                   WHERE e.is_active = 0`;
+        const params = [];
+        if (email) { sql += ' AND u.email LIKE ?'; params.push(`%${email}%`); }
+        sql += ' ORDER BY e.employee_id DESC';
+        const [rows] = await db.query(sql, params);
+        return res.json(rows);
+    } catch (err) {
+        return res.status(500).json({ error: err.message });
+    }
+});
+
+// POST /api/employees/:id/reactivate — admin: restore a soft-deleted employee
+router.post('/:id/reactivate', requireRole('admin'), async (req, res) => {
+    try {
+        await db.query('UPDATE employees SET is_active = 1 WHERE employee_id = ?', [req.params.id]);
+        return res.json({ success: true });
     } catch (err) {
         return res.status(500).json({ error: err.message });
     }
@@ -184,10 +216,11 @@ router.patch('/:id', requireRole('admin', 'manager'), async (req, res) => {
     }
 });
 
-// DELETE /api/employees/:id
+// DELETE /api/employees/:id — soft-delete (deactivate). Reactivate later via
+// POST /api/employees/:id/reactivate.
 router.delete('/:id', requireRole('admin'), async (req, res) => {
     try {
-        await db.query('DELETE FROM employees WHERE employee_id = ?', [req.params.id]);
+        await db.query('UPDATE employees SET is_active = 0 WHERE employee_id = ?', [req.params.id]);
         return res.json({ success: true });
     } catch (err) {
         return res.status(500).json({ error: err.message });

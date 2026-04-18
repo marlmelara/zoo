@@ -4,11 +4,12 @@ import { requireAuth, requireRole } from '../middleware/auth.js';
 
 const router = Router();
 
-// GET /api/customers/me — current customer's full profile
+// GET /api/customers/me — current customer's full profile (active only)
 router.get('/me', requireAuth, async (req, res) => {
     try {
         const [rows] = await db.query(
-            'SELECT * FROM customers WHERE user_id = ?', [req.user.userId]
+            'SELECT * FROM customers WHERE user_id = ? AND is_active = 1',
+            [req.user.userId]
         );
         if (rows.length === 0) return res.status(404).json({ error: 'Profile not found.' });
         return res.json(rows[0]);
@@ -77,36 +78,54 @@ router.patch('/me/billing', requireAuth, async (req, res) => {
     }
 });
 
-// DELETE /api/customers/me — delete account
+// DELETE /api/customers/me — soft-deactivate account. Tickets, donations,
+// and transactions are preserved for reporting; the customer can be
+// reactivated later by an admin via POST /api/customers/:id/reactivate.
 router.delete('/me', requireAuth, async (req, res) => {
-    const conn = await db.getConnection();
     try {
-        await conn.beginTransaction();
-        const { userId, customerId } = req.user;
-        if (customerId) {
-            await conn.query('DELETE FROM tickets    WHERE customer_id = ?', [customerId]);
-            await conn.query('UPDATE donations   SET customer_id = NULL WHERE customer_id = ?', [customerId]);
-            await conn.query('UPDATE transactions SET customer_id = NULL WHERE customer_id = ?', [customerId]);
-            await conn.query('DELETE FROM customers WHERE customer_id = ?', [customerId]);
-        }
-        await conn.query('DELETE FROM users WHERE user_id = ?', [userId]);
-        await conn.commit();
+        const { customerId } = req.user;
+        if (!customerId) return res.status(400).json({ error: 'Not a customer account.' });
+        await db.query('UPDATE customers SET is_active = 0 WHERE customer_id = ?', [customerId]);
         return res.json({ success: true });
     } catch (err) {
-        await conn.rollback();
         return res.status(500).json({ error: err.message });
-    } finally {
-        conn.release();
     }
 });
 
-// GET /api/customers — admin: list all customers
+// GET /api/customers — admin/manager: list customers (active by default)
 router.get('/', requireRole('admin', 'manager'), async (req, res) => {
     try {
-        const [rows] = await db.query(
-            'SELECT * FROM customers ORDER BY customer_id DESC'
-        );
+        const { include_inactive } = req.query;
+        const sql = include_inactive === '1'
+            ? 'SELECT * FROM customers ORDER BY customer_id DESC'
+            : 'SELECT * FROM customers WHERE is_active = 1 ORDER BY customer_id DESC';
+        const [rows] = await db.query(sql);
         return res.json(rows);
+    } catch (err) {
+        return res.status(500).json({ error: err.message });
+    }
+});
+
+// GET /api/customers/deactivated — admin: list soft-deleted customers
+router.get('/deactivated', requireRole('admin'), async (req, res) => {
+    try {
+        const { email } = req.query;
+        let sql = 'SELECT * FROM customers WHERE is_active = 0';
+        const params = [];
+        if (email) { sql += ' AND email LIKE ?'; params.push(`%${email}%`); }
+        sql += ' ORDER BY customer_id DESC';
+        const [rows] = await db.query(sql, params);
+        return res.json(rows);
+    } catch (err) {
+        return res.status(500).json({ error: err.message });
+    }
+});
+
+// POST /api/customers/:id/reactivate — admin: restore a soft-deleted customer
+router.post('/:id/reactivate', requireRole('admin'), async (req, res) => {
+    try {
+        await db.query('UPDATE customers SET is_active = 1 WHERE customer_id = ?', [req.params.id]);
+        return res.json({ success: true });
     } catch (err) {
         return res.status(500).json({ error: err.message });
     }

@@ -9,11 +9,35 @@ import {
     getAllOperationalSupplies
 } from '../../../api/supplies';
 import { getRecentActivity, getDepartmentActivity, logActivity } from '../../../api/activityLog';
+import { setHealthStatus } from '../../../api/animals';
+import AnimalMedicalPanel from '../../../components/AnimalMedicalPanel';
 import {
     LayoutDashboard, Users, ClipboardList, Calendar, Package,
     CheckCircle, XCircle, Clock, AlertTriangle, Shield, Activity,
-    Cat, UserPlus
+    Cat, UserPlus, Heart, ChevronDown, ChevronUp, Stethoscope
 } from 'lucide-react';
+
+function HealthBadge({ status }) {
+    const s = status || 'healthy';
+    const map = {
+        healthy:           { label: 'Healthy',      bg: 'rgba(16,185,129,0.15)', color: '#10b981' },
+        under_observation: { label: 'Observation',  bg: 'rgba(59,130,246,0.15)', color: '#3b82f6' },
+        recovering:        { label: 'Recovering',   bg: 'rgba(234,179,8,0.15)',  color: '#ca8a04' },
+        sick:              { label: 'Sick',         bg: 'rgba(245,158,11,0.2)',  color: '#d97706' },
+        critical:          { label: 'Critical',     bg: 'rgba(239,68,68,0.2)',   color: '#dc2626' },
+    };
+    const c = map[s] || map.healthy;
+    return (
+        <span style={{
+            display: 'inline-flex', alignItems: 'center', gap: '4px',
+            fontSize: '11px', fontWeight: 600,
+            padding: '2px 8px', borderRadius: '10px',
+            background: c.bg, color: c.color, textTransform: 'uppercase', letterSpacing: '0.3px',
+        }}>
+            <Heart size={10} /> {c.label}
+        </span>
+    );
+}
 
 const TABS = ['Overview', 'Supply Requests', 'My Staff', 'Animal Assignments', 'Events', 'Activity Log'];
 
@@ -55,6 +79,7 @@ export default function ManagerDashboard() {
     const [animalsLoading, setAnimalsLoading] = useState(true);
     const [vets, setVets] = useState([]);
     const [caretakers, setCaretakers] = useState([]);
+    const [expandedAnimalId, setExpandedAnimalId] = useState(null);
 
 
     const isAdmin = role === 'admin';
@@ -668,8 +693,11 @@ export default function ManagerDashboard() {
                                 return (
                                     <div key={animal.animal_id} className="glass-panel" style={{ padding: '20px' }}>
                                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', flexWrap: 'wrap', gap: '15px' }}>
-                                            <div style={{ minWidth: '200px' }}>
-                                                <h3 style={{ margin: '0 0 5px' }}>{animal.name}</h3>
+                                            <div style={{ minWidth: '220px' }}>
+                                                <h3 style={{ margin: '0 0 5px', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                                    {animal.name}
+                                                    <HealthBadge status={animal.health_status} />
+                                                </h3>
                                                 <p style={{ color: 'var(--color-secondary)', fontSize: '14px', margin: '0 0 3px' }}>
                                                     {animal.species_common_name}
                                                 </p>
@@ -678,9 +706,28 @@ export default function ManagerDashboard() {
                                                         {animal.species_binomial}
                                                     </p>
                                                 )}
-                                                <p style={{ fontSize: '13px', color: 'var(--color-text-muted)', margin: '5px 0 0' }}>
+                                                <p style={{ fontSize: '13px', color: 'var(--color-text-muted)', margin: '5px 0 4px' }}>
                                                     Zone: {animal.zone_name || 'Unassigned'} | Age: {animal.age}
                                                 </p>
+                                                <select
+                                                    className="glass-input"
+                                                    value={animal.health_status || 'healthy'}
+                                                    onChange={async (e) => {
+                                                        try {
+                                                            await setHealthStatus(animal.animal_id, e.target.value);
+                                                            fetchAnimalsWithAssignments();
+                                                        } catch (err) {
+                                                            alert('Failed to update: ' + err.message);
+                                                        }
+                                                    }}
+                                                    style={{ fontSize: '12px', padding: '6px 8px' }}
+                                                >
+                                                    <option value="healthy">Healthy</option>
+                                                    <option value="under_observation">Under observation</option>
+                                                    <option value="recovering">Recovering</option>
+                                                    <option value="sick">Sick</option>
+                                                    <option value="critical">Critical</option>
+                                                </select>
                                             </div>
 
                                             <div style={{ display: 'flex', gap: '15px', flexWrap: 'wrap' }}>
@@ -768,6 +815,32 @@ export default function ManagerDashboard() {
                                                     </select>
                                                 </div>
                                             </div>
+                                        </div>
+
+                                        {/* Medical & Care expand */}
+                                        <div style={{ marginTop: '12px', borderTop: '1px dashed rgba(121,162,128,0.3)', paddingTop: '10px' }}>
+                                            <button
+                                                onClick={() => setExpandedAnimalId(
+                                                    expandedAnimalId === animal.animal_id ? null : animal.animal_id
+                                                )}
+                                                className="glass-button"
+                                                style={{
+                                                    fontSize: '12px', padding: '6px 12px',
+                                                    background: 'rgba(123,144,79,0.15)', color: 'rgb(102,122,66)',
+                                                    display: 'flex', alignItems: 'center', gap: '6px',
+                                                }}
+                                            >
+                                                <Stethoscope size={14} />
+                                                {expandedAnimalId === animal.animal_id
+                                                    ? <>Hide medical &amp; care <ChevronUp size={12} /></>
+                                                    : <>View medical &amp; care <ChevronDown size={12} /></>}
+                                            </button>
+                                            {expandedAnimalId === animal.animal_id && (
+                                                <AnimalMedicalPanel
+                                                    animalId={animal.animal_id}
+                                                    canFileMedical={isAdmin || role === 'manager' || role === 'vet'}
+                                                />
+                                            )}
                                         </div>
                                     </div>
                                 );

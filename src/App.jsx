@@ -37,6 +37,7 @@ import VetDashboard from './pages/dashboards/Vet/VetDashboard';
 import CaretakerDashboard from './pages/dashboards/Caretaker/CaretakerDashboard';
 import GenEmployeeDashboard from './pages/dashboards/GenEmployee/GenEmployeeDashboard';
 import CustomerDashboard from './pages/dashboards/Customer/CustomerDashboard';
+import HoursDashboard from './pages/dashboards/Hours/HoursDashboard';
 
 const loadingScreenStyle = {
   height: '100vh',
@@ -122,6 +123,11 @@ function App() {
               <Route path="/dashboard/caretaker" element={<CaretakerDashboard />} />
               <Route path="/dashboard/employee" element={<GenEmployeeDashboard />} />
               <Route path="/dashboard/customer" element={<CustomerDashboard />} />
+
+              {/* Hours — any employee (not customers) */}
+              <Route element={<RoleRoute allowed={['admin','manager','vet','caretaker','security','retail']} />}>
+                <Route path="/dashboard/hours" element={<HoursDashboard />} />
+              </Route>
             </Route>
           </Route>
 

@@ -130,7 +130,7 @@ export default function AdminDashboard() {
         Animals: zoneCounts[zone]
     }));
 
-    const TABS = ['Overview', 'Staff Analytics', 'Animal Analytics', 'Financial Revenue'];
+    const TABS = ['Overview', 'Staff Analytics', 'Animal Analytics', 'Financial Revenue', 'Reactivate'];
 
     return (
         <div>
@@ -576,6 +576,131 @@ export default function AdminDashboard() {
                             </table>
                         </div>
                     )}
+                </div>
+            )}
+
+            {/* ═══════════ REACTIVATE TAB ═══════════ */}
+            {activeTab === 'Reactivate' && <ReactivatePanel />}
+        </div>
+    );
+}
+
+function ReactivatePanel() {
+    const [tab, setTab] = useState('customers');
+    const [query, setQuery] = useState('');
+    const [rows, setRows] = useState([]);
+    const [loading, setLoading] = useState(false);
+
+    const runSearch = async () => {
+        setLoading(true);
+        try {
+            const qs = query.trim()
+                ? (tab === 'animals' ? `?name=${encodeURIComponent(query)}` : `?email=${encodeURIComponent(query)}`)
+                : '';
+            const path = tab === 'customers' ? `/api/customers/deactivated${qs}`
+                       : tab === 'staff'     ? `/api/employees/deactivated${qs}`
+                       :                       `/api/animals/deactivated${qs}`;
+            const res = await fetch(path, {
+                headers: { Authorization: `Bearer ${localStorage.getItem('zoo_token') || ''}` },
+            });
+            const data = await res.json();
+            setRows(Array.isArray(data) ? data : []);
+        } catch (err) {
+            alert('Lookup failed: ' + err.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // Refresh when tab changes
+    React.useEffect(() => { setRows([]); setQuery(''); }, [tab]);
+
+    const reactivate = async (id) => {
+        if (!window.confirm('Reactivate this account?')) return;
+        const path = tab === 'customers' ? `/api/customers/${id}/reactivate`
+                   : tab === 'staff'     ? `/api/employees/${id}/reactivate`
+                   :                       `/api/animals/${id}/reactivate`;
+        try {
+            const res = await fetch(path, {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${localStorage.getItem('zoo_token') || ''}` },
+            });
+            if (!res.ok) throw new Error((await res.json()).error || 'Failed');
+            await runSearch();
+        } catch (err) {
+            alert('Reactivate failed: ' + err.message);
+        }
+    };
+
+    const label = (r) =>
+        tab === 'customers' ? `${r.first_name} ${r.last_name} — ${r.email}`
+      : tab === 'staff'     ? `${r.first_name} ${r.last_name} (${r.role}${r.dept_name ? ` · ${r.dept_name}` : ''})`
+      :                       `${r.name} — ${r.species_common_name}${r.zone_name ? ` · ${r.zone_name}` : ''}`;
+
+    const id = (r) =>
+        tab === 'customers' ? r.customer_id
+      : tab === 'staff'     ? r.employee_id
+      :                       r.animal_id;
+
+    return (
+        <div className="glass-panel" style={{ padding: '24px' }}>
+            <h3 style={{ marginTop: 0 }}>Reactivate Deactivated Accounts</h3>
+            <p style={{ color: 'var(--color-text-muted)', marginTop: 0 }}>
+                Look up customers, staff, or animals that were soft-deleted and restore them.
+            </p>
+
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '14px' }}>
+                {['customers','staff','animals'].map(t => (
+                    <button key={t}
+                        className="glass-button"
+                        onClick={() => setTab(t)}
+                        style={{
+                            padding: '6px 14px', fontSize: '13px',
+                            background: tab === t ? 'rgb(123, 144, 79)' : 'rgba(255,255,255,0.5)',
+                            color: tab === t ? 'white' : 'rgb(102, 122, 66)',
+                            textTransform: 'capitalize',
+                        }}>{t}</button>
+                ))}
+            </div>
+
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '14px' }}>
+                <input
+                    className="glass-input"
+                    placeholder={tab === 'animals' ? 'Search by name...' : 'Search by email...'}
+                    value={query}
+                    onChange={e => setQuery(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') runSearch(); }}
+                    style={{ flex: 1 }}
+                />
+                <button className="glass-button" onClick={runSearch}
+                    style={{ background: 'rgb(123, 144, 79)', color: 'white' }}>
+                    {loading ? 'Searching...' : 'Search'}
+                </button>
+            </div>
+
+            {loading ? (
+                <p>Loading...</p>
+            ) : rows.length === 0 ? (
+                <p style={{ color: 'var(--color-text-muted)', textAlign: 'center', padding: '20px' }}>
+                    No deactivated {tab} found{query ? ` matching "${query}"` : ''}.
+                </p>
+            ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {rows.map(r => (
+                        <div key={id(r)} style={{
+                            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                            padding: '12px 14px', borderRadius: '10px',
+                            background: 'rgba(255,255,255,0.5)',
+                            border: '1px solid rgba(121,162,128,0.25)',
+                        }}>
+                            <span>{label(r)}</span>
+                            <button className="glass-button"
+                                onClick={() => reactivate(id(r))}
+                                style={{ background: 'rgb(123, 144, 79)', color: 'white', padding: '6px 14px', fontSize: '12px' }}>
+                                Reactivate
+                            </button>
+                        </div>
+                    ))}
                 </div>
             )}
         </div>

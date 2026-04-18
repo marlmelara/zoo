@@ -23,6 +23,8 @@ import supplyRoutes      from './routes/supplies.js';
 import activityRoutes    from './routes/activityLog.js';
 import venueRoutes       from './routes/venues.js';
 import dashboardRoutes   from './routes/dashboard.js';
+import notificationRoutes from './routes/notifications.js';
+import hoursRoutes        from './routes/hours.js';
 
 export const MOUNTS = [
     { prefix: '/api/auth',         router: authRoutes },
@@ -38,6 +40,8 @@ export const MOUNTS = [
     { prefix: '/api/activity-log', router: activityRoutes },
     { prefix: '/api/venues',       router: venueRoutes },
     { prefix: '/api/dashboard',    router: dashboardRoutes },
+    { prefix: '/api/notifications',router: notificationRoutes },
+    { prefix: '/api/hours',        router: hoursRoutes },
 ];
 
 // ── Body reader — accepts whatever Vercel / Node hands us ─────

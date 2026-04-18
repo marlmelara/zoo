@@ -4,16 +4,56 @@ import { requireRole, requireAuth } from '../middleware/auth.js';
 
 const router = Router();
 
-// GET /api/animals — public
+// GET /api/animals — public (active only; admin can include inactive)
 router.get('/', async (req, res) => {
     try {
+        const { include_inactive } = req.query;
+        const where = include_inactive === '1' ? '' : ' WHERE a.is_active = 1';
         const [rows] = await db.query(
             `SELECT a.*, z.zone_name, z.location_description
              FROM animals a
              LEFT JOIN animal_zones z ON a.zone_id = z.zone_id
+             ${where}
              ORDER BY a.animal_id ASC`
         );
         return res.json(rows);
+    } catch (err) {
+        return res.status(500).json({ error: err.message });
+    }
+});
+
+// GET /api/animals/deactivated — admin: list soft-deleted animals
+router.get('/deactivated', requireRole('admin'), async (req, res) => {
+    try {
+        const { name } = req.query;
+        let sql = `SELECT a.*, z.zone_name FROM animals a
+                   LEFT JOIN animal_zones z ON a.zone_id = z.zone_id
+                   WHERE a.is_active = 0`;
+        const params = [];
+        if (name) { sql += ' AND a.name LIKE ?'; params.push(`%${name}%`); }
+        sql += ' ORDER BY a.animal_id DESC';
+        const [rows] = await db.query(sql, params);
+        return res.json(rows);
+    } catch (err) {
+        return res.status(500).json({ error: err.message });
+    }
+});
+
+// POST /api/animals/:id/reactivate — admin: restore a soft-deleted animal
+router.post('/:id/reactivate', requireRole('admin'), async (req, res) => {
+    try {
+        await db.query('UPDATE animals SET is_active = 1 WHERE animal_id = ?', [req.params.id]);
+        return res.json({ success: true });
+    } catch (err) {
+        return res.status(500).json({ error: err.message });
+    }
+});
+
+// DELETE /api/animals/:id — soft-delete (deactivate)
+router.delete('/:id', requireRole('admin','manager'), async (req, res) => {
+    try {
+        await db.query('UPDATE animals SET is_active = 0 WHERE animal_id = ?', [req.params.id]);
+        return res.json({ success: true });
     } catch (err) {
         return res.status(500).json({ error: err.message });
     }
@@ -69,9 +109,13 @@ router.get('/assigned/vet', requireAuth, async (req, res) => {
 router.get('/with-assignments', requireRole('admin', 'manager'), async (req, res) => {
     try {
         const [animals] = await db.query(
-            `SELECT a.*, z.zone_name FROM animals a
+            `SELECT a.*, z.zone_name
+             FROM animals a
              LEFT JOIN animal_zones z ON a.zone_id = z.zone_id
-             ORDER BY a.animal_id ASC`
+             WHERE a.is_active = 1
+             ORDER BY a.health_status = 'critical' DESC,
+                      a.health_status = 'sick' DESC,
+                      a.animal_id ASC`
         );
 
         const [vetAssignments] = await db.query(
@@ -125,17 +169,79 @@ router.get('/:id', async (req, res) => {
     }
 });
 
-// GET /api/animals/:id/medical-history
+// GET /api/animals/:id/medical-history — expanded with recorder + vitals
 router.get('/:id/medical-history', requireAuth, async (req, res) => {
     try {
         const [rows] = await db.query(
-            `SELECT mh.* FROM medical_history mh
-             JOIN animals a ON a.health_record_id = mh.record_id
+            `SELECT mh.*,
+                    e.first_name AS recorded_by_first,
+                    e.last_name  AS recorded_by_last,
+                    e.role       AS recorded_by_role
+             FROM medical_history mh
+             JOIN animals a    ON a.health_record_id = mh.record_id
+             LEFT JOIN employees e ON e.employee_id = mh.recorded_by
              WHERE a.animal_id = ?
-             ORDER BY mh.date_treated DESC`,
+             ORDER BY mh.created_at DESC, mh.date_treated DESC`,
             [req.params.id]
         );
         return res.json(rows);
+    } catch (err) {
+        return res.status(500).json({ error: err.message });
+    }
+});
+
+// PATCH /api/animals/:id/health-status — set/update the quick-look flag.
+// This is the UPDATE that fires trg_animal_sick_notify (or the healthy
+// resolver).
+router.patch('/:id/health-status', requireAuth, async (req, res) => {
+    const { health_status } = req.body;
+    const allowed = ['healthy','under_observation','sick','critical','recovering'];
+    if (!allowed.includes(health_status)) {
+        return res.status(400).json({ error: 'Invalid health_status value.' });
+    }
+    try {
+        await db.query(
+            `UPDATE animals
+                SET health_status = ?, last_health_update = NOW()
+              WHERE animal_id = ?`,
+            [health_status, req.params.id]
+        );
+        return res.json({ success: true, health_status });
+    } catch (err) {
+        return res.status(500).json({ error: err.message });
+    }
+});
+
+// GET /api/animals/:id/care-log — recent care log entries for an animal
+router.get('/:id/care-log', requireAuth, async (req, res) => {
+    try {
+        const [rows] = await db.query(
+            `SELECT cl.*,
+                    e.first_name, e.last_name, e.role
+             FROM animal_care_log cl
+             LEFT JOIN employees e ON e.employee_id = cl.employee_id
+             WHERE cl.animal_id = ?
+             ORDER BY cl.logged_at DESC
+             LIMIT 100`,
+            [req.params.id]
+        );
+        return res.json(rows);
+    } catch (err) {
+        return res.status(500).json({ error: err.message });
+    }
+});
+
+// POST /api/animals/:id/care-log — anyone on staff can log an update.
+router.post('/:id/care-log', requireRole('admin','manager','vet','caretaker'), async (req, res) => {
+    const { log_type, notes } = req.body;
+    if (!notes || !notes.trim()) return res.status(400).json({ error: 'Notes are required.' });
+    try {
+        const [result] = await db.query(
+            `INSERT INTO animal_care_log (animal_id, employee_id, log_type, notes)
+             VALUES (?, ?, ?, ?)`,
+            [req.params.id, req.user.employeeId, log_type || 'observation', notes]
+        );
+        return res.status(201).json({ log_id: result.insertId });
     } catch (err) {
         return res.status(500).json({ error: err.message });
     }
@@ -192,9 +298,13 @@ router.post('/:id/caretaker-assign', requireRole('admin', 'manager', 'caretaker'
     }
 });
 
-// POST /api/animals/:id/medical-history
+// POST /api/animals/:id/medical-history — full medical record entry.
 router.post('/:id/medical-history', requireRole('admin', 'manager', 'vet'), async (req, res) => {
-    const { injury, disease, date_treated, animal_age_at_treatment } = req.body;
+    const {
+        injury, disease, diagnosis, treatment, medications,
+        severity, status, weight_kg, temperature_c, heart_rate_bpm,
+        notes, next_followup_date, date_treated, animal_age_at_treatment,
+    } = req.body;
     try {
         const [animals] = await db.query(
             'SELECT health_record_id FROM animals WHERE animal_id = ?', [req.params.id]
@@ -202,13 +312,27 @@ router.post('/:id/medical-history', requireRole('admin', 'manager', 'vet'), asyn
         if (animals.length === 0 || !animals[0].health_record_id) {
             return res.status(404).json({ error: 'No health record for this animal.' });
         }
-        await db.query(
-            `INSERT INTO medical_history (record_id, injury, disease, date_treated, animal_age_at_treatment)
-             VALUES (?, ?, ?, ?, ?)`,
-            [animals[0].health_record_id, injury || null, disease || null,
-             date_treated || null, animal_age_at_treatment || null]
+        const [result] = await db.query(
+            `INSERT INTO medical_history
+             (record_id, injury, disease, diagnosis, treatment, medications,
+              severity, status, weight_kg, temperature_c, heart_rate_bpm,
+              notes, recorded_by, next_followup_date,
+              date_treated, animal_age_at_treatment)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+                animals[0].health_record_id,
+                injury || null, disease || null, diagnosis || null,
+                treatment || null, medications || null,
+                severity || 'minor', status || 'active',
+                weight_kg || null, temperature_c || null, heart_rate_bpm || null,
+                notes || null,
+                req.user.employeeId || null,
+                next_followup_date || null,
+                date_treated || null,
+                animal_age_at_treatment || null,
+            ]
         );
-        return res.status(201).json({ success: true });
+        return res.status(201).json({ history_id: result.insertId });
     } catch (err) {
         return res.status(500).json({ error: err.message });
     }

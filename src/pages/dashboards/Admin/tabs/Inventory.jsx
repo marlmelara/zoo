@@ -1,9 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import api from '../../../../lib/api';
 import { useAuth } from '../../../../contexts/AuthContext';
 import {
     ShoppingBag, AlertTriangle, Package, Plus, Trash2, Briefcase,
     Stethoscope, PawPrint, Shield, Activity, ClipboardList,
+    Pencil, X, ImagePlus,
 } from 'lucide-react';
 import { StatusFilter, DateRangeFilter } from '../../../../components/AnimalsPanel';
 import {
@@ -53,7 +55,12 @@ export default function Inventory() {
         price_cents: '',
         description: '',
         category: '',
+        image_url: '',     // base64 data URL for retail items
     });
+
+    // Edit-item modal state (retail only — stores image on the item)
+    const [editing, setEditing] = useState(null); // { item_id, item_name, price_cents, ... } or null
+    const [editForm, setEditForm] = useState({});
 
     // Manage mode
     const [manageMode, setManageMode] = useState(false);
@@ -112,6 +119,7 @@ export default function Inventory() {
                 stock: i.stock_count,
                 threshold: i.restock_threshold,
                 price_cents: i.price_cents,
+                image_url:  i.image_url || null,
                 shop_name: outlet.name,
                 dept_bucket: 'retail',
                 dept_name: 'Retail & Operations',
@@ -163,7 +171,13 @@ export default function Inventory() {
             .map(d => ({ key: String(d.dept_id), label: d.dept_name })),
     ]), [departments]);
 
-    // Activity log derived view — only inventory actions, filtered by dept + date range.
+    // Activity log derived view — only inventory-related actions, narrowed
+    // by dept pill + date range.
+    //   • Retail pill → target_type === 'inventory' (shop-item restocks only).
+    //     Retail & Operations dept employees' OTHER activity (e.g. operational
+    //     supplies for their own dept) does NOT count as Retail.
+    //   • A real department pill → performer works in that dept AND the event
+    //     is not a shop-item restock (so shop restocks don't double-count).
     const filteredActivity = useMemo(() => {
         const fromTs = logFrom ? new Date(logFrom + 'T00:00:00').getTime() : null;
         const toTs   = logTo   ? new Date(logTo   + 'T23:59:59').getTime() : null;
@@ -173,11 +187,9 @@ export default function Inventory() {
             if (fromTs && ts < fromTs) return false;
             if (toTs   && ts > toTs)   return false;
             if (deptFilter === 'all') return true;
-            if (deptFilter === 'retail') {
-                return a.performer?.dept_name === 'Retail & Operations'
-                    || a.target_type === 'inventory';
-            }
-            return String(a.performer?.dept_id || '') === deptFilter;
+            if (deptFilter === 'retail') return a.target_type === 'inventory';
+            return String(a.performer?.dept_id || '') === deptFilter
+                && a.target_type !== 'inventory';
         });
     }, [activity, deptFilter, logFrom, logTo]);
 
@@ -193,6 +205,7 @@ export default function Inventory() {
                     restock_threshold: parseInt(newItem.restock_threshold) || 10,
                     price_cents: Math.round(parseFloat(newItem.price_cents) * 100) || 0,
                     category: newItem.category || null,
+                    image_url: newItem.image_url || null,
                 });
             } else {
                 await createOperationalSupply({
@@ -207,10 +220,43 @@ export default function Inventory() {
             setShowAddForm(false);
             setNewItem({ kind: newItem.kind, outlet_id: '', department_id: '',
                          item_name: '', stock_count: '', restock_threshold: 10,
-                         price_cents: '', description: '', category: '' });
+                         price_cents: '', description: '', category: '', image_url: '' });
             fetchAll();
         } catch (err) {
             alert('Failed to add item: ' + err.message);
+        }
+    }
+
+    // ── Edit (retail items only) ──
+    function startEditRetail(item) {
+        setEditing(item);
+        setEditForm({
+            item_name: item.name || '',
+            price_cents: ((item.price_cents || 0) / 100).toFixed(2),
+            stock_count: item.stock,
+            restock_threshold: item.threshold,
+            image_url: '',              // new upload goes here
+            existing_image: item.image_url || null,
+        });
+    }
+    function cancelEdit() { setEditing(null); setEditForm({}); }
+    async function handleEditSave(e) {
+        e.preventDefault();
+        if (!editing) return;
+        try {
+            await api.patch(`/inventory/${editing.id}`, {
+                item_name: editForm.item_name,
+                price_cents: Math.round(parseFloat(editForm.price_cents) * 100) || 0,
+                stock_count: parseInt(editForm.stock_count) || 0,
+                restock_threshold: parseInt(editForm.restock_threshold) || 10,
+                // Only send image_url if the user picked a new one; otherwise
+                // leave the existing value alone.
+                ...(editForm.image_url ? { image_url: editForm.image_url } : {}),
+            });
+            cancelEdit();
+            fetchAll();
+        } catch (err) {
+            alert('Failed to save: ' + err.message);
         }
     }
 
@@ -410,6 +456,15 @@ export default function Inventory() {
                                     onChange={e => setNewItem({ ...newItem, description: e.target.value })} />
                             </div>
                         )}
+                        {newItem.kind === 'retail' && (
+                            <div style={{ gridColumn: '1 / -1' }}>
+                                <label style={labelStyle}>Item Image (optional)</label>
+                                <ImagePicker
+                                    value={newItem.image_url}
+                                    onChange={dataUrl => setNewItem({ ...newItem, image_url: dataUrl })}
+                                />
+                            </div>
+                        )}
                         <div style={{ gridColumn: '1 / -1', marginTop: '6px' }}>
                             <button type="submit" className="glass-button" style={{ background: GREEN, color: 'white', width: '100%', fontWeight: 600 }}>
                                 Save Item
@@ -418,6 +473,69 @@ export default function Inventory() {
                     </form>
                 </div>
             )}
+
+            {/* ══ Retail Edit modal ══
+                Portaled to <body> so it escapes the parent .glass-panel's
+                backdrop-filter (which creates a containing block and traps
+                `position: fixed`, making it scroll with the list instead of
+                staying centered in the viewport). */}
+            {editing && createPortal((
+                <div style={{
+                    position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
+                }} onClick={cancelEdit}>
+                    <div onClick={e => e.stopPropagation()} style={{
+                        width: '520px', maxWidth: '92vw', maxHeight: '90vh', overflowY: 'auto',
+                        padding: '28px', background: 'rgba(255,255,255,0.96)',
+                        border: `1px solid ${GREEN}`, borderRadius: '14px',
+                        boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+                    }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                            <h2 style={{ margin: 0, color: GREEN_DARK }}>Edit: {editing.name}</h2>
+                            <button onClick={cancelEdit} style={{ background: 'none', border: 'none', cursor: 'pointer', color: GREEN_DARK }}>
+                                <X size={20} />
+                            </button>
+                        </div>
+                        <form onSubmit={handleEditSave} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+                            <div style={{ gridColumn: '1 / -1' }}>
+                                <label style={labelStyle}>Item Name</label>
+                                <input required className="glass-input" value={editForm.item_name}
+                                    onChange={e => setEditForm({ ...editForm, item_name: e.target.value })} />
+                            </div>
+                            <div>
+                                <label style={labelStyle}>Price ($)</label>
+                                <input required type="number" step="0.01" className="glass-input" value={editForm.price_cents}
+                                    onChange={e => setEditForm({ ...editForm, price_cents: e.target.value })} />
+                            </div>
+                            <div>
+                                <label style={labelStyle}>Stock</label>
+                                <input required type="number" min="0" className="glass-input" value={editForm.stock_count}
+                                    onChange={e => setEditForm({ ...editForm, stock_count: e.target.value })} />
+                            </div>
+                            <div>
+                                <label style={labelStyle}>Low-stock Threshold</label>
+                                <input required type="number" min="0" className="glass-input" value={editForm.restock_threshold}
+                                    onChange={e => setEditForm({ ...editForm, restock_threshold: e.target.value })} />
+                            </div>
+                            <div style={{ gridColumn: '1 / -1' }}>
+                                <label style={labelStyle}>Image</label>
+                                <ImagePicker
+                                    value={editForm.image_url || editForm.existing_image}
+                                    onChange={dataUrl => setEditForm({ ...editForm, image_url: dataUrl })}
+                                />
+                            </div>
+                            <div style={{ gridColumn: '1 / -1', display: 'flex', gap: '10px', marginTop: '4px' }}>
+                                <button type="button" onClick={cancelEdit} className="glass-button" style={{ flex: 1 }}>
+                                    Cancel
+                                </button>
+                                <button type="submit" className="glass-button" style={{ flex: 2, background: GREEN, color: 'white', fontWeight: 700 }}>
+                                    Save Changes
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            ), document.body)}
 
             {/* ══ ITEMS TAB ══ */}
             {mainTab === 'items' && (
@@ -428,6 +546,7 @@ export default function Inventory() {
                     selected={selected}
                     toggleSelect={toggleSelect}
                     onRestock={handleRestock}
+                    onEdit={canManage ? startEditRetail : null}
                 />
             )}
 
@@ -462,7 +581,7 @@ export default function Inventory() {
 // Sub-components
 // ═══════════════════════════════════════════════════════════════
 
-function ItemsList({ loading, items, manageMode, selected, toggleSelect, onRestock }) {
+function ItemsList({ loading, items, manageMode, selected, toggleSelect, onRestock, onEdit }) {
     if (loading) return <p style={{ color: GREEN_DARK }}>Loading inventory...</p>;
     if (items.length === 0) return (
         <div className="glass-panel" style={{ padding: '40px', textAlign: 'center', color: GREEN_DARK, background: 'rgba(255,255,255,0.55)' }}>
@@ -498,7 +617,19 @@ function ItemsList({ loading, items, manageMode, selected, toggleSelect, onResto
                                     style={{ width: '18px', height: '18px', accentColor: '#ef4444' }}
                                 />
                             )}
-                            <Package size={20} color={item.is_low_stock ? '#dc2626' : GREEN_DARK} />
+                            {item.image_url ? (
+                                <img
+                                    src={item.image_url}
+                                    alt={item.name}
+                                    style={{
+                                        width: '42px', height: '42px', objectFit: 'cover',
+                                        borderRadius: '8px', border: '1px solid rgba(121,162,128,0.25)',
+                                        background: 'white', flexShrink: 0,
+                                    }}
+                                />
+                            ) : (
+                                <Package size={20} color={item.is_low_stock ? '#dc2626' : GREEN_DARK} />
+                            )}
                             <div style={{ minWidth: 0 }}>
                                 <div style={{ fontWeight: 700, color: 'var(--color-text-dark)', fontSize: '15px' }}>{item.name}</div>
                                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center', fontSize: '12px', color: GREEN_DARK, marginTop: '2px' }}>
@@ -530,15 +661,30 @@ function ItemsList({ loading, items, manageMode, selected, toggleSelect, onResto
                                 </div>
                             )}
                             {!manageMode && (
-                                <button onClick={e => { e.stopPropagation(); onRestock(item); }}
-                                    style={{
-                                        padding: '6px 14px', fontSize: '12px', fontWeight: 600,
-                                        background: GREEN, color: 'white', border: 'none',
-                                        borderRadius: '8px', cursor: 'pointer',
-                                        display: 'flex', alignItems: 'center', gap: '5px',
-                                    }}>
-                                    <Plus size={14} /> Restock
-                                </button>
+                                <div style={{ display: 'flex', gap: '6px' }}>
+                                    {item.source === 'retail' && onEdit && (
+                                        <button onClick={e => { e.stopPropagation(); onEdit(item); }}
+                                            title="Edit item"
+                                            style={{
+                                                padding: '6px 10px', fontSize: '12px', fontWeight: 600,
+                                                background: 'rgba(121,162,128,0.18)', color: GREEN_DARK,
+                                                border: '1px solid rgba(121,162,128,0.35)',
+                                                borderRadius: '8px', cursor: 'pointer',
+                                                display: 'flex', alignItems: 'center', gap: '4px',
+                                            }}>
+                                            <Pencil size={12} /> Edit
+                                        </button>
+                                    )}
+                                    <button onClick={e => { e.stopPropagation(); onRestock(item); }}
+                                        style={{
+                                            padding: '6px 14px', fontSize: '12px', fontWeight: 600,
+                                            background: GREEN, color: 'white', border: 'none',
+                                            borderRadius: '8px', cursor: 'pointer',
+                                            display: 'flex', alignItems: 'center', gap: '5px',
+                                        }}>
+                                        <Plus size={14} /> Restock
+                                    </button>
+                                </div>
                             )}
                         </div>
                     </div>
@@ -640,3 +786,92 @@ const labelStyle = {
     textTransform: 'uppercase',
     letterSpacing: '0.04em',
 };
+
+// Client-side image resize + JPEG compression. Max 600px on the long edge
+// and quality 0.82 keeps a real photo around ~80 KB — well inside the
+// MEDIUMTEXT column headroom and tolerable for JSON payloads.
+function resizeToDataUrl(file, maxEdge = 600, quality = 0.82) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onerror = () => reject(reader.error);
+        reader.onload = () => {
+            const img = new Image();
+            img.onerror = () => reject(new Error('Invalid image.'));
+            img.onload = () => {
+                const scale = Math.min(1, maxEdge / Math.max(img.width, img.height));
+                const w = Math.round(img.width * scale);
+                const h = Math.round(img.height * scale);
+                const canvas = document.createElement('canvas');
+                canvas.width = w;
+                canvas.height = h;
+                canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+                resolve(canvas.toDataURL('image/jpeg', quality));
+            };
+            img.src = reader.result;
+        };
+        reader.readAsDataURL(file);
+    });
+}
+
+function ImagePicker({ value, onChange }) {
+    const [busy, setBusy] = useState(false);
+    const inputId = React.useId();
+    async function onFile(e) {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        if (!/^image\//.test(file.type)) {
+            alert('Please choose an image file.');
+            return;
+        }
+        if (file.size > 8 * 1024 * 1024) {
+            alert('Image too large (limit 8 MB).');
+            return;
+        }
+        try {
+            setBusy(true);
+            onChange(await resizeToDataUrl(file));
+        } catch (err) {
+            alert('Failed to read image: ' + err.message);
+        } finally {
+            setBusy(false);
+            e.target.value = '';
+        }
+    }
+    return (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{
+                width: '72px', height: '72px', flexShrink: 0,
+                borderRadius: '10px', border: '1px dashed rgba(121,162,128,0.5)',
+                background: value ? 'white' : 'rgba(255,255,255,0.6)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
+            }}>
+                {value
+                    ? <img src={value} alt="preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    : <ImagePlus size={24} color={GREEN_DARK} style={{ opacity: 0.6 }} />}
+            </div>
+            <div style={{ display: 'flex', gap: '8px' }}>
+                <label htmlFor={inputId}
+                    style={{
+                        cursor: busy ? 'wait' : 'pointer',
+                        background: GREEN, color: 'white', fontWeight: 600,
+                        padding: '8px 14px', borderRadius: '8px', fontSize: '13px',
+                        display: 'inline-flex', alignItems: 'center', gap: '6px',
+                        opacity: busy ? 0.7 : 1,
+                    }}>
+                    <ImagePlus size={14} /> {busy ? 'Processing…' : (value ? 'Replace' : 'Upload')}
+                </label>
+                <input id={inputId} type="file" accept="image/*" onChange={onFile} disabled={busy}
+                    style={{ display: 'none' }} />
+                {value && (
+                    <button type="button" onClick={() => onChange('')}
+                        style={{
+                            background: 'rgba(239,68,68,0.15)', color: '#b91c1c', border: '1px solid rgba(239,68,68,0.35)',
+                            padding: '8px 12px', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', fontWeight: 600,
+                        }}>
+                        Remove
+                    </button>
+                )}
+            </div>
+        </div>
+    );
+}

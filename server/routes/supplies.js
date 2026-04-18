@@ -152,6 +152,22 @@ router.patch('/requests/:id', requireRole('admin','manager'), async (req, res) =
                     'UPDATE inventory SET stock_count = stock_count + ? WHERE item_id = ?',
                     [sr.requested_quantity, sr.item_id]
                 );
+                // Also log this as an `inventory` event so the Retail filter in
+                // the Inventory Activity Log picks it up — Retail should
+                // reflect every shop-item restock, including those triggered
+                // by approving a supply request.
+                await conn.query(
+                    `INSERT INTO activity_log
+                     (action_type, description, performed_by, target_type, target_id, metadata)
+                     VALUES (?, ?, ?, 'inventory', ?, ?)`,
+                    [
+                        'supply_restocked',
+                        `Restocked ${sr.requested_quantity}x ${sr.item_name} (via approved request)`,
+                        req.user.employeeId || null,
+                        sr.item_id,
+                        JSON.stringify({ source: 'retail', quantity: sr.requested_quantity, via_request: sr.request_id }),
+                    ]
+                );
             } else {
                 await conn.query(
                     'UPDATE operational_supplies SET stock_count = stock_count + ? WHERE supply_id = ?',

@@ -85,7 +85,10 @@ router.post('/', requireRole('admin','manager'), async (req, res) => {
     }
 });
 
-// PATCH /api/inventory/:id/restock — add quantity to stock_count
+// PATCH /api/inventory/:id/restock — add quantity to stock_count.
+// Emits an activity_log entry so the Inventory → Retail filter can
+// actually show shop restocks (the Retail filter in the UI keys off
+// target_type='inventory').
 router.patch('/:id/restock', requireRole('admin', 'manager', 'retail'), async (req, res) => {
     const { quantity } = req.body;
     if (!quantity || quantity <= 0) return res.status(400).json({ error: 'Invalid quantity.' });
@@ -93,6 +96,23 @@ router.patch('/:id/restock', requireRole('admin', 'manager', 'retail'), async (r
         await db.query(
             'UPDATE inventory SET stock_count = stock_count + ? WHERE item_id = ?',
             [quantity, req.params.id]
+        );
+        const [rows] = await db.query(
+            'SELECT item_name FROM inventory WHERE item_id = ?',
+            [req.params.id]
+        );
+        const itemName = rows[0]?.item_name || `item #${req.params.id}`;
+        await db.query(
+            `INSERT INTO activity_log
+             (action_type, description, performed_by, target_type, target_id, metadata)
+             VALUES (?, ?, ?, 'inventory', ?, ?)`,
+            [
+                'supply_restocked',
+                `Restocked ${quantity}x ${itemName}`,
+                req.user?.employeeId || null,
+                req.params.id,
+                JSON.stringify({ source: 'retail', quantity, item_name: itemName }),
+            ]
         );
         return res.json({ success: true });
     } catch (err) {

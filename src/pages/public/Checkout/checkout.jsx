@@ -395,36 +395,46 @@ export default function Checkout() {
         }
       }
 
-      // 5b. Process membership purchase
+      // 5b+6: Membership + billing are "nice to have" after the money
+      // already moved. If either fails, the user's tickets are already
+      // valid — don't bail out of the whole checkout and show a scary
+      // alert. Just log and continue to the receipt screen.
       if (membershipPlan && customerId) {
         const startDate = new Date();
         const endDate = new Date();
         endDate.setDate(endDate.getDate() + (membershipPlan.duration_days || 365));
-        await api.patch('/customers/me/membership', {
-            is_member: true,
-            membership_type: membershipPlan.plan_name,
-            membership_start: startDate.toISOString().split('T')[0],
-            membership_end: endDate.toISOString().split('T')[0],
-          });
+        try {
+            await api.patch('/customers/me/membership', {
+                is_member: 1,
+                membership_type: membershipPlan.plan_name,
+                membership_start: startDate.toISOString().split('T')[0],
+                membership_end: endDate.toISOString().split('T')[0],
+            });
+        } catch (e) {
+            console.warn('Non-fatal: membership update failed after checkout.', e);
+        }
       }
 
-      // 6. Save billing/shipping to customer profile if logged in
       if (customerId) {
-        await api.patch('/customers/me/billing', {
-          billing_street: billing.street,
-          billing_city:   billing.city,
-          billing_state:  billing.state,
-          billing_zip:    billing.zip,
-          billing_phone:  billing.phone,
-          shipping_same_as_billing: sameAsBilling,
-          ...(sameAsBilling ? {} : {
-            shipping_street: shipping.street,
-            shipping_city:   shipping.city,
-            shipping_state:  shipping.state,
-            shipping_zip:    shipping.zip,
-            shipping_phone:  shipping.phone,
-          }),
-        });
+        try {
+            await api.patch('/customers/me/billing', {
+                billing_street: billing.street,
+                billing_city:   billing.city,
+                billing_state:  billing.state,
+                billing_zip:    billing.zip,
+                billing_phone:  billing.phone,
+                shipping_same_as_billing: sameAsBilling,
+                ...(sameAsBilling ? {} : {
+                    shipping_street: shipping.street,
+                    shipping_city:   shipping.city,
+                    shipping_state:  shipping.state,
+                    shipping_zip:    shipping.zip,
+                    shipping_phone:  shipping.phone,
+                }),
+            });
+        } catch (e) {
+            console.warn('Non-fatal: billing save failed after checkout.', e);
+        }
       }
 
       // Cleanup (receipt was written atomically with the transaction above)

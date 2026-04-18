@@ -1,13 +1,14 @@
 import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Swiper, SwiperSlide } from 'swiper/react';
 import { Autoplay, Pagination, Navigation, EffectFade } from 'swiper/modules';
 import { getUpcomingEvents } from '../../../api/public';
-import "./home.css"; 
+import { useAuth } from '../../../contexts/AuthContext';
+import "./home.css";
 import logo from '../../../images/logo.png';
 
 // Import React Icons
-import { FaClock, FaTicketAlt, FaMap, FaMapMarkerAlt, FaPhone, FaEnvelope, FaArrowRight } from 'react-icons/fa';
+import { FaClock, FaTicketAlt, FaMap, FaMapMarkerAlt, FaPhone, FaEnvelope, FaArrowRight, FaUserCircle, FaSignOutAlt } from 'react-icons/fa';
 
 // Import Swiper styles
 import 'swiper/css';
@@ -17,6 +18,18 @@ import 'swiper/css/effect-fade';
 
 export default function Home() {
   document.title = 'Welcome to Coog Zoo!';
+
+  const { user, role, customerId, signOut } = useAuth();
+  const navigate = useNavigate();
+  const dashboardPath =
+      role === 'admin'     ? '/dashboard/admin'
+    : role === 'manager'   ? '/dashboard/manager'
+    : role === 'vet'       ? '/dashboard/vet'
+    : role === 'caretaker' ? '/dashboard/caretaker'
+    : role === 'security' || role === 'retail' ? '/dashboard/employee'
+    : customerId ? '/dashboard/customer'
+    : '/account';
+  const handleLogout = async () => { await signOut(); navigate('/'); };
 
   // Static daily schedule for Today's Schedule section (first 5 events)
   const staticDailySchedule = [
@@ -199,8 +212,21 @@ export default function Home() {
             <Link to="/tickets" className="navbar-link">Buy Tickets</Link>
             <Link to="/shop" className="navbar-link">Shop</Link>
             <Link to="/membership" className="navbar-link">Membership</Link>
-            <Link to="/account" className="navbar-link">Customer Login</Link>
-            <Link to="/login" className="navbar-link">Staff Portal</Link>
+            {user ? (
+              <>
+                <Link to={dashboardPath} className="navbar-link user-dashboard-link">
+                  <FaUserCircle className="user-icon" /> Dashboard
+                </Link>
+                <button onClick={handleLogout} className="navbar-link logout-btn">
+                  <FaSignOutAlt className="user-icon" /> Logout
+                </button>
+              </>
+            ) : (
+              <>
+                <Link to="/account" className="navbar-link">Customer Login</Link>
+                <Link to="/login" className="navbar-link">Staff Portal</Link>
+              </>
+            )}
           </div>
         </div>
       </nav>

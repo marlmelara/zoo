@@ -54,6 +54,20 @@ router.get('/my', requireAuth, async (req, res) => {
             }
         };
 
+        // mysql2 returns DATETIMEs as naive strings ("YYYY-MM-DD HH:MM:SS") due
+        // to `dateStrings: true` in db.js. We store UTC (timezone: '+00:00'),
+        // but the browser's `new Date(str)` parses the naive form as *local*,
+        // shifting timestamps by the UTC offset. Re-emit as ISO with Z so
+        // clients always see the true UTC instant and can localize themselves.
+        const toIsoUtc = (v) => {
+            if (!v) return v;
+            if (v instanceof Date) return v.toISOString();
+            const s = String(v);
+            // Already ISO? leave it.
+            if (s.includes('T') && (s.endsWith('Z') || /[+-]\d{2}:\d{2}$/.test(s))) return s;
+            return s.replace(' ', 'T') + 'Z';
+        };
+
         const shaped = txns.map(t => {
             // Prefer the stored receipt line_items when present.
             let lineItems = t.line_items;
@@ -89,7 +103,11 @@ router.get('/my', requireAuth, async (req, res) => {
                 }
                 lineItems = derived;
             }
-            return { ...t, line_items: lineItems };
+            return {
+                ...t,
+                transaction_date: toIsoUtc(t.transaction_date),
+                line_items: lineItems,
+            };
         });
         return res.json(shaped);
     } catch (err) {
@@ -106,7 +124,16 @@ router.get('/', requireRole('admin', 'manager'), async (req, res) => {
              LEFT JOIN customers c ON t.customer_id = c.customer_id
              ORDER BY t.transaction_date DESC`
         );
-        return res.json(rows);
+        // Same UTC normalization as /my so the admin log matches reality.
+        const shaped = rows.map(r => {
+            if (!r.transaction_date) return r;
+            const s = String(r.transaction_date);
+            const iso = (s.includes('T') && (s.endsWith('Z') || /[+-]\d{2}:\d{2}$/.test(s)))
+                ? s
+                : s.replace(' ', 'T') + 'Z';
+            return { ...r, transaction_date: iso };
+        });
+        return res.json(shaped);
     } catch (err) {
         return res.status(500).json({ error: err.message });
     }

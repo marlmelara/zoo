@@ -156,14 +156,29 @@ router.patch('/:id/review', requireRole('admin', 'manager'), async (req, res) =>
              WHERE request_id = ?`,
             [status, req.user.employeeId, notes || null, req.params.id]
         );
-        // Log to activity_log so it shows up alongside supply-request activity.
+
+        // Look up the submitter + total hours so the activity-log entry reads
+        // as a sentence instead of "hours request #17".
+        const [[meta]] = await db.query(
+            `SELECT CONCAT(e.first_name, ' ', e.last_name) AS submitter,
+                    COALESCE(SUM(hre.hours), 0) AS total_hours
+             FROM hours_requests hr
+             LEFT JOIN employees e            ON e.employee_id = hr.employee_id
+             LEFT JOIN hours_request_entries hre ON hre.request_id = hr.request_id
+             WHERE hr.request_id = ?
+             GROUP BY hr.request_id`,
+            [req.params.id]
+        );
+        const submitter  = meta?.submitter?.trim() || 'an employee';
+        const totalHours = Number(meta?.total_hours || 0).toFixed(2);
+
         await db.query(
             `INSERT INTO activity_log
              (action_type, description, performed_by, target_type, target_id, metadata)
              VALUES (?, ?, ?, 'hours_request', ?, ?)`,
             [
                 status === 'approved' ? 'supply_request_approved' : 'supply_request_denied',
-                `${status === 'approved' ? 'Approved' : 'Denied'} hours request #${req.params.id}`,
+                `${status === 'approved' ? 'Approved' : 'Denied'} ${totalHours} hrs submitted by ${submitter}`,
                 req.user.employeeId,
                 req.params.id,
                 JSON.stringify({ hours_request_id: Number(req.params.id), status, notes: notes || null }),

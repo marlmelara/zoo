@@ -4,7 +4,7 @@ import { useAuth } from '../../../contexts/AuthContext';
 import api from '../../../lib/api';
 import {
     User, Ticket, Heart, Calendar, MapPin, Phone, Mail,
-    Star, Gift, ShoppingCart, RefreshCw, Clock, Package, Trash2, AlertTriangle
+    Star, Gift, ShoppingCart, RefreshCw, Clock, Package, Trash2, AlertTriangle, LogOut
 } from 'lucide-react';
 
 const TABS = ['My Profile', 'My Purchases', 'My Tickets', 'My Donations', 'Events'];
@@ -235,19 +235,43 @@ export default function CustomerDashboard() {
                         Welcome back{profile ? `, ${profile.first_name}` : ''}!
                     </p>
                 </div>
-                {isMembershipActive && (
-                    <div style={{
-                        display: 'flex', alignItems: 'center', gap: '8px',
-                        padding: '8px 16px', borderRadius: '20px',
-                        background: `${membershipColor(profile.membership_type)}22`,
-                        border: `1px solid ${membershipColor(profile.membership_type)}44`
-                    }}>
-                        <Star size={16} color={membershipColor(profile.membership_type)} />
-                        <span style={{ fontWeight: 600, color: membershipColor(profile.membership_type), textTransform: 'capitalize' }}>
-                            {profile.membership_type} Member
-                        </span>
+                <div style={{ display: 'flex', gap: '20px' }}>
+                    {isMembershipActive && (
+                        <div className="glass-panel" style={{ background: 'rgba(255,255,255,0.5)', padding: '10px 20px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <Star size={16} color={membershipColor(profile.membership_type)} />
+                            <div>
+                                <span style={{ display: 'block', fontSize: '12px', color: 'var(--color-text-muted)' }}>Membership</span>
+                                <span style={{ fontWeight: 'bold', fontSize: '14px', textTransform: 'capitalize' }}>{profile.membership_type}</span>
+                            </div>
+                        </div>
+                    )}
+                    <div
+                        className="glass-panel"
+                        onClick={signOut}
+                        style={{
+                            background: 'rgba(255,255,255,0.5)',
+                            padding: '10px 20px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '10px',
+                            cursor: 'pointer',
+                            transition: 'transform 0.2s ease, box-shadow 0.2s ease'
+                        }}
+                        onMouseEnter={(e) => {
+                            e.currentTarget.style.transform = 'translateY(-2px)';
+                            e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
+                        }}
+                        onMouseLeave={(e) => {
+                            e.currentTarget.style.transform = 'translateY(0)';
+                            e.currentTarget.style.boxShadow = 'none';
+                        }}
+                    >
+                        <LogOut size={16} color="#6d8243" />
+                        <div>
+                            <span style={{ display: 'block', fontSize: '15px', color: 'var(--color-text-dark)' }}>Sign Out</span>
+                        </div>
                     </div>
-                )}
+                </div>
             </div>
 
             {/* Tab Navigation */}
@@ -258,10 +282,11 @@ export default function CustomerDashboard() {
                         className="glass-button"
                         onClick={() => setActiveTab(tab)}
                         style={{
-                            background: activeTab === tab ? 'var(--color-primary)' : 'rgba(255,255,255,0.05)',
+                            background: activeTab === tab ? '#6d8243' : 'rgba(255,255,255,0.5)',
+                            color: activeTab === tab ? 'white' : 'var(--zoo-muted)',
                             padding: '10px 20px',
                             fontSize: '14px',
-                            fontWeight: activeTab === tab ? 700 : 400
+                            fontWeight: activeTab === tab ? 700 : 400,
                         }}
                     >
                         {tab}
@@ -275,12 +300,12 @@ export default function CustomerDashboard() {
                     {profileLoading ? <p>Loading profile...</p> : !profile ? (
                         <p style={{ color: 'var(--color-text-muted)' }}>Could not load profile.</p>
                     ) : editing ? (
-                        <div className="glass-panel" style={{ padding: '30px' }}>
+                        <div className="glass-panel" style={{ background: 'rgba(255,255,255,0.5)', padding: '30px' }}>
                             <h2 style={{ marginTop: 0 }}>Edit Profile</h2>
                             {profileIncomplete && (
-                                <div style={{ marginBottom: '16px', padding: '12px 16px', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '10px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                    <AlertTriangle size={18} color="#f59e0b" />
-                                    <span style={{ fontSize: '0.9rem', color: '#fcd34d' }}>
+                                <div style={{ marginBottom: '16px', padding: '12px 16px', background: 'rgba(109,130,67,0.1)', border: '1px solid rgba(109,130,67,0.3)', borderRadius: '10px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                    <AlertTriangle size={18} color="#6d8243" />
+                                    <span style={{ fontSize: '0.9rem', color: '#6d8243' }}>
                                         Please complete all required profile information before continuing.
                                     </span>
                                 </div>
@@ -288,27 +313,27 @@ export default function CustomerDashboard() {
                             <form onSubmit={handleProfileUpdate} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
                                 <div>
                                     <label style={{ fontSize: '12px', color: 'var(--color-text-muted)', display: 'block', marginBottom: '5px' }}>First Name <span style={{ color: '#ef4444' }}>*</span></label>
-                                    <input className="glass-input" value={editForm.first_name || ''} onChange={e => setEditForm({ ...editForm, first_name: e.target.value })} required maxLength={50} />
+                                    <input className="glass-input" value={editForm.first_name || ''} onChange={e => setEditForm({ ...editForm, first_name: e.target.value })} required />
                                 </div>
                                 <div>
                                     <label style={{ fontSize: '12px', color: 'var(--color-text-muted)', display: 'block', marginBottom: '5px' }}>Last Name <span style={{ color: '#ef4444' }}>*</span></label>
-                                    <input className="glass-input" value={editForm.last_name || ''} onChange={e => setEditForm({ ...editForm, last_name: e.target.value })} required maxLength={50} />
+                                    <input className="glass-input" value={editForm.last_name || ''} onChange={e => setEditForm({ ...editForm, last_name: e.target.value })} required />
                                 </div>
                                 <div>
                                     <label style={{ fontSize: '12px', color: 'var(--color-text-muted)', display: 'block', marginBottom: '5px' }}>Phone <span style={{ color: '#ef4444' }}>*</span></label>
-                                    <input className="glass-input" type="tel" value={editForm.phone || ''} onChange={e => setEditForm({ ...editForm, phone: formatPhone(e.target.value) })} required maxLength={14} inputMode="numeric" placeholder="(123) 456-7890" />
+                                    <input className="glass-input" type="tel" value={editForm.phone || ''} onChange={e => setEditForm({ ...editForm, phone: e.target.value })} required />
                                 </div>
                                 <div>
                                     <label style={{ fontSize: '12px', color: 'var(--color-text-muted)', display: 'block', marginBottom: '5px' }}>Date of Birth <span style={{ color: '#ef4444' }}>*</span></label>
-                                    <input className="glass-input" type="date" value={editForm.date_of_birth || ''} onChange={e => setEditForm({ ...editForm, date_of_birth: e.target.value })} required min={minDob} max={todayStr} />
+                                    <input className="glass-input" type="date" value={editForm.date_of_birth || ''} onChange={e => setEditForm({ ...editForm, date_of_birth: e.target.value })} required />
                                 </div>
                                 <div style={{ gridColumn: '1 / -1' }}>
                                     <label style={{ fontSize: '12px', color: 'var(--color-text-muted)', display: 'block', marginBottom: '5px' }}>Street Address <span style={{ color: '#ef4444' }}>*</span></label>
-                                    <input className="glass-input" value={editForm.address || ''} onChange={e => setEditForm({ ...editForm, address: e.target.value })} required maxLength={200} />
+                                    <input className="glass-input" value={editForm.address || ''} onChange={e => setEditForm({ ...editForm, address: e.target.value })} required />
                                 </div>
                                 <div>
                                     <label style={{ fontSize: '12px', color: 'var(--color-text-muted)', display: 'block', marginBottom: '5px' }}>City <span style={{ color: '#ef4444' }}>*</span></label>
-                                    <input className="glass-input" value={editForm.city || ''} onChange={e => setEditForm({ ...editForm, city: e.target.value })} required maxLength={100} />
+                                    <input className="glass-input" value={editForm.city || ''} onChange={e => setEditForm({ ...editForm, city: e.target.value })} required />
                                 </div>
                                 <div>
                                     <label style={{ fontSize: '12px', color: 'var(--color-text-muted)', display: 'block', marginBottom: '5px' }}>State <span style={{ color: '#ef4444' }}>*</span></label>
@@ -319,10 +344,10 @@ export default function CustomerDashboard() {
                                 </div>
                                 <div>
                                     <label style={{ fontSize: '12px', color: 'var(--color-text-muted)', display: 'block', marginBottom: '5px' }}>Zip Code <span style={{ color: '#ef4444' }}>*</span></label>
-                                    <input className="glass-input" value={editForm.zip_code || ''} onChange={e => setEditForm({ ...editForm, zip_code: digitsOnly(e.target.value, 5) })} required maxLength={5} inputMode="numeric" pattern="\d{5}" placeholder="12345" />
+                                    <input className="glass-input" value={editForm.zip_code || ''} onChange={e => setEditForm({ ...editForm, zip_code: e.target.value })} required />
                                 </div>
                                 <div style={{ gridColumn: '1 / -1', display: 'flex', gap: '10px', marginTop: '10px' }}>
-                                    <button type="submit" className="glass-button" style={{ background: 'var(--color-primary)', flex: 1 }}>Save Changes</button>
+                                    <button type="submit" className="glass-button" style={{ background: '#6d8243', flex: 1 }}>Save Changes</button>
                                     {!profileIncomplete && (
                                         <button type="button" className="glass-button" onClick={() => { setEditing(false); setEditForm(profile); }} style={{ flex: 1 }}>Cancel</button>
                                     )}
@@ -332,12 +357,12 @@ export default function CustomerDashboard() {
                     ) : (
                         <div>
                             {/* Profile Card */}
-                            <div className="glass-panel" style={{ padding: '30px', marginBottom: '20px' }}>
+                            <div className="glass-panel" style={{ background: 'rgba(255,255,255,0.5)', padding: '30px', marginBottom: '20px' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '25px' }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
                                         <div style={{
                                             width: '70px', height: '70px', borderRadius: '50%',
-                                            background: 'var(--color-primary)', display: 'flex',
+                                            background: '#6d8243', display: 'flex',
                                             alignItems: 'center', justifyContent: 'center'
                                         }}>
                                             <User size={35} color="white" />
@@ -346,7 +371,7 @@ export default function CustomerDashboard() {
                                             <h2 style={{ margin: 0 }}>{profile.first_name} {profile.last_name}</h2>
                                             {isMembershipActive ? (
                                                 <span style={{
-                                                    fontSize: '13px', padding: '4px 10px', borderRadius: '20px',
+                                                    fontSize: '13px', padding: '4px 10px', borderRadius: '20px', marginBottom: '2rem',
                                                     background: `${membershipColor(profile.membership_type)}22`,
                                                     color: membershipColor(profile.membership_type),
                                                     textTransform: 'capitalize', fontWeight: 600
@@ -364,21 +389,21 @@ export default function CustomerDashboard() {
                                 </div>
 
                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
-                                    <div style={{ background: 'rgba(255,255,255,0.05)', padding: '15px', borderRadius: '10px' }}>
+                                    <div style={{ background: 'rgba(0,0,0,0.05)', padding: '15px', borderRadius: '10px' }}>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '5px' }}>
                                             <Mail size={14} color="var(--color-text-muted)" />
                                             <p style={{ fontSize: '12px', color: 'var(--color-text-muted)', margin: 0}}>Email</p>
                                         </div>
                                         <p style={{ fontWeight: 600, margin: 0 }}>{profile.email || user?.email || 'Not set'}</p>
                                     </div>
-                                    <div style={{ background: 'rgba(255,255,255,0.05)', padding: '15px', borderRadius: '10px' }}>
+                                    <div style={{ background: 'rgba(0,0,0,0.05)', padding: '15px', borderRadius: '10px' }}>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '5px' }}>
                                             <Phone size={14} color="var(--color-text-muted)" />
                                             <p style={{ fontSize: '12px', color: 'var(--color-text-muted)', margin: 0 }}>Phone</p>
                                         </div>
                                         <p style={{ fontWeight: 600, margin: 0 }}>{profile.phone || 'Not set'}</p>
                                     </div>
-                                    <div style={{ background: 'rgba(255,255,255,0.05)', padding: '15px', borderRadius: '10px' }}>
+                                    <div style={{ background: 'rgba(0,0,0,0.05)', padding: '15px', borderRadius: '10px' }}>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '5px' }}>
                                             <MapPin size={14} color="var(--color-text-muted)" />
                                             <p style={{ fontSize: '12px', color: 'var(--color-text-muted)', margin: 0 }}>Address</p>
@@ -387,7 +412,7 @@ export default function CustomerDashboard() {
                                             {profile.address ? [profile.address, profile.city, profile.state, profile.zip_code].filter(Boolean).join(', ') : 'Not set'}
                                         </p>
                                     </div>
-                                    <div style={{ background: 'rgba(255,255,255,0.05)', padding: '15px', borderRadius: '10px' }}>
+                                    <div style={{ background: 'rgba(0,0,0,0.05)', padding: '15px', borderRadius: '10px' }}>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '5px' }}>
                                             <Calendar size={14} color="var(--color-text-muted)" />
                                             <p style={{ fontSize: '12px', color: 'var(--color-text-muted)', margin: 0 }}>Date of Birth</p>
@@ -401,40 +426,40 @@ export default function CustomerDashboard() {
 
                             {/* Profile Completion Prompt */}
                             {(!profile.phone || !profile.address || !profile.date_of_birth) && (
-                                <div style={{ marginBottom: '20px', padding: '16px 20px', background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.3)', borderRadius: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <div style={{ marginBottom: '20px', padding: '16px 20px', background: 'rgba(109,130,67,0.1)', border: '1px solid rgba(109,130,67,0.3)', borderRadius: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                     <div>
                                         <p style={{ margin: '0 0 4px', fontWeight: 600, fontSize: '0.9rem' }}>Complete your profile</p>
                                         <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
                                             Add your {[!profile.phone && 'phone number', !profile.date_of_birth && 'date of birth', !profile.address && 'address'].filter(Boolean).join(', ')} for faster checkout.
                                         </p>
                                     </div>
-                                    <button className="glass-button" onClick={() => setEditing(true)} style={{ padding: '8px 16px', fontSize: '0.8rem', background: 'rgba(59,130,246,0.25)', flexShrink: 0 }}>
+                                    <button className="glass-button" onClick={() => setEditing(true)} style={{ padding: '8px 16px', fontSize: '0.8rem', background: 'rgba(109,130,67,0.25)', flexShrink: 0 }}>
                                         Edit Profile
                                     </button>
                                 </div>
                             )}
 
                             {/* Membership Card */}
-                            <div className="glass-panel" style={{ padding: '25px' }}>
+                            <div className="glass-panel" style={{ background: 'rgba(255,255,255,0.5)', padding: '25px' }}>
                                 <h3 style={{ margin: '0 0 15px', display: 'flex', alignItems: 'center', gap: '10px' }}>
                                     <Star size={20} color={membershipColor(profile.membership_type)} /> Membership
                                 </h3>
                                 {isMembershipActive ? (
                                     <div>
                                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '15px' }}>
-                                            <div style={{ background: 'rgba(255,255,255,0.05)', padding: '15px', borderRadius: '10px' }}>
+                                            <div style={{ background: 'rgba(0,0,0,0.05)', padding: '15px', borderRadius: '10px' }}>
                                                 <p style={{ fontSize: '12px', color: 'var(--color-text-muted)', margin: '0 0 5px' }}>Plan</p>
                                                 <p style={{ fontWeight: 600, margin: 0, textTransform: 'capitalize', color: membershipColor(profile.membership_type) }}>
                                                     {profile.membership_type}
                                                 </p>
                                             </div>
-                                            <div style={{ background: 'rgba(255,255,255,0.05)', padding: '15px', borderRadius: '10px' }}>
+                                            <div style={{ background: 'rgba(0,0,0,0.05)', padding: '15px', borderRadius: '10px' }}>
                                                 <p style={{ fontSize: '12px', color: 'var(--color-text-muted)', margin: '0 0 5px' }}>Start Date</p>
                                                 <p style={{ fontWeight: 600, margin: 0 }}>
                                                     {profile.membership_start ? new Date(profile.membership_start).toLocaleDateString() : 'N/A'}
                                                 </p>
                                             </div>
-                                            <div style={{ background: 'rgba(255,255,255,0.05)', padding: '15px', borderRadius: '10px' }}>
+                                            <div style={{ background: 'rgba(0,0,0,0.05)', padding: '15px', borderRadius: '10px' }}>
                                                 <p style={{ fontSize: '12px', color: 'var(--color-text-muted)', margin: '0 0 5px' }}>Expires</p>
                                                 <p style={{ fontWeight: 600, margin: 0 }}>
                                                     {profile.membership_end ? new Date(profile.membership_end).toLocaleDateString() : 'N/A'}
@@ -443,7 +468,7 @@ export default function CustomerDashboard() {
                                         </div>
                                         {profile.membership_end && new Date(profile.membership_end) < new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) && (
                                             <div style={{ marginTop: '15px', padding: '12px 16px', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                                <span style={{ fontSize: '0.85rem', color: '#fcd34d' }}>
+                                                <span style={{ fontSize: '0.85rem', color: '#d97706' }}>
                                                     <RefreshCw size={14} style={{ marginRight: '6px', verticalAlign: 'middle' }} />
                                                     Your membership expires soon. Renew to keep your perks!
                                                 </span>
@@ -459,7 +484,7 @@ export default function CustomerDashboard() {
                                                     };
                                                     localStorage.setItem('zooCart', JSON.stringify(cart));
                                                     navigate('/checkout');
-                                                }} style={{ background: 'var(--color-secondary)', padding: '8px 16px', fontSize: '0.8rem' }}>
+                                                }} style={{ background: '#6d8243', padding: '8px 16px', fontSize: '0.8rem' }}>
                                                     Renew Membership
                                                 </button>
                                             </div>
@@ -473,7 +498,7 @@ export default function CustomerDashboard() {
                                         <Gift size={32} style={{ marginBottom: '10px', opacity: 0.5 }} />
                                         <p>You don't have an active membership.</p>
                                         <p style={{ fontSize: '13px', marginBottom: '15px' }}>Become a member for free admission, discounts, and exclusive perks!</p>
-                                        <button className="glass-button" onClick={() => navigate('/tickets')} style={{ background: 'var(--color-primary)', padding: '10px 24px', fontSize: '0.9rem' }}>
+                                        <button className="glass-button" onClick={() => navigate('/tickets')} style={{ background: '#6d8243', padding: '10px 24px', fontSize: '0.9rem' }}>
                                             View Membership Plans
                                         </button>
                                     </div>
@@ -500,14 +525,14 @@ export default function CustomerDashboard() {
                             {/* Delete Confirmation Modal */}
                             {showDeleteConfirm && (
                                 <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.7)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }} onClick={() => setShowDeleteConfirm(false)}>
-                                    <div className="glass-panel" onClick={e => e.stopPropagation()} style={{ padding: '30px', maxWidth: '440px', width: '100%', textAlign: 'center' }}>
+                                    <div className="glass-panel" onClick={e => e.stopPropagation()} style={{ background: 'rgba(255,255,255,0.95)', padding: '30px', maxWidth: '440px', width: '100%', textAlign: 'center' }}>
                                         <AlertTriangle size={48} color="#ef4444" style={{ marginBottom: '16px' }} />
                                         <h2 style={{ margin: '0 0 8px' }}>Are you sure?</h2>
                                         <p style={{ color: 'var(--color-text-muted)', fontSize: '0.9rem', marginBottom: '24px' }}>
                                             This will permanently delete your account, purchase history, and all associated data. This action <strong style={{ color: '#f87171' }}>cannot be undone</strong>.
                                         </p>
                                         <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
-                                            <button className="glass-button" onClick={() => setShowDeleteConfirm(false)} style={{ padding: '10px 24px', background: 'rgba(255,255,255,0.1)' }}>
+                                            <button className="glass-button" onClick={() => setShowDeleteConfirm(false)} style={{ padding: '10px 24px', background: 'rgba(0,0,0,0.1)' }}>
                                                 Cancel
                                             </button>
                                             <button className="glass-button" onClick={handleDeleteAccount} disabled={deleting} style={{ padding: '10px 24px', background: '#ef4444', color: 'white' }}>
@@ -529,7 +554,7 @@ export default function CustomerDashboard() {
                         <h2 style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: 0 }}>
                             <Package size={24} /> My Purchases
                         </h2>
-                        <button className="glass-button" onClick={() => navigate('/tickets')} style={{ background: 'var(--color-secondary)', padding: '8px 18px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <button className="glass-button" onClick={() => navigate('/tickets')} style={{ background: '#6d8243', padding: '8px 18px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px', color: 'white' }}>
                             <ShoppingCart size={14} /> Shop Now
                         </button>
                     </div>
@@ -546,11 +571,11 @@ export default function CustomerDashboard() {
                         </div>
                     )}
                     {purchasesLoading ? <p>Loading purchases...</p> : purchases.length === 0 ? (
-                        <div className="glass-panel" style={{ padding: '40px', textAlign: 'center', color: 'var(--color-text-muted)' }}>
+                        <div className="glass-panel" style={{ background: 'rgba(255,255,255,0.5)', padding: '40px', textAlign: 'center', color: 'var(--color-text-muted)' }}>
                             <Package size={48} style={{ marginBottom: '15px', opacity: 0.3 }} />
                             <p>No purchases yet.</p>
                             <p style={{ fontSize: '13px', marginBottom: '15px' }}>Your order history and itemized receipts will appear here.</p>
-                            <button className="glass-button" onClick={() => navigate('/tickets')} style={{ background: 'var(--color-primary)', padding: '10px 24px' }}>
+                            <button className="glass-button" onClick={() => navigate('/tickets')} style={{ background: '#6d8243', padding: '10px 24px' }}>
                                 Browse Tickets & Shop
                             </button>
                         </div>
@@ -564,7 +589,7 @@ export default function CustomerDashboard() {
                             }).map(txn => {
                                 const lineItems = Array.isArray(txn.line_items) ? txn.line_items : (typeof txn.line_items === 'string' ? JSON.parse(txn.line_items || '[]') : []);
                                 return (
-                                    <div key={txn.transaction_id} className="glass-panel" style={{ padding: '20px' }}>
+                                    <div key={txn.transaction_id} className="glass-panel" style={{ background: 'rgba(255,255,255,0.5)', padding: '20px' }}>
                                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: lineItems.length > 0 ? '12px' : 0 }}>
                                             <div>
                                                 <h3 style={{ margin: '0 0 4px', fontSize: '1rem' }}>
@@ -577,24 +602,24 @@ export default function CustomerDashboard() {
                                                     {new Date(txn.transaction_date).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}
                                                 </div>
                                             </div>
-                                            <p style={{ fontWeight: 'bold', fontSize: '18px', margin: 0, color: 'var(--color-primary)' }}>
+                                            <p style={{ fontWeight: 'bold', fontSize: '18px', margin: 0, color: '#6d8243' }}>
                                                 ${(txn.total_amount_cents / 100).toFixed(2)}
                                             </p>
                                         </div>
                                         {lineItems.length > 0 && (
-                                            <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', padding: '12px' }}>
+                                            <div style={{ background: 'rgba(0,0,0,0.05)', border: '1px solid rgba(0,0,0,0.08)', borderRadius: '8px', padding: '12px' }}>
                                                 {lineItems.map((item, idx) => (
-                                                    <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 0', borderBottom: idx < lineItems.length - 1 ? '1px solid rgba(255,255,255,0.06)' : 'none' }}>
+                                                    <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 0', borderBottom: idx < lineItems.length - 1 ? '1px solid rgba(0,0,0,0.06)' : 'none' }}>
                                                         <span style={{ fontSize: '13px' }}>
                                                             {item.description} <span style={{ color: 'var(--color-text-muted)' }}>x{item.quantity}</span>
                                                         </span>
-                                                        <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-primary)' }}>
+                                                        <span style={{ fontSize: '13px', fontWeight: 600, color: '#6d8243' }}>
                                                             ${((item.unitPriceCents * item.quantity) / 100).toFixed(2)}
                                                         </span>
                                                     </div>
                                                 ))}
                                                 {(txn.subtotal_cents != null) && (
-                                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '8px', paddingTop: '8px', borderTop: '1px solid rgba(255,255,255,0.1)', fontSize: '12px', color: 'var(--color-text-muted)' }}>
+                                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '8px', paddingTop: '8px', borderTop: '1px solid rgba(0,0,0,0.1)', fontSize: '12px', color: 'var(--color-text-muted)' }}>
                                                         <span>Subtotal: ${(txn.subtotal_cents / 100).toFixed(2)}</span>
                                                         <span>Tax: ${(txn.tax_cents / 100).toFixed(2)}</span>
                                                     </div>
@@ -604,9 +629,9 @@ export default function CustomerDashboard() {
                                     </div>
                                 );
                             })}
-                            <div style={{ background: 'rgba(255,255,255,0.05)', padding: '15px', borderRadius: '10px', textAlign: 'right' }}>
+                            <div style={{ background: 'rgba(0,0,0,0.05)', padding: '15px', borderRadius: '10px', textAlign: 'right' }}>
                                 <span style={{ color: 'var(--color-text-muted)', marginRight: '15px' }}>Total Spent:</span>
-                                <span style={{ fontWeight: 'bold', fontSize: '20px', color: 'var(--color-primary)' }}>
+                                <span style={{ fontWeight: 'bold', fontSize: '20px', color: '#206718' }}>
                                     ${(purchases.reduce((sum, t) => sum + t.total_amount_cents, 0) / 100).toFixed(2)}
                                 </span>
                             </div>
@@ -622,7 +647,7 @@ export default function CustomerDashboard() {
                         <h2 style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: 0 }}>
                             <Ticket size={24} /> My Tickets
                         </h2>
-                        <button className="glass-button" onClick={() => navigate('/tickets')} style={{ background: 'var(--color-secondary)', padding: '8px 18px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <button className="glass-button" onClick={() => navigate('/tickets')} style={{ background: '#6d8243', padding: '8px 18px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px', color: 'white'}}>
                             <ShoppingCart size={14} /> Buy Tickets
                         </button>
                     </div>
@@ -645,11 +670,11 @@ export default function CustomerDashboard() {
                         </div>
                     )}
                     {ticketsLoading ? <p>Loading tickets...</p> : tickets.length === 0 ? (
-                        <div className="glass-panel" style={{ padding: '40px', textAlign: 'center', color: 'var(--color-text-muted)' }}>
+                        <div className="glass-panel" style={{ background: 'rgba(255,255,255,0.5)', padding: '40px', textAlign: 'center', color: 'var(--color-text-muted)' }}>
                             <Ticket size={48} style={{ marginBottom: '15px', opacity: 0.3 }} />
                             <p>No tickets purchased yet.</p>
                             <p style={{ fontSize: '13px', marginBottom: '15px' }}>Buy tickets from our website to visit the zoo!</p>
-                            <button className="glass-button" onClick={() => navigate('/tickets')} style={{ background: 'var(--color-primary)', padding: '10px 24px' }}>
+                            <button className="glass-button" onClick={() => navigate('/tickets')} style={{ background: '#6d8243', padding: '10px 24px' }}>
                                 Browse Tickets
                             </button>
                         </div>
@@ -667,7 +692,7 @@ export default function CustomerDashboard() {
                         const renderAdmission = (ticket) => {
                             const purchaseDate = ticket.transactions?.transaction_date;
                             return (
-                                <div key={ticket.ticket_id} className="glass-panel" style={{ padding: '20px' }}>
+                                <div key={ticket.ticket_id} className="glass-panel" style={{ background: 'rgba(255,255,255,0.5)', padding: '20px' }}>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
                                         <div style={{ display: 'flex', alignItems: 'start', gap: '15px', flex: 1 }}>
                                             <div style={{
@@ -675,13 +700,13 @@ export default function CustomerDashboard() {
                                                 background: 'rgba(16, 185, 129, 0.2)',
                                                 display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
                                             }}>
-                                                <Ticket size={22} color="var(--color-primary)" />
+                                                <Ticket size={22} color="#6d8243" />
                                             </div>
                                             <div style={{ flex: 1 }}>
                                                 <h3 style={{ margin: '0 0 4px' }}>General Admission</h3>
                                                 <span style={{
                                                     fontSize: '11px', padding: '2px 8px', borderRadius: '10px',
-                                                    background: 'rgba(255,255,255,0.1)', textTransform: 'capitalize'
+                                                    background: 'rgba(0,0,0,0.05)', textTransform: 'capitalize'
                                                 }}>
                                                     {ticketTypeLabel(ticket.type)}
                                                 </span>
@@ -694,7 +719,7 @@ export default function CustomerDashboard() {
                                             </div>
                                         </div>
                                         <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: '12px' }}>
-                                            <p style={{ fontWeight: 'bold', fontSize: '18px', margin: 0, color: 'var(--color-primary)' }}>
+                                            <p style={{ fontWeight: 'bold', fontSize: '18px', margin: 0, color: '#6d8243' }}>
                                                 ${(ticket.price_cents / 100).toFixed(2)}
                                             </p>
                                             <p style={{ fontSize: '11px', color: 'var(--color-text-muted)', margin: 0 }}>
@@ -710,7 +735,7 @@ export default function CustomerDashboard() {
                             const ev = ticket.events;
                             const purchaseDate = ticket.transactions?.transaction_date;
                             return (
-                                <div key={ticket.ticket_id} className="glass-panel" style={{ padding: '20px' }}>
+                                <div key={ticket.ticket_id} className="glass-panel" style={{ background: 'rgba(255,255,255,0.5)', padding: '20px' }}>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
                                         <div style={{ display: 'flex', alignItems: 'start', gap: '15px', flex: 1 }}>
                                             <div style={{
@@ -724,7 +749,7 @@ export default function CustomerDashboard() {
                                                 <h3 style={{ margin: '0 0 4px' }}>{ev.title}</h3>
                                                 <span style={{
                                                     fontSize: '11px', padding: '2px 8px', borderRadius: '10px',
-                                                    background: 'rgba(245,158,11,0.15)', color: '#fbbf24', textTransform: 'capitalize'
+                                                    background: 'rgba(245,158,11,0.15)', color: '#d97706', textTransform: 'capitalize'
                                                 }}>
                                                     Event
                                                 </span>
@@ -733,7 +758,7 @@ export default function CustomerDashboard() {
                                                         <p style={{ fontSize: '13px', color: 'var(--color-text-muted)', margin: '0 0 4px' }}>{ev.description}</p>
                                                     )}
                                                     {ev.event_date && (
-                                                        <p style={{ fontSize: '13px', color: 'var(--color-secondary)', fontWeight: 600, margin: '0 0 3px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                                        <p style={{ fontSize: '13px', fontWeight: 600, margin: '0 0 3px', display: 'flex', alignItems: 'center', gap: '5px' }}>
                                                             <Clock size={12} />
                                                             {new Date(ev.event_date).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
                                                             {ev.start_time && ` · ${formatTime(ev.start_time)}`}
@@ -755,7 +780,7 @@ export default function CustomerDashboard() {
                                             </div>
                                         </div>
                                         <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: '12px' }}>
-                                            <p style={{ fontWeight: 'bold', fontSize: '18px', margin: 0, color: 'var(--color-primary)' }}>
+                                            <p style={{ fontWeight: 'bold', fontSize: '18px', margin: 0, color: '#6d8243' }}>
                                                 ${(ticket.price_cents / 100).toFixed(2)}
                                             </p>
                                             <p style={{ fontSize: '11px', color: 'var(--color-text-muted)', margin: 0 }}>
@@ -771,7 +796,7 @@ export default function CustomerDashboard() {
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                                 {admissionTickets.length > 0 && (
                                     <div>
-                                        <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '0 0 10px', fontSize: '1rem', color: 'var(--color-primary)' }}>
+                                        <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '0 0 10px', fontSize: '1rem', color: '#6d8243' }}>
                                             <Ticket size={18} /> Admission Tickets ({admissionTickets.length})
                                         </h3>
                                         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -789,9 +814,9 @@ export default function CustomerDashboard() {
                                         </div>
                                     </div>
                                 )}
-                                <div style={{ background: 'rgba(255,255,255,0.05)', padding: '15px', borderRadius: '10px', textAlign: 'right' }}>
+                                <div style={{ background: 'rgba(0,0,0,0.05)', padding: '15px', borderRadius: '10px', textAlign: 'right' }}>
                                     <span style={{ color: 'var(--color-text-muted)', marginRight: '15px' }}>Total Spent:</span>
-                                    <span style={{ fontWeight: 'bold', fontSize: '20px', color: 'var(--color-primary)' }}>
+                                    <span style={{ fontWeight: 'bold', fontSize: '20px', color: '#6d8243' }}>
                                         ${(inRange.reduce((sum, t) => sum + t.price_cents, 0) / 100).toFixed(2)}
                                     </span>
                                 </div>
@@ -808,7 +833,7 @@ export default function CustomerDashboard() {
                         <h2 style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: 0 }}>
                             <Heart size={24} /> My Donations
                         </h2>
-                        <button className="glass-button" onClick={() => navigate('/donations')} style={{ background: '#ef4444', padding: '8px 18px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <button className="glass-button" onClick={() => navigate('/donations')} style={{ background: '#ef4444', padding: '8px 18px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px', color: 'white' }}>
                             <Heart size={14} /> Make a Donation
                         </button>
                     </div>
@@ -825,7 +850,7 @@ export default function CustomerDashboard() {
                         </div>
                     )}
                     {donationsLoading ? <p>Loading donations...</p> : donations.length === 0 ? (
-                        <div className="glass-panel" style={{ padding: '40px', textAlign: 'center', color: 'var(--color-text-muted)' }}>
+                        <div className="glass-panel" style={{ background: 'rgba(255,255,255,0.5)', padding: '40px', textAlign: 'center', color: 'var(--color-text-muted)' }}>
                             <Heart size={48} style={{ marginBottom: '15px', opacity: 0.3 }} />
                             <p>No donations on record.</p>
                             <p style={{ fontSize: '13px', marginBottom: '15px' }}>Your donations help protect endangered animals and fund conservation programs.</p>
@@ -842,7 +867,7 @@ export default function CustomerDashboard() {
                                 if (donationDateTo && d > new Date(donationDateTo + 'T23:59:59')) return false;
                                 return true;
                             }).map(donation => (
-                                <div key={donation.donation_id} className="glass-panel" style={{ padding: '20px' }}>
+                                <div key={donation.donation_id} className="glass-panel" style={{ background: 'rgba(255,255,255,0.5)', padding: '20px' }}>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
                                             <div style={{
@@ -868,7 +893,7 @@ export default function CustomerDashboard() {
                                     </div>
                                 </div>
                             ))}
-                            <div style={{ background: 'rgba(255,255,255,0.05)', padding: '15px', borderRadius: '10px', textAlign: 'right' }}>
+                            <div style={{ background: 'rgba(0,0,0,0.05)', padding: '15px', borderRadius: '10px', textAlign: 'right' }}>
                                 <span style={{ color: 'var(--color-text-muted)', marginRight: '15px' }}>Total Donated:</span>
                                 <span style={{ fontWeight: 'bold', fontSize: '20px', color: '#ef4444' }}>
                                     ${(donations.reduce((sum, d) => sum + d.amount_cents, 0) / 100).toFixed(2)}
@@ -886,19 +911,20 @@ export default function CustomerDashboard() {
                         <h2 style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: 0 }}>
                             <Calendar size={24} /> Events
                         </h2>
-                        <button className="glass-button" onClick={() => navigate('/tickets')} style={{ background: 'var(--color-secondary)', padding: '8px 18px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <button className="glass-button" onClick={() => navigate('/tickets')} style={{ background: '#6d8243', padding: '8px 18px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px', color: 'white' }}>
                             <Ticket size={14} /> Buy Event Tickets
                         </button>
                     </div>
                     {/* Upcoming / All Toggle + Date Range */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '15px', flexWrap: 'wrap' }}>
-                        <div style={{ display: 'flex', borderRadius: '8px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.15)' }}>
+                        <div style={{ display: 'flex', borderRadius: '8px', overflow: 'hidden', border: '1px solid rgba(0,0,0,0.15)' }}>
                             {['upcoming', 'all'].map(f => (
                                 <button key={f} className="glass-button" onClick={() => setEventsFilter(f)} style={{
                                     padding: '6px 16px', fontSize: '13px', borderRadius: 0,
-                                    background: eventsFilter === f ? 'var(--color-primary)' : 'rgba(255,255,255,0.05)',
+                                    background: eventsFilter === f ? '#6d8243' : 'rgba(255,255,255,0.5)',
                                     fontWeight: eventsFilter === f ? 700 : 400,
                                     textTransform: 'capitalize',
+                                    color: eventsFilter === f ? 'white' : 'var(--zoo-muted)',
                                 }}>
                                     {f === 'upcoming' ? 'Upcoming' : 'All Events'}
                                 </button>
@@ -913,7 +939,7 @@ export default function CustomerDashboard() {
                         )}
                     </div>
                     {eventsLoading ? <p>Loading events...</p> : events.length === 0 ? (
-                        <div className="glass-panel" style={{ padding: '40px', textAlign: 'center', color: 'var(--color-text-muted)' }}>
+                        <div className="glass-panel" style={{ background: 'rgba(255,255,255,0.5)', padding: '40px', textAlign: 'center', color: 'var(--color-text-muted)' }}>
                             <Calendar size={48} style={{ marginBottom: '15px', opacity: 0.3 }} />
                             <p>No events at this time.</p>
                         </div>
@@ -931,16 +957,16 @@ export default function CustomerDashboard() {
                                 const today = new Date(); today.setHours(0, 0, 0, 0);
                                 const isPast = eventDate < today;
                                 return (
-                                    <div key={event.event_id} className="glass-panel" style={{ padding: '20px', opacity: isPast ? 0.65 : 1 }}>
+                                    <div key={event.event_id} className="glass-panel" style={{ background: 'rgba(255,255,255,0.5)', padding: '20px', opacity: isPast ? 0.65 : 1 }}>
                                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
                                             <div style={{ flex: 1 }}>
                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '5px', flexWrap: 'wrap' }}>
-                                                    <Calendar color={isPast ? 'var(--color-text-muted)' : 'var(--color-secondary)'} size={20} />
+                                                    <Calendar color={isPast ? 'var(--color-text-muted)' : '#6d8243'} size={20} />
                                                     <h3 style={{ margin: 0 }}>{event.title}</h3>
                                                     <span style={{
                                                         fontSize: '11px', padding: '2px 10px', borderRadius: '10px', fontWeight: 600,
-                                                        background: isPast ? 'rgba(255,255,255,0.08)' : 'rgba(16,185,129,0.15)',
-                                                        color: isPast ? 'var(--color-text-muted)' : '#6ee7b7',
+                                                        background: isPast ? 'rgba(0,0,0,0.05)' : 'rgba(16,185,129,0.15)',
+                                                        color: isPast ? 'var(--color-text-muted)' : '#10b981',
                                                     }}>
                                                         {isPast ? 'Past' : 'Upcoming'}
                                                     </span>
@@ -948,7 +974,7 @@ export default function CustomerDashboard() {
                                                 {event.description && (
                                                     <p style={{ fontSize: '14px', color: 'var(--color-text-muted)', margin: '5px 0' }}>{event.description}</p>
                                                 )}
-                                                <p style={{ color: isPast ? 'var(--color-text-muted)' : 'var(--color-secondary)', fontWeight: 600, fontSize: '14px', margin: '5px 0', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                <p style={{ color: isPast ? 'var(--color-text-muted)' : '#6d8243', fontWeight: 600, fontSize: '14px', margin: '5px 0', display: 'flex', alignItems: 'center', gap: '6px' }}>
                                                     <Clock size={13} />
                                                     {eventDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
                                                     {event.start_time && ` · ${formatTime(event.start_time)}`}
@@ -992,7 +1018,7 @@ export default function CustomerDashboard() {
                                                         };
                                                         localStorage.setItem('zooCart', JSON.stringify(cart));
                                                         navigate('/checkout');
-                                                    }} style={{ background: 'var(--color-secondary)', padding: '6px 14px', fontSize: '0.8rem' }}>
+                                                    }} style={{ background: '#6d8243', padding: '6px 14px', fontSize: '0.8rem', color: 'white' }}>
                                                         ${(event.ticket_price_cents / 100).toFixed(2)} — Add to Cart
                                                     </button>
                                                 )}
@@ -1006,16 +1032,18 @@ export default function CustomerDashboard() {
                 </div>
             )}
         </div>
-    );
+);
+
+
 }
 
 const US_STATES = [
-  'Alabama','Alaska','Arizona','Arkansas','California','Colorado','Connecticut',
-  'Delaware','Florida','Georgia','Hawaii','Idaho','Illinois','Indiana','Iowa',
-  'Kansas','Kentucky','Louisiana','Maine','Maryland','Massachusetts','Michigan',
-  'Minnesota','Mississippi','Missouri','Montana','Nebraska','Nevada','New Hampshire',
-  'New Jersey','New Mexico','New York','North Carolina','North Dakota','Ohio',
-  'Oklahoma','Oregon','Pennsylvania','Rhode Island','South Carolina','South Dakota',
-  'Tennessee','Texas','Utah','Vermont','Virginia','Washington','West Virginia',
-  'Wisconsin','Wyoming',
+'Alabama','Alaska','Arizona','Arkansas','California','Colorado','Connecticut',
+'Delaware','Florida','Georgia','Hawaii','Idaho','Illinois','Indiana','Iowa',
+'Kansas','Kentucky','Louisiana','Maine','Maryland','Massachusetts','Michigan',
+'Minnesota','Mississippi','Missouri','Montana','Nebraska','Nevada','New Hampshire',
+'New Jersey','New Mexico','New York','North Carolina','North Dakota','Ohio',
+'Oklahoma','Oregon','Pennsylvania','Rhode Island','South Carolina','South Dakota',
+'Tennessee','Texas','Utah','Vermont','Virginia','Washington','West Virginia',
+'Wisconsin','Wyoming',
 ];

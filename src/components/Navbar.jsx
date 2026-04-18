@@ -53,7 +53,7 @@ export default function Navbar() {
     if (path === '/calendar') return 'Events Calendar';
     if (path === '/map') return 'Zoo Map';
     if (path === '/calendar') return 'Events Calendar';
-    if (path === '/schedule') return 'Schedule of The Day';ggggggBbbbbbbbbbbbbbbbbbbbvvvvvvgagg
+    if (path === '/schedule') return 'Schedule of The Day';
     return '';
   };
 

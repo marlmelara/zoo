@@ -341,3 +341,10 @@ a {
 .logout-btn:hover {
   background: rgba(220, 38, 38, 0.5);
 }
+
+.navbar-page-name {
+  font-size: 2.5rem;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+  color: white;
+}

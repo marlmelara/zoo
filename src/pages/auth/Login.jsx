@@ -53,7 +53,7 @@ export default function Login() {
         }}>
             {/* Home button */}
             <Link to="/" style={{ position: 'absolute', top: '24px', left: '24px', backgroundColor: 'rgb(123,144,79)', padding: '10px 20px', borderRadius: '5px', textDecoration: 'none' }}>
-                <button style={{ background: 'none', border: 'none', color: 'white', fontSize: '18px', fontWeight: 'bold' }}>Home</button>
+                <button style={{ background: 'none', border: 'none', color: 'white', fontSize: '18px', fontWeight: 'bold', cursor: 'pointer' }}>Home</button>
             </Link>
 
             {/* Coog Zoo logo above panel — click to go home */}

@@ -150,8 +150,8 @@ export default function AdminDashboard() {
                     <div className="glass-panel" style={{ background: 'rgba(255,255,255,0.5)', padding: '10px 20px', display: 'flex', alignItems: 'center', gap: '10px' }}>
                         <DollarSign color="#6d8243" />
                         <div>
-                            <span style={{ display: 'block', fontSize: '12px', color: 'var(--zoo-muted)' }}>Total Revenue</span>
-                            <span style={{ color: 'var(--zoo-accent)', fontWeight: 'bold', fontSize: '18px' }}>${formatDollars(stats.totalRevenueCents)}</span>
+                            <span style={{ display: 'block', fontSize: '12px', color: 'var(--color-text-muted)' }}>Total Revenue</span>
+                            <span style={{ fontWeight: 'bold', fontSize: '18px' }}>${formatDollars(stats.totalRevenueCents)}</span>
                         </div>
                     </div>
                 </div>
@@ -165,7 +165,7 @@ export default function AdminDashboard() {
                 }}>
                     <div className="glass-panel" style={{ padding: '30px', width: '500px', maxWidth: '90%' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
-                            <h2 style={{ color: 'var(--zoo-muted)',margin: 0 }}>Create New User</h2>
+                            <h2 style={{ margin: 0 }}>Create New User</h2>
                             <button onClick={() => setShowCreateUser(false)} style={{ background: 'none', border: 'none', color: 'white', fontSize: '20px', cursor: 'pointer' }}>×</button>
                         </div>
                         <form onSubmit={handleCreateUser} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
@@ -196,7 +196,7 @@ export default function AdminDashboard() {
                                 {departments.map(d => <option key={d.dept_id} value={d.dept_id}>{d.dept_name}</option>)}
                             </select>
 
-                            <button type="submit" className="glass-button" style={{ gridColumn: '1/-1', background: 'var(--zoo-accent)', marginTop: '10px' }}>Create Account</button>
+                            <button type="submit" className="glass-button" style={{ gridColumn: '1/-1', background: 'var(--color-secondary)', marginTop: '10px' }}>Create Account</button>
                         </form>
                     </div>
                 </div>
@@ -210,11 +210,11 @@ export default function AdminDashboard() {
                         className="glass-button"
                         onClick={() => setActiveTab(tab)}
                         style={{
-                            background: activeTab === tab ? '#6d8243' : 'rgba(255,255,255,0.5)',
-                            color: activeTab === tab ? 'white' : 'var(--zoo-muted)',
+                            background: activeTab === tab ? 'var(--color-primary)' : 'rgba(255,255,255,0.5)',
+                            color: activeTab === tab ? 'white' : 'rgb(102, 122, 66)',
                             padding: '10px 20px',
                             fontSize: '14px',
-                            fontWeight: activeTab === tab ? 700 : 400,
+                            fontWeight: activeTab === tab ? 700 : 500,
                         }}
                     >
                         {tab}
@@ -228,28 +228,28 @@ export default function AdminDashboard() {
                     {/* Key Metrics Grid */}
                     <div className="grid-cards" style={{ marginBottom: '40px' }}>
                         <div className="glass-panel" style={{ background: 'rgba(255,255,255,0.5)', padding: '20px' }}>
-                            <div style={{ color: 'var(--zoo-muted)', display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
                                 <h3 style={{ margin: 0 }}>Tickets</h3>
                                 <Ticket size={20} color="var(--color-primary)" />
                             </div>
                             <p style={{ fontSize: '24px', fontWeight: 'bold', margin: 0 }}>${formatDollars(stats.ticketRevenueCents)}</p>
                         </div>
                         <div className="glass-panel" style={{ background: 'rgba(255,255,255,0.5)',padding: '20px' }}>
-                            <div style={{ color: 'var(--zoo-muted)',display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
                                 <h3 style={{ margin: 0 }}>Retail</h3>
                                 <ShoppingBag size={20} color="var(--color-secondary)" />
                             </div>
                             <p style={{ fontSize: '24px', fontWeight: 'bold', margin: 0 }}>${formatDollars(stats.retailRevenueCents)}</p>
                         </div>
                         <div className="glass-panel" style={{ background: 'rgba(255,255,255,0.5)', padding: '20px' }}>
-                            <div style={{ color: 'var(--zoo-muted)', display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
                                 <h3 style={{ margin: 0 }}>Staff</h3>
                                 <Users size={20} color="var(--color-accent)" />
                             </div>
                             <p style={{ fontSize: '24px', fontWeight: 'bold', margin: 0 }}>{stats.totalEmployees}</p>
                         </div>
                         <div className="glass-panel" style={{ background: 'rgba(255,255,255,0.5)',padding: '20px' }}>
-                            <div style={{ color: 'var(--zoo-muted)', display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
                                 <h3 style={{ margin: 0 }}>Animals</h3>
                                 <Database size={20} color="#f59e0b" />
                             </div>
@@ -258,15 +258,15 @@ export default function AdminDashboard() {
                     </div>
 
                     <div className="glass-panel" style={{ background: 'rgba(255,255,255,0.5)', padding: '20px' }}>
-                        <h3 style={{ color: 'var(--zoo-muted)',marginTop: 0 }}>System Status</h3>
+                        <h3 style={{ marginTop: 0 }}>System Status</h3>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                <div style={{ color: 'var(--color-secondary)', width: '10px', height: '10px', borderRadius: '50%', background: '#10b981' }}></div>
-                                <span style={{color: 'var(--zoo-muted)'}}>Database Connection: <span style={{ color: '#10b981' }}>Active</span></span>
+                                <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#10b981' }}></div>
+                                <span>Database Connection: <span style={{ color: '#10b981' }}>Active</span></span>
                             </div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                <div style={{ color: 'var(--color-secondary)', width: '10px', height: '10px', borderRadius: '50%', background: '#10b981' }}></div>
-                                <span style={{ color: 'var(--zoo-muted)' }}>Auth Service: <span style={{ color: '#10b981' }}>Active</span></span>
+                                <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#10b981' }}></div>
+                                <span>Auth Service: <span style={{ color: '#10b981' }}>Active</span></span>
                             </div>
                         </div>
                     </div>
@@ -277,7 +277,7 @@ export default function AdminDashboard() {
             {activeTab === 'Staff Analytics' && (
                 <div className="glass-panel" style={{ background: 'rgba(255,255,255,0.5)',padding: '20px', marginBottom: '40px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                        <h3 style={{ color: 'var(--zoo-muted)',margin: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
                             <Users size={20} color="var(--color-primary)" />
                             Employees per Department
                         </h3>
@@ -375,7 +375,7 @@ export default function AdminDashboard() {
             {activeTab === 'Animal Analytics' && (
                 <div className="glass-panel" style={{ background: 'rgba(255,255,255,0.5)',padding: '20px', marginBottom: '40px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                        <h3 style={{ color: 'var(--zoo-muted)', margin: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
                             <Database size={20} color="var(--color-secondary)" />
                             Animal Distribution per Zone
                         </h3>
@@ -473,7 +473,7 @@ export default function AdminDashboard() {
             {activeTab === 'Financial Revenue' && (
                 <div className="glass-panel" style={{ background: 'rgba(255,255,255,0.5)', padding: '20px', marginBottom: '40px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                        <h3 style={{ color: 'var(--zoo-muted)', margin: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
                             <DollarSign size={20} color="#10b981" />
                             Revenue Breakdown
                         </h3>
@@ -644,7 +644,7 @@ function ReactivatePanel() {
 
     return (
         <div className="glass-panel" style={{ padding: '24px' }}>
-            <h3 style={{ color: 'var(--zoo-muted)', marginTop: 0 }}>Reactivate Deactivated Accounts</h3>
+            <h3 style={{ marginTop: 0 }}>Reactivate Deactivated Accounts</h3>
             <p style={{ color: 'var(--color-text-muted)', marginTop: 0 }}>
                 Look up customers, staff, or animals that were soft-deleted and restore them.
             </p>
@@ -657,7 +657,7 @@ function ReactivatePanel() {
                         style={{
                             padding: '6px 14px', fontSize: '13px',
                             background: tab === t ? 'rgb(123, 144, 79)' : 'rgba(255,255,255,0.5)',
-                            color: tab === t ? 'white' : 'var(--zoo-muted)',
+                            color: tab === t ? 'white' : 'rgb(102, 122, 66)',
                             textTransform: 'capitalize',
                         }}>{t}</button>
                 ))}

@@ -11,11 +11,15 @@ import {
 import { getRecentActivity, getDepartmentActivity, logActivity } from '../../../api/activityLog';
 import { setHealthStatus } from '../../../api/animals';
 import AnimalMedicalPanel from '../../../components/AnimalMedicalPanel';
+import { StatusFilter, DateRangeFilter } from '../../../components/AnimalsPanel';
 import {
     LayoutDashboard, Users, ClipboardList, Calendar, Package,
     CheckCircle, XCircle, Clock, AlertTriangle, Shield, Activity,
     Cat, UserPlus, Heart, ChevronDown, ChevronUp, Stethoscope
 } from 'lucide-react';
+
+const MGR_GREEN      = 'rgb(123, 144, 79)';
+const MGR_GREEN_DARK = 'rgb(102, 122, 66)';
 
 function HealthBadge({ status }) {
     const s = status || 'healthy';
@@ -58,6 +62,14 @@ export default function ManagerDashboard() {
     const [allRequests, setAllRequests] = useState([]);
     const [requestsLoading, setRequestsLoading] = useState(true);
     const [requestFilter, setRequestFilter] = useState('pending');
+    // Date-range filters — applied to Supply Requests, Activity Log, Events.
+    const [reqFrom,   setReqFrom]   = useState('');
+    const [reqTo,     setReqTo]     = useState('');
+    const [logFrom,   setLogFrom]   = useState('');
+    const [logTo,     setLogTo]     = useState('');
+    const [eventFrom, setEventFrom] = useState('');
+    const [eventTo,   setEventTo]   = useState('');
+    const [eventWhen, setEventWhen] = useState('all'); // all | upcoming | past
 
     // Staff state
     const [staff, setStaff] = useState([]);
@@ -356,11 +368,39 @@ export default function ManagerDashboard() {
         }
     };
 
-    const filteredRequests = requestFilter === 'pending'
+    // Small helper — ts falls inside [from, to] when both set; each side
+    // is optional. Used by every Manager Panel time-based view.
+    function inRange(ts, from, to) {
+        if (!ts) return false;
+        const t = new Date(ts).getTime();
+        if (from && t < new Date(from + 'T00:00:00').getTime()) return false;
+        if (to   && t > new Date(to   + 'T23:59:59').getTime()) return false;
+        return true;
+    }
+    const anyRange = (from, to) => from || to;
+
+    const baseRequests = requestFilter === 'pending'
         ? pendingRequests
         : requestFilter === 'all'
             ? allRequests
             : allRequests.filter(r => r.status === requestFilter);
+    const filteredRequests = anyRange(reqFrom, reqTo)
+        ? baseRequests.filter(r => inRange(r.created_at, reqFrom, reqTo))
+        : baseRequests;
+
+    const filteredActivity = anyRange(logFrom, logTo)
+        ? activityLog.filter(l => inRange(l.created_at, logFrom, logTo))
+        : activityLog;
+
+    // Events filter: when (all/upcoming/past) + optional event_date range.
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const filteredEvents = (events || []).filter(ev => {
+        if (eventWhen === 'upcoming' && !(ev.event_date >= todayStr)) return false;
+        if (eventWhen === 'past'     && !(ev.event_date <  todayStr)) return false;
+        if (eventFrom && ev.event_date <  eventFrom) return false;
+        if (eventTo   && ev.event_date >  eventTo)   return false;
+        return true;
+    });
 
     return (
         <div>
@@ -372,52 +412,56 @@ export default function ManagerDashboard() {
                 {overviewStats.pendingRequests > 0 && (
                     <div className="glass-panel" style={{
                         padding: '10px 20px', display: 'flex', alignItems: 'center', gap: '10px',
-                        border: '1px solid rgba(241, 41, 31, 0.1)', background: 'rgba(241, 41, 31, 0.1)'
+                        border: '1px solid rgba(245, 158, 11, 0.3)', background: 'rgba(245, 158, 11, 0.1)'
                     }}>
-                        <AlertTriangle color="#ef4444" size={20} />
-                        <span style={{ color:"#ef4444", fontWeight: 600 }}>{overviewStats.pendingRequests} Pending Request{overviewStats.pendingRequests !== 1 ? 's' : ''}</span>
+                        <AlertTriangle color="#f59e0b" size={20} />
+                        <span style={{ fontWeight: 600 }}>{overviewStats.pendingRequests} Pending Request{overviewStats.pendingRequests !== 1 ? 's' : ''}</span>
                     </div>
                 )}
             </div>
 
-            {/* Tab Navigation */}
+            {/* Tab Navigation — uses glass-button so we pick up the themed
+                hover translateY + box-shadow (matches the Admin panel tabs). */}
             <div style={{ display: 'flex', gap: '10px', marginBottom: '30px', flexWrap: 'wrap' }}>
-                {TABS.map(tab => (
-                    <button
-                        key={tab}
-                        className="glass-button"
-                        onClick={() => setActiveTab(tab)}
-                        style={{
-                            background: activeTab === tab ? 'var(--zoo-accent)' : 'rgba(255,255,255,0.05)',
-                            color: activeTab === tab ? 'white' : 'var(--zoo-muted)',
-                            padding: '10px 20px',
-                            fontSize: '14px',
-                            fontWeight: activeTab === tab ? 700 : 400,
-                            position: 'relative'
-                        }}
-                    >
-                        {tab}
-                        {tab === 'Supply Requests' && overviewStats.pendingRequests > 0 && (
-                            <span style={{
-                                position: 'absolute', top: '-5px', right: '-5px',
-                                background: 'var(--color-accent)', color: 'white',
-                                borderRadius: '50%', width: '20px', height: '20px',
-                                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                fontSize: '11px', fontWeight: 'bold'
-                            }}>
-                                {overviewStats.pendingRequests}
-                            </span>
-                        )}
-                    </button>
-                ))}
+                {TABS.map(tab => {
+                    const active = activeTab === tab;
+                    return (
+                        <button
+                            key={tab}
+                            className="glass-button"
+                            onClick={() => setActiveTab(tab)}
+                            style={{
+                                background: active ? 'var(--color-primary)' : 'rgba(255,255,255,0.5)',
+                                color:      active ? 'white' : MGR_GREEN_DARK,
+                                padding: '10px 20px',
+                                fontSize: '14px',
+                                fontWeight: active ? 700 : 500,
+                                position: 'relative',
+                            }}
+                        >
+                            {tab}
+                            {tab === 'Supply Requests' && overviewStats.pendingRequests > 0 && (
+                                <span style={{
+                                    position: 'absolute', top: '-5px', right: '-5px',
+                                    background: '#ef4444', color: 'white',
+                                    borderRadius: '50%', width: '20px', height: '20px',
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    fontSize: '11px', fontWeight: 'bold'
+                                }}>
+                                    {overviewStats.pendingRequests}
+                                </span>
+                            )}
+                        </button>
+                    );
+                })}
             </div>
 
             {/* ═══════════ OVERVIEW TAB ═══════════ */}
             {activeTab === 'Overview' && (
                 <div>
                     <div className="grid-cards" style={{ marginBottom: '30px' }}>
-                        <div className="glass-panel" style={{ background: 'rgba(255,255,255,0.5)', padding: '20px' }}>
-                            <div style={{ color: 'var(--zoo-muted)',display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
+                        <div className="glass-panel" style={{ padding: '20px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
                                 <h3 style={{ margin: 0 }}>Department Staff</h3>
                                 <Users size={20} color="var(--color-primary)" />
                             </div>
@@ -425,8 +469,8 @@ export default function ManagerDashboard() {
                                 {overviewLoading ? '...' : overviewStats.staffCount}
                             </p>
                         </div>
-                        <div className="glass-panel" style={{background: 'rgba(255,255,255,0.5)', padding: '20px' }}>
-                            <div style={{ color: 'var(--zoo-muted)', display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
+                        <div className="glass-panel" style={{ padding: '20px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
                                 <h3 style={{ margin: 0 }}>Pending Requests</h3>
                                 <ClipboardList size={20} color="#f59e0b" />
                             </div>
@@ -434,8 +478,8 @@ export default function ManagerDashboard() {
                                 {overviewLoading ? '...' : overviewStats.pendingRequests}
                             </p>
                         </div>
-                        <div className="glass-panel" style={{ background: 'rgba(255,255,255,0.5)',padding: '20px' }}>
-                            <div style={{color: 'var(--zoo-muted)', display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
+                        <div className="glass-panel" style={{ padding: '20px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
                                 <h3 style={{ margin: 0 }}>Low Stock Items</h3>
                                 <AlertTriangle size={20} color="var(--color-accent)" />
                             </div>
@@ -443,8 +487,8 @@ export default function ManagerDashboard() {
                                 {overviewLoading ? '...' : overviewStats.lowStockCount}
                             </p>
                         </div>
-                        <div className="glass-panel" style={{ background: 'rgba(255,255,255,0.5)',padding: '20px' }}>
-                            <div style={{ color: 'var(--zoo-muted)',display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
+                        <div className="glass-panel" style={{ padding: '20px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
                                 <h3 style={{ margin: 0 }}>Upcoming Events</h3>
                                 <Calendar size={20} color="var(--color-secondary)" />
                             </div>
@@ -464,18 +508,18 @@ export default function ManagerDashboard() {
                         ) : allSupplies.filter(s => s.is_low_stock).map(item => (
                             <div key={item.supply_id} style={{
                                 display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                                background: 'rgba(244, 63, 94, 0.05)', padding: '12px 15px', borderRadius: '10px',
-                                border: '1px solid rgba(244, 63, 94, 0.2)'
+                                background: 'rgba(255,255,255,0.6)', padding: '12px 15px', borderRadius: '10px',
+                                border: '1px solid rgba(239, 68, 68, 0.35)',
                             }}>
                                 <div>
-                                    <span style={{ fontWeight: 'bold' }}>{item.item_name}</span>
-                                    <span style={{ fontSize: '12px', color: 'var(--color-text-muted)', marginLeft: '10px' }}>
+                                    <span style={{ fontWeight: 700, color: 'var(--color-text-dark)' }}>{item.item_name}</span>
+                                    <span style={{ fontSize: '12px', color: MGR_GREEN_DARK, marginLeft: '10px', fontWeight: 600 }}>
                                         {item.dept_name}
                                     </span>
                                 </div>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                    <span style={{ fontWeight: 'bold', color: 'var(--color-accent)' }}>{item.stock_count}</span>
-                                    <span style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>/ {item.restock_threshold} threshold</span>
+                                    <span style={{ fontWeight: 700, color: '#b91c1c' }}>{item.stock_count}</span>
+                                    <span style={{ fontSize: '12px', color: MGR_GREEN_DARK }}>/ {item.restock_threshold} threshold</span>
                                 </div>
                             </div>
                         ))}
@@ -486,26 +530,25 @@ export default function ManagerDashboard() {
             {/* ═══════════ SUPPLY REQUESTS TAB ═══════════ */}
             {activeTab === 'Supply Requests' && (
                 <div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '14px' }}>
                         <h2 style={{ margin: 0 }}>Supply Requests</h2>
-                        <div style={{ display: 'flex', gap: '8px' }}>
-                            {['pending', 'approved', 'denied', 'all'].map(f => (
-                                <button
-                                    key={f}
-                                    className="glass-button"
-                                    onClick={() => setRequestFilter(f)}
-                                    style={{
-                                        padding: '6px 14px', fontSize: '12px',
-                                        background: requestFilter === f ? 'var(--zoo-accent)' : 'rgba(255,255,255,0.03)',
-                                        color: requestFilter === f ? 'white' : 'var(--zoo-muted)',
-                                        textTransform: 'capitalize'
-                                    }}
-                                >
-                                    {f}
-                                </button>
-                            ))}
-                        </div>
+                        <StatusFilter
+                            label="Status"
+                            tabs={[
+                                { key: 'pending',  label: 'Pending'  },
+                                { key: 'approved', label: 'Approved' },
+                                { key: 'denied',   label: 'Denied'   },
+                                { key: 'all',      label: 'All'      },
+                            ]}
+                            value={requestFilter}
+                            onChange={setRequestFilter}
+                        />
                     </div>
+                    <DateRangeFilter
+                        label="Submitted between"
+                        from={reqFrom} to={reqTo}
+                        onFrom={setReqFrom} onTo={setReqTo}
+                    />
 
                     {requestsLoading ? <p>Loading requests...</p> : filteredRequests.length === 0 ? (
                         <div className="glass-panel" style={{ padding: '40px', textAlign: 'center', color: 'var(--color-text-muted)' }}>
@@ -516,58 +559,70 @@ export default function ManagerDashboard() {
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                             {filteredRequests.map(req => (
                                 <div key={req.request_id} className="glass-panel" style={{
-                                    color: 'var(--zoo-muted)',
-                                    background: 'rgba(255,255,255, 0.5)',
                                     padding: '20px',
-                                    border: req.status === 'pending' ? '1px solid var(--zoo-accent)' : '1px solid var(--glass-border)'
+                                    background: 'rgba(255,255,255,0.55)',
+                                    border: req.status === 'pending' ? '1px solid rgba(245, 158, 11, 0.35)' : '1px solid rgba(121,162,128,0.25)',
                                 }}>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '10px' }}>
                                         <div>
                                             <h3 style={{ margin: '0 0 5px' }}>{req.item_name}</h3>
-                                            <span style={{ fontSize: '13px', color: 'var(--color-text-muted)' }}>
+                                            <span style={{ fontSize: '13px', color: MGR_GREEN_DARK }}>
                                                 Requested by: <strong>{req.requester?.first_name} {req.requester?.last_name}</strong>
                                                 {req.requester?.departments?.dept_name && (
-                                                    <span style={{ marginLeft: '8px', padding: '2px 8px', borderRadius: '10px', fontSize: '11px', background: 'rgba(255,255,255,0.1)' }}>
+                                                    <span style={{
+                                                        marginLeft: '8px', padding: '2px 8px', borderRadius: '10px', fontSize: '11px',
+                                                        background: 'rgba(121,162,128,0.18)', color: MGR_GREEN_DARK, fontWeight: 600,
+                                                    }}>
                                                         {req.requester.departments.dept_name}
                                                     </span>
                                                 )}
                                             </span>
                                         </div>
-                                        <div style={{ color: 'var(--zoo-muted)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                            {req.status === 'pending' ? <Clock size={16} color="var(--zoo-muted)" /> :
-                                                req.status === 'approved' ? <CheckCircle size={16} color="var(--zoo-muted)" /> :
-                                                    <XCircle size={16} color="var(--zoo-accent)" />}
-                                            <span style={{ color: statusColor(req.status), fontWeight: 600, textTransform: 'capitalize' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                            {req.status === 'pending' ? <Clock size={16} color="#f59e0b" /> :
+                                                req.status === 'approved' ? <CheckCircle size={16} color="#10b981" /> :
+                                                    <XCircle size={16} color="#ef4444" />}
+                                            <span style={{ color: statusColor(req.status), fontWeight: 700, textTransform: 'capitalize' }}>
                                                 {req.status}
                                             </span>
                                         </div>
                                     </div>
 
-                                    <div style={{ color: 'var(--zoo-muted)', display: 'flex', gap: '20px', fontSize: '14px', marginBottom: '10px' }}>
-                                        <span>Quantity: <strong style={{ color: 'var(--zoo-accent)' }}>{req.requested_quantity}</strong></span>
-                                        <span>Type: <strong style={{ color: 'var(--zoo-accent)', textTransform: 'capitalize' }}>{req.supply_type}</strong></span>
-                                        <span>Date: <strong style={{ color: 'var(--zoo-accent)' }}>{new Date(req.created_at).toLocaleDateString()}</strong></span>
+                                    <div style={{ display: 'flex', gap: '20px', fontSize: '14px', color: MGR_GREEN_DARK, marginBottom: '10px', flexWrap: 'wrap' }}>
+                                        <span>Quantity: <strong style={{ color: 'var(--color-text-dark)' }}>{req.requested_quantity}</strong></span>
+                                        <span>Type: <strong style={{ color: 'var(--color-text-dark)', textTransform: 'capitalize' }}>{req.supply_type}</strong></span>
+                                        <span>Date: <strong style={{ color: 'var(--color-text-dark)' }}>{new Date(req.created_at).toLocaleDateString()}</strong></span>
                                     </div>
 
                                     {req.reason && (
-                                        <p style={{ fontSize: '14px', color: 'var(--zoo-muted)', margin: '0 0 15px', fontWeight: 500 }}>
-                                            Reason: <strong style={{ color: 'var(--zoo-accent)' }}>{req.reason}</strong>
+                                        <p style={{ fontSize: '14px', color: 'var(--color-text-dark)', margin: '0 0 15px', fontWeight: 500 }}>
+                                            <strong style={{ color: MGR_GREEN_DARK }}>Reason:</strong> {req.reason}
                                         </p>
                                     )}
 
                                     {req.status === 'pending' && (
                                         <div style={{ display: 'flex', gap: '10px' }}>
                                             <button
-                                                className="glass-button"
                                                 onClick={() => handleReview(req.request_id, 'approved')}
-                                                style={{ background: 'rgba(123, 144, 79, 0.3)', color: 'var(--color-primary)', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+                                                style={{
+                                                    background: 'rgba(16, 185, 129, 0.18)', color: '#047857',
+                                                    border: '1px solid rgba(16, 185, 129, 0.35)',
+                                                    borderRadius: '8px', padding: '10px 14px', cursor: 'pointer',
+                                                    fontWeight: 700, fontSize: '13px',
+                                                    flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                                                }}
                                             >
                                                 <CheckCircle size={16} /> Approve & Restock
                                             </button>
                                             <button
-                                                className="glass-button"
                                                 onClick={() => handleReview(req.request_id, 'denied')}
-                                                style={{ background: 'rgba(239, 68, 68, 0.2)', color: '#ef4444', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+                                                style={{
+                                                    background: 'rgba(239, 68, 68, 0.15)', color: '#b91c1c',
+                                                    border: '1px solid rgba(239, 68, 68, 0.35)',
+                                                    borderRadius: '8px', padding: '10px 14px', cursor: 'pointer',
+                                                    fontWeight: 700, fontSize: '13px',
+                                                    flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                                                }}
                                             >
                                                 <XCircle size={16} /> Deny
                                             </button>
@@ -575,8 +630,8 @@ export default function ManagerDashboard() {
                                     )}
 
                                     {req.reviewer && (
-                                        <p style={{ fontSize: '12px', color: 'var(--color-text-muted)', margin: '10px 0 0' }}>
-                                            Reviewed by {req.reviewer.first_name} {req.reviewer.last_name}
+                                        <p style={{ fontSize: '12px', color: MGR_GREEN_DARK, margin: '10px 0 0', opacity: 0.85 }}>
+                                            Reviewed by <strong>{req.reviewer.first_name} {req.reviewer.last_name}</strong>
                                             {req.reviewed_at && ` on ${new Date(req.reviewed_at).toLocaleDateString()}`}
                                         </p>
                                     )}
@@ -598,38 +653,40 @@ export default function ManagerDashboard() {
                         </div>
                     ) : (
                         <div className="grid-cards">
-                            {staff.map(person => (
-                                <div key={person.employee_id} className="glass-panel" style={{ background: 'rgba(255,255,255,0.5)', padding: '20px' }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '15px' }}>
-                                        <div>
-                                            <h3 style={{ color: 'var(--zoo-muted)',margin: '0 0 5px' }}>{person.first_name} {person.last_name}</h3>
+                            {staff.map(person => {
+                                const roleColor = person.role === 'vet' ? { bg: 'rgba(16,185,129,0.18)', fg: '#047857' }
+                                    : person.role === 'caretaker' ? { bg: 'rgba(59,130,246,0.18)', fg: '#1d4ed8' }
+                                    : person.role === 'security'  ? { bg: 'rgba(168,85,247,0.18)', fg: '#7e22ce' }
+                                    : { bg: 'rgba(121,162,128,0.18)', fg: MGR_GREEN_DARK };
+                                return (
+                                    <div key={person.employee_id} className="glass-panel" style={{ padding: '20px', background: 'rgba(255,255,255,0.6)', border: '1px solid rgba(121,162,128,0.25)' }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '15px' }}>
+                                            <div>
+                                                <h3 style={{ margin: '0 0 5px', color: 'var(--color-text-dark)' }}>{person.first_name} {person.last_name}</h3>
+                                                <span style={{
+                                                    fontSize: '12px', padding: '4px 10px', borderRadius: '20px',
+                                                    background: 'rgba(121,162,128,0.18)', color: MGR_GREEN_DARK, fontWeight: 600,
+                                                }}>
+                                                    {person.dept_name || 'Unassigned'}
+                                                </span>
+                                            </div>
                                             <span style={{
-                                                fontSize: '12px', padding: '4px 8px', borderRadius: '20px',
-                                                background: 'rgba(255,255,255,0.1)', color: 'var(--zoo-muted)'
+                                                fontSize: '11px', padding: '3px 10px', borderRadius: '10px',
+                                                background: roleColor.bg, color: roleColor.fg, fontWeight: 700,
+                                                textTransform: 'capitalize'
                                             }}>
-                                                {person.dept_name || 'Unassigned'}
+                                                {person.role}
                                             </span>
                                         </div>
-                                        <span style={{
-                                            color: 'var(--zoo-accent)', fontWeight: 600,
-                                            fontSize: '11px', padding: '3px 8px', borderRadius: '10px',
-                                            background: person.role === 'vet' ? 'rgba(16,185,129,0.2)' :
-                                                person.role === 'caretaker' ? 'rgba(59,130,246,0.2)' :
-                                                    person.role === 'security' ? 'rgba(168,85,247,0.2)' :
-                                                        'rgba(255,255,255,0.1)',
-                                            textTransform: 'capitalize'
-                                        }}>
-                                            {person.role}
-                                        </span>
+                                        <div style={{ fontSize: '14px', color: MGR_GREEN_DARK, display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                                            <p style={{ margin: 0 }}>Shift: <strong style={{ color: 'var(--color-text-dark)' }}>{person.shift_timeframe || 'N/A'}</strong></p>
+                                            <p style={{ margin: 0 }}>Contact: <strong style={{ color: 'var(--color-text-dark)' }}>{person.contact_info || 'N/A'}</strong></p>
+                                            {person.vets && <p style={{ margin: 0 }}>Specialty: <strong style={{ color: 'var(--color-text-dark)' }}>{person.vets.specialty}</strong></p>}
+                                            {person.animal_caretakers && <p style={{ margin: 0 }}>Species: <strong style={{ color: 'var(--color-text-dark)' }}>{person.animal_caretakers.specialization_species}</strong></p>}
+                                        </div>
                                     </div>
-                                    <div style={{ fontSize: '14px', color: 'var(--color-text-muted)', display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                                        <p>Shift: {person.shift_timeframe || 'N/A'}</p>
-                                        <p>Contact: {person.contact_info || 'N/A'}</p>
-                                        {person.vets && <p style={{ color: 'var(--color-primary)' }}>Specialty: {person.vets.specialty}</p>}
-                                        {person.animal_caretakers && <p>Species: {person.animal_caretakers.specialization_species}</p>}
-                                    </div>
-                                </div>
-                            ))}
+                                );
+                            })}
                         </div>
                     )}
                 </div>
@@ -641,17 +698,24 @@ export default function ManagerDashboard() {
                     <h2 style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                         <Activity size={24} /> Recent Activity
                     </h2>
-                    {activityLoading ? <p>Loading activity...</p> : activityLog.length === 0 ? (
+                    <DateRangeFilter
+                        label="Happened between"
+                        from={logFrom} to={logTo}
+                        onFrom={setLogFrom} onTo={setLogTo}
+                    />
+                    {activityLoading ? <p>Loading activity...</p> : filteredActivity.length === 0 ? (
                         <div className="glass-panel" style={{ padding: '40px', textAlign: 'center', color: 'var(--color-text-muted)' }}>
                             <Activity size={48} style={{ marginBottom: '15px', opacity: 0.3 }} />
-                            <p>No activity recorded yet.</p>
+                            <p>{activityLog.length === 0 ? 'No activity recorded yet.' : 'No activity in this date range.'}</p>
                         </div>
                     ) : (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                            {activityLog.map(log => (
+                            {filteredActivity.map(log => (
                                 <div key={log.log_id} style={{
-                                    display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: 'var(--zoo-accent)',
-                                    background: 'rgba(255,255,255,0.8)', padding: '14px 18px', borderRadius: '10px',
+                                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                                    background: 'rgba(255,255,255,0.6)',
+                                    border: '1px solid rgba(121,162,128,0.25)',
+                                    padding: '14px 18px', borderRadius: '10px',
                                     borderLeft: `3px solid ${
                                         log.action_type.includes('approved') ? '#10b981' :
                                         log.action_type.includes('denied') ? '#ef4444' :
@@ -660,22 +724,26 @@ export default function ManagerDashboard() {
                                     }`
                                 }}>
                                     <div>
-                                        <span style={{ fontWeight: 600 }}>{log.description}</span>
-                                        <div style={{ fontSize: '12px', color: 'var(--color-text-muted)', marginTop: '4px' }}>
+                                        <span style={{ fontWeight: 700, color: 'var(--color-text-dark)' }}>{log.description}</span>
+                                        <div style={{ fontSize: '12px', color: MGR_GREEN_DARK, marginTop: '4px' }}>
                                             {log.performer
-                                                ? `${log.performer.first_name} ${log.performer.last_name} (${log.performer.role})`
+                                                ? <>
+                                                    <strong>{log.performer.first_name} {log.performer.last_name}</strong>
+                                                    <span style={{ opacity: 0.75 }}> ({log.performer.role})</span>
+                                                  </>
                                                 : 'System'}
                                             <span style={{
-                                                marginLeft: '10px', padding: '2px 6px', borderRadius: '6px',
-                                                background: 'rgba(255,255,255,0.08)', fontSize: '11px'
+                                                marginLeft: '10px', padding: '2px 8px', borderRadius: '6px',
+                                                background: 'rgba(121,162,128,0.18)', color: MGR_GREEN_DARK,
+                                                fontSize: '11px', fontWeight: 600,
                                             }}>
                                                 {log.action_type.replace(/_/g, ' ')}
                                             </span>
                                         </div>
                                     </div>
-                                    <div style={{ textAlign: 'right', fontSize: '12px', color: 'var(--color-text-muted)', whiteSpace: 'nowrap' }}>
+                                    <div style={{ textAlign: 'right', fontSize: '12px', color: MGR_GREEN_DARK, whiteSpace: 'nowrap', fontWeight: 500 }}>
                                         <div>{new Date(log.created_at).toLocaleDateString()}</div>
-                                        <div>{new Date(log.created_at).toLocaleTimeString()}</div>
+                                        <div style={{ opacity: 0.8 }}>{new Date(log.created_at).toLocaleTimeString()}</div>
                                     </div>
                                 </div>
                             ))}
@@ -708,14 +776,14 @@ export default function ManagerDashboard() {
                                 const assignedCtIds = assignedCts.map(a => a.caretaker_id);
 
                                 return (
-                                    <div key={animal.animal_id} className="glass-panel" style={{ background: 'rgba(255,255,255,0.5)', padding: '20px' }}>
+                                    <div key={animal.animal_id} className="glass-panel" style={{ padding: '20px' }}>
                                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', flexWrap: 'wrap', gap: '15px' }}>
                                             <div style={{ minWidth: '220px' }}>
-                                                <h3 style={{ color: 'var(--zoo-muted)',margin: '0 0 5px', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                                <h3 style={{ margin: '0 0 5px', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                                                     {animal.name}
                                                     <HealthBadge status={animal.health_status} />
                                                 </h3>
-                                                <p style={{ color: 'var(--zoo-accent)', fontSize: '14px', margin: '0 0 3px' }}>
+                                                <p style={{ color: 'var(--color-secondary)', fontSize: '14px', margin: '0 0 3px' }}>
                                                     {animal.species_common_name}
                                                 </p>
                                                 {animal.species_binomial && (
@@ -750,15 +818,15 @@ export default function ManagerDashboard() {
                                             <div style={{ display: 'flex', gap: '15px', flexWrap: 'wrap' }}>
                                                 {/* Vet Assignments (multiple) */}
                                                 <div style={{ background: 'rgba(255,255,255,0.05)', padding: '12px', borderRadius: '10px', minWidth: '220px' }}>
-                                                    <p style={{ fontSize: '13px', color: 'var(--color-text-muted)', margin: '0 0 8px' }}>Assigned Vets</p>
+                                                    <p style={{ fontSize: '12px', color: 'var(--color-text-muted)', margin: '0 0 8px' }}>Assigned Vets</p>
                                                     {assignedVets.length > 0 && (
                                                         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '8px' }}>
                                                             {assignedVets.map(a => (
                                                                 <div key={a.vet_id} style={{
-                                                                    display: 'flex', alignItems: 'center', justifyContent: 'space-between', color: 'var(--zoo-accent)',
+                                                                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                                                                     background: 'rgba(255,255,255,0.08)', padding: '4px 8px', borderRadius: '6px', fontSize: '13px'
                                                                 }}>
-                                                                    <span><strong>{a.first_name} {a.last_name}</strong></span>
+                                                                    <span>{a.first_name} {a.last_name}</span>
                                                                     <button
                                                                         onClick={() => handleRemoveVetAssignment(a.vet_id, animal.animal_id)}
                                                                         style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '0 2px', fontSize: '16px', lineHeight: 1 }}
@@ -792,15 +860,15 @@ export default function ManagerDashboard() {
 
                                                 {/* Caretaker Assignments (multiple) */}
                                                 <div style={{ background: 'rgba(255,255,255,0.05)', padding: '12px', borderRadius: '10px', minWidth: '220px' }}>
-                                                    <p style={{ fontSize: '13px', color: 'var(--color-text-muted)', margin: '0 0 8px' }}>Assigned Caretakers</p>
+                                                    <p style={{ fontSize: '12px', color: 'var(--color-text-muted)', margin: '0 0 8px' }}>Assigned Caretakers</p>
                                                     {assignedCts.length > 0 && (
                                                         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '8px' }}>
                                                             {assignedCts.map(a => (
                                                                 <div key={a.caretaker_id} style={{
-                                                                    display: 'flex', alignItems: 'center', justifyContent: 'space-between', color: 'var(--zoo-accent)',
+                                                                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                                                                     background: 'rgba(255,255,255,0.08)', padding: '4px 8px', borderRadius: '6px', fontSize: '13px'
                                                                 }}>
-                                                                    <span><strong> {a.first_name} {a.last_name} </strong></span>
+                                                                    <span>{a.first_name} {a.last_name}</span>
                                                                     <button
                                                                         onClick={() => handleRemoveCaretakerAssignment(a.caretaker_id, animal.animal_id)}
                                                                         style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '0 2px', fontSize: '16px', lineHeight: 1 }}
@@ -870,58 +938,79 @@ export default function ManagerDashboard() {
             {/* ═══════════ EVENTS TAB ═══════════ */}
             {activeTab === 'Events' && (
                 <div>
-                    <h2>Events</h2>
-                    {eventsLoading ? <p>Loading events...</p> : events.length === 0 ? (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '14px' }}>
+                        <h2 style={{ margin: 0 }}>Events</h2>
+                        <StatusFilter
+                            label="When"
+                            tabs={[
+                                { key: 'all',      label: 'All'      },
+                                { key: 'upcoming', label: 'Upcoming' },
+                                { key: 'past',     label: 'Past'     },
+                            ]}
+                            value={eventWhen}
+                            onChange={setEventWhen}
+                        />
+                    </div>
+                    <DateRangeFilter
+                        label="Event date between"
+                        from={eventFrom} to={eventTo}
+                        onFrom={setEventFrom} onTo={setEventTo}
+                    />
+                    {eventsLoading ? <p>Loading events...</p> : filteredEvents.length === 0 ? (
                         <div className="glass-panel" style={{ padding: '40px', textAlign: 'center', color: 'var(--color-text-muted)' }}>
                             <Calendar size={48} style={{ marginBottom: '15px', opacity: 0.3 }} />
-                            <p>No events found.</p>
+                            <p>{events.length === 0 ? 'No events found.' : 'No events match this filter.'}</p>
                         </div>
                     ) : (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-                            {events.map(event => {
+                            {filteredEvents.map(event => {
                                 const assigned = event.assignments || [];
                                 return (
-                                    <div key={event.event_id} className="glass-panel" style={{ background: 'rgba(255, 255, 255, 0.5)', padding: '20px' }}>
+                                    <div key={event.event_id} className="glass-panel" style={{ padding: '20px', background: 'rgba(255,255,255,0.6)', border: '1px solid rgba(121,162,128,0.25)' }}>
                                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '10px' }}>
                                             <div>
                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '5px' }}>
-                                                    <Calendar color="var(--color-secondary)" size={20} />
-                                                    <h3 style={{ color: 'var(--zoo-muted)', margin: 0 }}>{event.title}</h3>
+                                                    <Calendar color={MGR_GREEN} size={20} />
+                                                    <h3 style={{ margin: 0, color: 'var(--color-text-dark)' }}>{event.title}</h3>
                                                 </div>
-                                                <p style={{ fontSize: '14px', color: 'var(--color-text-muted)', margin: '5px 0' }}>{event.description}</p>
-                                                <p style={{ color: 'var(--color-secondary)', fontWeight: 600, fontSize: '14px' }}>
+                                                {event.description && (
+                                                    <p style={{ fontSize: '14px', color: 'var(--color-text-dark)', margin: '5px 0', opacity: 0.85 }}>{event.description}</p>
+                                                )}
+                                                <p style={{ color: MGR_GREEN_DARK, fontWeight: 700, fontSize: '14px', margin: '5px 0' }}>
                                                     {new Date(event.event_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
                                                 </p>
                                                 {event.start_time && event.end_time && (
-                                                    <p style={{ fontSize: '13px', color: 'var(--color-text-muted)', margin: '4px 0' }}>
+                                                    <p style={{ fontSize: '13px', color: MGR_GREEN_DARK, margin: '4px 0', fontWeight: 500 }}>
                                                         <Clock size={13} style={{ marginRight: '4px', verticalAlign: 'middle' }} />
                                                         {event.start_time?.slice(0, 5)} – {event.end_time?.slice(0, 5)}
                                                     </p>
                                                 )}
                                                 {event.venue_id && (
-                                                    <p style={{ fontSize: '13px', color: 'var(--color-text-muted)', margin: '4px 0' }}>
+                                                    <p style={{ fontSize: '13px', color: MGR_GREEN_DARK, margin: '4px 0', fontWeight: 500 }}>
                                                         📍 {event.venue_name || 'Unknown venue'}
                                                     </p>
                                                 )}
                                             </div>
-                                            <div style={{ textAlign: 'right', fontSize: '13px', color: 'var(--color-text-muted)' }}>
-                                                {event.actual_attendance || 0} / {event.max_capacity} capacity
+                                            <div style={{ textAlign: 'right', fontSize: '13px', color: MGR_GREEN_DARK, fontWeight: 600 }}>
+                                                <strong style={{ color: 'var(--color-text-dark)' }}>{event.actual_attendance || 0}</strong> / {event.max_capacity}
+                                                <div style={{ fontSize: '11px', opacity: 0.75, fontWeight: 500 }}>capacity</div>
                                             </div>
                                         </div>
 
                                         {/* Personnel & Animals */}
-                                        <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '12px', marginTop: '10px' }}>
-                                            <p style={{ fontSize: '12px', color: 'var(--color-text-muted)', margin: '0 0 8px' }}>Personnel:</p>
+                                        <div style={{ borderTop: '1px solid rgba(121,162,128,0.25)', paddingTop: '12px', marginTop: '10px' }}>
+                                            <p style={{ fontSize: '11px', color: MGR_GREEN_DARK, margin: '0 0 8px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Personnel</p>
                                             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '10px' }}>
                                                 {assigned.filter(a => a.employee_id).length === 0 ? (
-                                                    <span style={{ fontSize: '13px', color: 'var(--color-text-muted)', fontStyle: 'italic' }}>No staff assigned</span>
+                                                    <span style={{ fontSize: '13px', color: MGR_GREEN_DARK, fontStyle: 'italic', opacity: 0.75 }}>No staff assigned</span>
                                                 ) : assigned.filter(a => a.employee_id).map(a => (
                                                     <div key={a.assignment_id} style={{
-                                                        display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--zoo-accent)',
-                                                        background: 'rgba(255,255,255,0.08)', padding: '5px 10px', borderRadius: '8px', fontSize: '13px'
+                                                        display: 'flex', alignItems: 'center', gap: '6px',
+                                                        background: 'rgba(121,162,128,0.18)', color: MGR_GREEN_DARK, fontWeight: 600,
+                                                        padding: '5px 10px', borderRadius: '8px', fontSize: '13px'
                                                     }}>
                                                         <Users size={14} />
-                                                        <span><strong>{a.first_name} {a.last_name}</strong></span>
+                                                        <span>{a.first_name} {a.last_name}</span>
                                                         <button
                                                             onClick={() => handleRemoveEventAssignment(a.assignment_id)}
                                                             style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '0 2px', fontSize: '16px', lineHeight: 1 }}
@@ -934,19 +1023,21 @@ export default function ManagerDashboard() {
                                             </div>
 
                                             <p style={{ fontSize: '12px', color: 'var(--color-text-muted)', margin: '0 0 8px' }}>Animals:</p>
+                                            <p style={{ fontSize: '11px', color: MGR_GREEN_DARK, margin: '10px 0 8px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Animals</p>
                                             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '10px' }}>
                                                 {assigned.filter(a => a.animal_id).length === 0 ? (
-                                                    <span style={{ fontSize: '13px', color: 'var(--color-text-muted)', fontStyle: 'italic' }}>No animals assigned</span>
+                                                    <span style={{ fontSize: '13px', color: MGR_GREEN_DARK, fontStyle: 'italic', opacity: 0.75 }}>No animals assigned</span>
                                                 ) : assigned.filter(a => a.animal_id).map(a => (
                                                     <div key={a.assignment_id} style={{
-                                                        display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--zoo-accent)',
-                                                        background: 'rgba(255,255,255,0.08)', padding: '5px 10px', borderRadius: '8px', fontSize: '13px'
+                                                        display: 'flex', alignItems: 'center', gap: '6px',
+                                                        background: 'rgba(121,162,128,0.18)', color: MGR_GREEN_DARK, fontWeight: 600,
+                                                        padding: '5px 10px', borderRadius: '8px', fontSize: '13px'
                                                     }}>
                                                         <Cat size={14} />
-                                                        <span><strong>{a.animal_name}</strong></span>
+                                                        <span>{a.animal_name}</span>
                                                         <button
                                                             onClick={() => handleRemoveEventAssignment(a.assignment_id)}
-                                                            style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '0 2px', fontSize: '16px', lineHeight: 1 }}
+                                                            style={{ background: 'none', border: 'none', color: '#b91c1c', cursor: 'pointer', padding: '0 2px', fontSize: '16px', lineHeight: 1, fontWeight: 700 }}
                                                             title="Remove"
                                                         >
                                                             &times;
@@ -975,7 +1066,7 @@ export default function ManagerDashboard() {
                                                 </select>
                                                 <button
                                                     className="glass-button"
-                                                    style={{ background: 'var(--zoo-accent)', padding: '8px 16px', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '5px' }}
+                                                    style={{ background: 'var(--color-secondary)', padding: '8px 16px', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '5px' }}
                                                     onClick={() => {
                                                         const sel = document.getElementById(`event-assign-${event.event_id}`);
                                                         if (sel.value) {

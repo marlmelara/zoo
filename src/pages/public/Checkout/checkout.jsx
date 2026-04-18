@@ -513,8 +513,8 @@ export default function Checkout() {
               }
             </p>
             {billing.email && (
-              <p style={{ color: 'var(--color-text-muted)', fontSize: '0.9rem' }}>
-                A confirmation receipt has been sent to <strong style={{ color: 'white' }}>{billing.email}</strong>.
+              <p style={{ color: 'var(--color-text)', fontSize: '0.9rem' }}>
+                A confirmation receipt has been sent to <strong style={{ color: 'rgb(0, 0, 0)' }}>{billing.email}</strong>.
               </p>
             )}
             {orderTransaction && (
@@ -528,7 +528,7 @@ export default function Checkout() {
                   Go to Dashboard
                 </button>
               )}
-              <button className="glass-button" style={{ background: 'transparent', border: '1px solid var(--glass-border)' }}
+              <button className="glass-button"
                       onClick={() => navigate('/')}>
                 Return Home
               </button>

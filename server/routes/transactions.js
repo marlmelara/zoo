@@ -198,4 +198,43 @@ router.post('/', async (req, res) => {
     }
 });
 
+// POST /api/transactions/sale-items
+router.post('/sale-items', async (req, res) => {
+  try {
+    const { items } = req.body;
+    
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ error: 'Invalid items array' });
+    }
+    
+    // Insert each sale item
+    for (const item of items) {
+      await db.query(
+        `INSERT INTO sale_items (transaction_id, item_id, quantity, price_at_sale_cents)
+         VALUES ($1, $2, $3, $4)`,
+        [item.transaction_id, item.item_id, item.quantity, item.price_at_sale_cents]
+      );
+    }
+    
+    res.status(201).json({ success: true, message: `${items.length} sale items created` });
+  } catch (error) {
+    console.error('Error creating sale items:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/transactions/:id/sale-items
+router.get('/:id/sale-items', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await db.query(
+      `SELECT * FROM sale_items WHERE transaction_id = $1`,
+      [id]
+    );
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error fetching sale items:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
 export default router;

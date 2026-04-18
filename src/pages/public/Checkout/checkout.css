@@ -547,11 +547,12 @@ details[open] .food-add-toggle::before {
   text-align: center;
   max-width: 520px;
   margin: 4rem auto;
+  background: rgb(255, 245, 231,0.8);
 }
 
 .checkout-success h2,
 .checkout-empty h2 {
-  color: white;
+  color: rgb(0, 0, 0);
   margin-bottom: 8px;
 }
 

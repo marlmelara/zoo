@@ -184,7 +184,7 @@ export default function Home() {
       image: '/images/penguin.jpg',
       title: 'Lunch with the Zoo Keepers!',
       subtitle: 'Learn more about how you can support the zoo',
-      buttons: [{ text: 'RSVP for the lunch!', link: '/tickets', variant: 'secondary' }]
+      buttons: [{ text: 'Reserve A Ticket', link: '/tickets', variant: 'secondary' }]
     }
   ];
 
@@ -192,7 +192,6 @@ export default function Home() {
     <div className="home">
       {/* Navigation Bar */}
       <Navbar />
-
       {/* Welcome Section */}
       <section className="welcome-section">
         <div className="container">
@@ -223,8 +222,8 @@ export default function Home() {
                   <img src={slide.image} alt={slide.title} className="hero-image" />
                   <div className="hero-overlay"></div>
                   <div className="hero-content">
-                    <h2 className="hero-title" style = {{color: "#ede9e2"}}>{slide.title}</h2>
-                    <p className="hero-subtitle" style={{ color: "#dcd0d0" }}>{slide.subtitle}</p>
+                    <h2 className="hero-title">{slide.title}</h2>
+                    <p className="hero-subtitle">{slide.subtitle}</p>
                     <div className="hero-buttons">
                       {slide.buttons.map((button, btnIndex) => (
                         <a key={btnIndex} href={button.link} className={`hero-button hero-button-${button.variant}`}>

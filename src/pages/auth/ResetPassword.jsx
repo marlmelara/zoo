@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import api from '../../lib/api';
 import { KeyRound } from 'lucide-react';
+import logo from '../../images/logo_alt2.png';
 
 export default function ResetPassword() {
   const navigate = useNavigate();
@@ -42,7 +43,7 @@ export default function ResetPassword() {
       await api.post('/auth/reset-password', { token, password: form.password });
 
       setSuccess(true);
-      setTimeout(() => navigate('/login'), 3000);
+      setTimeout(() => navigate('/account'), 3000);
     } catch (err) {
       console.error('Reset password error:', err);
       setError(err.message || 'Something went wrong. Please try again.');
@@ -53,22 +54,37 @@ export default function ResetPassword() {
 
   return (
     <div style={{
+      position: 'relative',
       minHeight: '100vh',
       display: 'flex',
+      flexDirection: 'column',
       alignItems: 'center',
       justifyContent: 'center',
-      background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
+      background: 'rgb(255, 245, 231)',
       color: 'white',
       padding: '2rem',
     }}>
+      {/* Home button */}
+      <Link to="/" style={{ position: 'absolute', top: '24px', left: '24px', backgroundColor: 'rgb(123,144,79)', padding: '10px 20px', borderRadius: '5px', textDecoration: 'none' }}>
+        <button style={{ background: 'none', border: 'none', color: 'white', fontSize: '18px', fontWeight: 'bold' }}>Home</button>
+      </Link>
+
+      {/* Coog Zoo logo above panel — click to go home */}
+      <Link to="/" style={{ marginBottom: '24px', padding: '10px', borderRadius: '5px', display: 'inline-block' }} aria-label="Go to homepage">
+        <img src={logo} alt="Coog Zoo" style={{ maxWidth: '240px', height: 'auto', cursor: 'pointer' }} />
+      </Link>
+
+      {/* Glass Panel */}
       <div className="glass-panel" style={{
         padding: '40px',
         width: '100%',
         maxWidth: '420px',
         textAlign: 'center',
+        background: 'rgba(255, 255, 255, 0.5)',
+        backdropFilter: 'blur(10px)'
       }}>
         <div style={{
-          background: 'var(--color-primary)',
+          background: 'rgb(123, 144, 79)',
           width: '60px',
           height: '60px',
           borderRadius: '50%',
@@ -82,14 +98,14 @@ export default function ResetPassword() {
 
         {success ? (
           <>
-            <h2 style={{ marginBottom: '12px' }}>Password Updated</h2>
+            <h2 style={{ marginBottom: '12px', color: '#1f2937' }}>Password Updated</h2>
             <p style={{ color: 'var(--color-text-muted)', fontSize: '0.9rem' }}>
               Your password has been reset successfully. Redirecting you to sign in...
             </p>
           </>
         ) : (
           <>
-            <h2 style={{ marginBottom: '8px' }}>Set New Password</h2>
+            <h2 style={{ marginBottom: '8px', color: '#1f2937' }}>Set New Password</h2>
             <p style={{ color: 'var(--color-text-muted)', marginBottom: '24px', fontSize: '0.9rem' }}>
               Enter your new password below.
             </p>
@@ -103,6 +119,7 @@ export default function ResetPassword() {
                 marginBottom: '16px',
                 fontSize: '0.85rem',
                 color: '#fca5a5',
+                textAlign: 'left',
               }}>
                 {error}
               </div>
@@ -115,6 +132,7 @@ export default function ResetPassword() {
                   fontSize: '0.85rem',
                   fontWeight: 600,
                   marginBottom: '6px',
+                  color: '#1f2937',
                 }}>
                   New Password <span style={{ color: '#ef4444' }}>*</span>
                 </label>
@@ -126,7 +144,7 @@ export default function ResetPassword() {
                   onChange={handleChange}
                   placeholder="At least 6 characters"
                   required
-                  style={{ padding: '14px', width: '100%', boxSizing: 'border-box' }}
+                  style={{ padding: '15px', width: '100%', boxSizing: 'border-box' }}
                 />
               </div>
 
@@ -136,6 +154,7 @@ export default function ResetPassword() {
                   fontSize: '0.85rem',
                   fontWeight: 600,
                   marginBottom: '6px',
+                  color: '#1f2937',
                 }}>
                   Confirm New Password <span style={{ color: '#ef4444' }}>*</span>
                 </label>
@@ -147,7 +166,7 @@ export default function ResetPassword() {
                   onChange={handleChange}
                   placeholder="Re-enter your password"
                   required
-                  style={{ padding: '14px', width: '100%', boxSizing: 'border-box' }}
+                  style={{ padding: '15px', width: '100%', boxSizing: 'border-box' }}
                 />
               </div>
 
@@ -156,8 +175,9 @@ export default function ResetPassword() {
                 className="glass-button"
                 disabled={loading}
                 style={{
-                  padding: '14px',
-                  background: 'var(--color-secondary)',
+                  padding: '15px',
+                  background: 'rgb(123, 144, 79)',
+                  color: 'white',
                   fontSize: '16px',
                   marginTop: '4px',
                 }}
@@ -169,7 +189,7 @@ export default function ResetPassword() {
         )}
 
         <p style={{ marginTop: '20px', fontSize: '14px', color: 'var(--color-text-muted)' }}>
-          <Link to="/login" style={{ color: 'var(--color-primary)', textDecoration: 'none' }}>
+          <Link to="/account" style={{ color: '#ffbf69', textDecoration: 'none' }}>
             Back to Sign In
           </Link>
         </p>

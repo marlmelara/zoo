@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { UserPlus } from 'lucide-react';
-import logo from '../../images/logo.png';
+import logo from '../../images/logo_alt2.png';
 
 export default function SignUp() {
   const navigate = useNavigate();
@@ -119,27 +119,32 @@ export default function SignUp() {
 
   return (
     <div style={{
+      position: 'relative',
       minHeight: '100vh',
       display: 'flex',
       flexDirection: 'column',
       alignItems: 'center',
       justifyContent: 'center',
-      background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
+      background: 'rgb(255, 245, 231)',
       color: 'white',
       padding: '2rem',
     }}>
-      <Link to="/" style={{ marginBottom: '24px' }}>
-        <img src={logo} alt="Coog Zoo" style={{ maxWidth: '160px', height: 'auto' }} />
+      {/* Coog Zoo logo above panel — click to go home */}
+      <Link to="/" style={{ marginBottom: '24px', padding: '10px', borderRadius: '5px', display: 'inline-block' }} aria-label="Go to homepage">
+        <img src={logo} alt="Coog Zoo" style={{ maxWidth: '240px', height: 'auto', cursor: 'pointer' }} />
       </Link>
 
+      {/* Glass Panel */}
       <div className="glass-panel" style={{
         padding: '40px',
         width: '100%',
         maxWidth: '520px',
         textAlign: 'center',
+        background: 'rgba(255, 255, 255, 0.5)',
+        backdropFilter: 'blur(10px)'
       }}>
         <div style={{
-          background: 'var(--color-primary)',
+          background: 'rgb(123, 144, 79)',
           width: '60px',
           height: '60px',
           borderRadius: '50%',
@@ -151,7 +156,7 @@ export default function SignUp() {
           <UserPlus size={30} color="white" />
         </div>
 
-        <h2 style={{ marginBottom: '8px' }}>Create Your Account</h2>
+        <h2 style={{ marginBottom: '8px', color: 'var(--color-text-dark)' }}>Create Your Account</h2>
         <p style={{ color: 'var(--color-text-muted)', marginBottom: '24px', fontSize: '0.9rem' }}>
           Join Coog Zoo for faster checkout, order tracking, and membership perks.
         </p>
@@ -165,12 +170,13 @@ export default function SignUp() {
             marginBottom: '16px',
             fontSize: '0.85rem',
             color: '#fca5a5',
+            textAlign: 'left',
           }}>
             {error}
           </div>
         )}
 
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px', textAlign: 'left' }}>
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px', textAlign: 'left'}}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
             <div>
               <label style={labelStyle}>First Name <span style={{ color: '#ef4444' }}>*</span></label>
@@ -350,10 +356,11 @@ export default function SignUp() {
             className="glass-button"
             disabled={loading}
             style={{
-              padding: '14px',
-              background: 'var(--color-secondary)',
+              padding: '15px',
+              background: 'rgb(123, 144, 79)',
+              color: 'white',
               fontSize: '16px',
-              marginTop: '8px',
+              marginTop: '4px',
               width: '100%',
             }}
           >
@@ -363,7 +370,7 @@ export default function SignUp() {
 
         <p style={{ marginTop: '20px', fontSize: '14px', color: 'var(--color-text-muted)' }}>
           Already have an account?{' '}
-          <Link to="/account" style={{ color: 'var(--color-primary)', textDecoration: 'none' }}>
+          <Link to="/account" style={{ color: '#ffbf69', textDecoration: 'none'}}>
             Sign in
           </Link>
         </p>
@@ -377,7 +384,7 @@ const labelStyle = {
   fontSize: '0.85rem',
   fontWeight: 600,
   marginBottom: '6px',
-  color: 'var(--color-text)',
+  color: 'var(--color-text-dark)'
 };
 
 const inputStyle = {

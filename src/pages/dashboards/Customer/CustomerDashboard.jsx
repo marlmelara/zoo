@@ -4,7 +4,7 @@ import { useAuth } from '../../../contexts/AuthContext';
 import api from '../../../lib/api';
 import {
     User, Ticket, Heart, Calendar, MapPin, Phone, Mail,
-    Star, Gift, ShoppingCart, RefreshCw, Clock, Package, Trash2, AlertTriangle, LogOut
+    Star, Gift, ShoppingCart, RefreshCw, Clock, Package, Trash2, AlertTriangle
 } from 'lucide-react';
 
 const TABS = ['My Profile', 'My Purchases', 'My Tickets', 'My Donations', 'Events'];
@@ -245,32 +245,6 @@ export default function CustomerDashboard() {
                             </div>
                         </div>
                     )}
-                    <div
-                        className="glass-panel"
-                        onClick={signOut}
-                        style={{
-                            background: 'rgba(255,255,255,0.5)',
-                            padding: '10px 20px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '10px',
-                            cursor: 'pointer',
-                            transition: 'transform 0.2s ease, box-shadow 0.2s ease'
-                        }}
-                        onMouseEnter={(e) => {
-                            e.currentTarget.style.transform = 'translateY(-2px)';
-                            e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
-                        }}
-                        onMouseLeave={(e) => {
-                            e.currentTarget.style.transform = 'translateY(0)';
-                            e.currentTarget.style.boxShadow = 'none';
-                        }}
-                    >
-                        <LogOut size={16} color="#6d8243" />
-                        <div>
-                            <span style={{ display: 'block', fontSize: '15px', color: 'var(--color-text-dark)' }}>Sign Out</span>
-                        </div>
-                    </div>
                 </div>
             </div>
 
@@ -566,7 +540,7 @@ export default function CustomerDashboard() {
                             <span style={{ color: 'var(--color-text-muted)' }}>to</span>
                             <input type="date" className="glass-input" value={purchaseDateTo} onChange={e => setPurchaseDateTo(e.target.value)} style={{ padding: '6px 10px', fontSize: '13px', width: 'auto' }} />
                             {(purchaseDateFrom || purchaseDateTo) && (
-                                <button className="glass-button" onClick={() => { setPurchaseDateFrom(''); setPurchaseDateTo(''); }} style={{ padding: '6px 12px', fontSize: '12px' }}>Clear</button>
+                                <button className="glass-button" onClick={() => { setPurchaseDateFrom(''); setPurchaseDateTo(''); }} style={{ padding: '6px 12px', fontSize: '12px'}}>Clear</button>
                             )}
                         </div>
                     )}
@@ -595,7 +569,7 @@ export default function CustomerDashboard() {
                                                 <h3 style={{ margin: '0 0 4px', fontSize: '1rem' }}>
                                                     Order #{txn.transaction_id}
                                                 </h3>
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: 'var(--color-text-muted)' }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: 'var(--color-text)'}}>
                                                     <Clock size={12} />
                                                     {new Date(txn.transaction_date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
                                                     {' at '}
@@ -607,11 +581,11 @@ export default function CustomerDashboard() {
                                             </p>
                                         </div>
                                         {lineItems.length > 0 && (
-                                            <div style={{ background: 'rgba(0,0,0,0.05)', border: '1px solid rgba(0,0,0,0.08)', borderRadius: '8px', padding: '12px' }}>
+                                            <div style={{ background: 'rgba(0,0,0,0.05)', border: '1px solid rgba(0,0,0,0.08)', borderRadius: '8px', padding: '12px', color: 'var(--color-secondary)' }}>
                                                 {lineItems.map((item, idx) => (
                                                     <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 0', borderBottom: idx < lineItems.length - 1 ? '1px solid rgba(0,0,0,0.06)' : 'none' }}>
                                                         <span style={{ fontSize: '13px' }}>
-                                                            {item.description} <span style={{ color: 'var(--color-text-muted)' }}>x{item.quantity}</span>
+                                                            {item.description} <span style={{color: 'var(--color-secondary)'}}>x{item.quantity}</span>
                                                         </span>
                                                         <span style={{ fontSize: '13px', fontWeight: 600, color: '#6d8243' }}>
                                                             ${((item.unitPriceCents * item.quantity) / 100).toFixed(2)}

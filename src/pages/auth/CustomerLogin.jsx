@@ -69,7 +69,7 @@ export default function CustomerLogin() {
         }}>
           <Lock size={30} color="white" />
         </div>
-        <h2 style={{ marginBottom: '8px', color: '#1f2937'}}>Customer Sign In</h2>
+        <h2 style={{ marginBottom: '8px', color: 'var(--color-text-dark'}}>Customer Sign In</h2>
         <p style={{ color: 'var(--color-text-muted)', marginBottom: '24px', fontSize: '0.9rem' }}>
           Sign in to manage your tickets, orders, and membership.
         </p>

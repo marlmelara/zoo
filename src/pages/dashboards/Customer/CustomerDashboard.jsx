@@ -137,6 +137,19 @@ export default function CustomerDashboard() {
         }
     }
 
+    // Phone/zip format helpers for the profile edit form.
+    const formatPhone = (v) => {
+        const d = String(v).replace(/\D/g, '').slice(0, 10);
+        if (d.length <= 3) return d;
+        if (d.length <= 6) return `(${d.slice(0, 3)}) ${d.slice(3)}`;
+        return `(${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6)}`;
+    };
+    const digitsOnly = (v, max) => String(v).replace(/\D/g, '').slice(0, max);
+    const today = new Date();
+    const todayStr = today.toISOString().split('T')[0];
+    const minDob   = new Date(today.getFullYear() - 120, today.getMonth(), today.getDate())
+        .toISOString().split('T')[0];
+
     async function handleProfileUpdate(e) {
         e.preventDefault();
         const required = {
@@ -149,6 +162,19 @@ export default function CustomerDashboard() {
                 alert(`${label} is required.`);
                 return;
             }
+        }
+        if ((editForm.phone || '').replace(/\D/g, '').length !== 10) {
+            alert('Phone number must be exactly 10 digits.');
+            return;
+        }
+        if (!/^\d{5}$/.test(editForm.zip_code || '')) {
+            alert('Zip code must be exactly 5 digits.');
+            return;
+        }
+        const dob = new Date(editForm.date_of_birth);
+        if (Number.isNaN(dob.getTime()) || dob > today || dob < new Date(minDob)) {
+            alert('Please enter a valid date of birth.');
+            return;
         }
         try {
             await api.patch('/customers/me', {
@@ -262,27 +288,27 @@ export default function CustomerDashboard() {
                             <form onSubmit={handleProfileUpdate} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
                                 <div>
                                     <label style={{ fontSize: '12px', color: 'var(--color-text-muted)', display: 'block', marginBottom: '5px' }}>First Name <span style={{ color: '#ef4444' }}>*</span></label>
-                                    <input className="glass-input" value={editForm.first_name || ''} onChange={e => setEditForm({ ...editForm, first_name: e.target.value })} required />
+                                    <input className="glass-input" value={editForm.first_name || ''} onChange={e => setEditForm({ ...editForm, first_name: e.target.value })} required maxLength={50} />
                                 </div>
                                 <div>
                                     <label style={{ fontSize: '12px', color: 'var(--color-text-muted)', display: 'block', marginBottom: '5px' }}>Last Name <span style={{ color: '#ef4444' }}>*</span></label>
-                                    <input className="glass-input" value={editForm.last_name || ''} onChange={e => setEditForm({ ...editForm, last_name: e.target.value })} required />
+                                    <input className="glass-input" value={editForm.last_name || ''} onChange={e => setEditForm({ ...editForm, last_name: e.target.value })} required maxLength={50} />
                                 </div>
                                 <div>
                                     <label style={{ fontSize: '12px', color: 'var(--color-text-muted)', display: 'block', marginBottom: '5px' }}>Phone <span style={{ color: '#ef4444' }}>*</span></label>
-                                    <input className="glass-input" type="tel" value={editForm.phone || ''} onChange={e => setEditForm({ ...editForm, phone: e.target.value })} required />
+                                    <input className="glass-input" type="tel" value={editForm.phone || ''} onChange={e => setEditForm({ ...editForm, phone: formatPhone(e.target.value) })} required maxLength={14} inputMode="numeric" placeholder="(123) 456-7890" />
                                 </div>
                                 <div>
                                     <label style={{ fontSize: '12px', color: 'var(--color-text-muted)', display: 'block', marginBottom: '5px' }}>Date of Birth <span style={{ color: '#ef4444' }}>*</span></label>
-                                    <input className="glass-input" type="date" value={editForm.date_of_birth || ''} onChange={e => setEditForm({ ...editForm, date_of_birth: e.target.value })} required />
+                                    <input className="glass-input" type="date" value={editForm.date_of_birth || ''} onChange={e => setEditForm({ ...editForm, date_of_birth: e.target.value })} required min={minDob} max={todayStr} />
                                 </div>
                                 <div style={{ gridColumn: '1 / -1' }}>
                                     <label style={{ fontSize: '12px', color: 'var(--color-text-muted)', display: 'block', marginBottom: '5px' }}>Street Address <span style={{ color: '#ef4444' }}>*</span></label>
-                                    <input className="glass-input" value={editForm.address || ''} onChange={e => setEditForm({ ...editForm, address: e.target.value })} required />
+                                    <input className="glass-input" value={editForm.address || ''} onChange={e => setEditForm({ ...editForm, address: e.target.value })} required maxLength={200} />
                                 </div>
                                 <div>
                                     <label style={{ fontSize: '12px', color: 'var(--color-text-muted)', display: 'block', marginBottom: '5px' }}>City <span style={{ color: '#ef4444' }}>*</span></label>
-                                    <input className="glass-input" value={editForm.city || ''} onChange={e => setEditForm({ ...editForm, city: e.target.value })} required />
+                                    <input className="glass-input" value={editForm.city || ''} onChange={e => setEditForm({ ...editForm, city: e.target.value })} required maxLength={100} />
                                 </div>
                                 <div>
                                     <label style={{ fontSize: '12px', color: 'var(--color-text-muted)', display: 'block', marginBottom: '5px' }}>State <span style={{ color: '#ef4444' }}>*</span></label>
@@ -293,7 +319,7 @@ export default function CustomerDashboard() {
                                 </div>
                                 <div>
                                     <label style={{ fontSize: '12px', color: 'var(--color-text-muted)', display: 'block', marginBottom: '5px' }}>Zip Code <span style={{ color: '#ef4444' }}>*</span></label>
-                                    <input className="glass-input" value={editForm.zip_code || ''} onChange={e => setEditForm({ ...editForm, zip_code: e.target.value })} required />
+                                    <input className="glass-input" value={editForm.zip_code || ''} onChange={e => setEditForm({ ...editForm, zip_code: digitsOnly(e.target.value, 5) })} required maxLength={5} inputMode="numeric" pattern="\d{5}" placeholder="12345" />
                                 </div>
                                 <div style={{ gridColumn: '1 / -1', display: 'flex', gap: '10px', marginTop: '10px' }}>
                                     <button type="submit" className="glass-button" style={{ background: 'var(--color-primary)', flex: 1 }}>Save Changes</button>

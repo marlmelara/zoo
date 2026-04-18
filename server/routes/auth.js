@@ -21,8 +21,27 @@ router.post('/signup', async (req, res) => {
             return res.status(400).json({ error: `Missing required field: ${k}` });
         }
     }
-    if (password.length < 6) {
-        return res.status(400).json({ error: 'Password must be at least 6 characters.' });
+    if (password.length < 6 || password.length > 128) {
+        return res.status(400).json({ error: 'Password must be 6-128 characters.' });
+    }
+    if (String(firstName).length > 50 || String(lastName).length > 50) {
+        return res.status(400).json({ error: 'Name fields must be 50 characters or fewer.' });
+    }
+    if (String(email).length > 255) {
+        return res.status(400).json({ error: 'Email is too long.' });
+    }
+    if (String(phone).replace(/\D/g, '').length !== 10) {
+        return res.status(400).json({ error: 'Phone number must be exactly 10 digits.' });
+    }
+    if (!/^\d{5}$/.test(String(zipCode))) {
+        return res.status(400).json({ error: 'Zip code must be exactly 5 digits.' });
+    }
+    const dobDate = new Date(dateOfBirth);
+    if (Number.isNaN(dobDate.getTime()) || dobDate > new Date()) {
+        return res.status(400).json({ error: 'Date of birth must be a valid past date.' });
+    }
+    if (String(address).length > 200 || String(city).length > 100) {
+        return res.status(400).json({ error: 'Address or city is too long.' });
     }
 
     const conn = await db.getConnection();

@@ -23,10 +23,28 @@ export default function SignUp() {
     zipCode: '',
   });
 
+  // Format 10 digits as (XXX) XXX-XXXX as the user types.
+  const formatPhone = (v) => {
+    const d = String(v).replace(/\D/g, '').slice(0, 10);
+    if (d.length <= 3) return d;
+    if (d.length <= 6) return `(${d.slice(0, 3)}) ${d.slice(3)}`;
+    return `(${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6)}`;
+  };
+  const digitsOnly = (v, max) => String(v).replace(/\D/g, '').slice(0, max);
+
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setForm(prev => ({ ...prev, [name]: value }));
+    let next = value;
+    if (name === 'phone')   next = formatPhone(value);
+    if (name === 'zipCode') next = digitsOnly(value, 5);
+    setForm(prev => ({ ...prev, [name]: next }));
   };
+
+  // Max DOB = today (no future dates). Min = 120 years ago.
+  const today = new Date();
+  const todayStr   = today.toISOString().split('T')[0];
+  const minDob     = new Date(today.getFullYear() - 120, today.getMonth(), today.getDate())
+    .toISOString().split('T')[0];
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -52,6 +70,26 @@ export default function SignUp() {
         setError(`${label} is required.`);
         return;
       }
+    }
+
+    // Format-specific constraints
+    const phoneDigits = form.phone.replace(/\D/g, '');
+    if (phoneDigits.length !== 10) {
+      setError('Phone number must be exactly 10 digits.');
+      return;
+    }
+    if (!/^\d{5}$/.test(form.zipCode)) {
+      setError('Zip code must be exactly 5 digits.');
+      return;
+    }
+    const dob = new Date(form.dateOfBirth);
+    if (Number.isNaN(dob.getTime()) || dob > today) {
+      setError('Date of birth cannot be in the future.');
+      return;
+    }
+    if (dob < new Date(minDob)) {
+      setError('Please enter a valid date of birth.');
+      return;
     }
 
     try {
@@ -144,6 +182,7 @@ export default function SignUp() {
                 onChange={handleChange}
                 placeholder="First name"
                 required
+                maxLength={50}
                 style={inputStyle}
               />
             </div>
@@ -157,6 +196,7 @@ export default function SignUp() {
                 onChange={handleChange}
                 placeholder="Last name"
                 required
+                maxLength={50}
                 style={inputStyle}
               />
             </div>
@@ -172,6 +212,7 @@ export default function SignUp() {
               onChange={handleChange}
               placeholder="your@email.com"
               required
+              maxLength={255}
               style={inputStyle}
             />
           </div>
@@ -186,6 +227,8 @@ export default function SignUp() {
               onChange={handleChange}
               placeholder="(123) 456-7890"
               required
+              maxLength={14}
+              inputMode="numeric"
               style={inputStyle}
             />
           </div>
@@ -199,6 +242,8 @@ export default function SignUp() {
               value={form.dateOfBirth}
               onChange={handleChange}
               required
+              min={minDob}
+              max={todayStr}
               style={inputStyle}
             />
           </div>
@@ -213,6 +258,7 @@ export default function SignUp() {
               onChange={handleChange}
               placeholder="Street address"
               required
+              maxLength={200}
               style={inputStyle}
             />
           </div>
@@ -228,6 +274,7 @@ export default function SignUp() {
                 onChange={handleChange}
                 placeholder="City"
                 required
+                maxLength={100}
                 style={inputStyle}
               />
             </div>
@@ -256,8 +303,11 @@ export default function SignUp() {
                 className="glass-input"
                 value={form.zipCode}
                 onChange={handleChange}
-                placeholder="Zip code"
+                placeholder="12345"
                 required
+                maxLength={5}
+                inputMode="numeric"
+                pattern="\d{5}"
                 style={inputStyle}
               />
             </div>
@@ -273,6 +323,8 @@ export default function SignUp() {
               onChange={handleChange}
               placeholder="At least 6 characters"
               required
+              minLength={6}
+              maxLength={128}
               style={inputStyle}
             />
           </div>
@@ -287,6 +339,8 @@ export default function SignUp() {
               onChange={handleChange}
               placeholder="Re-enter your password"
               required
+              minLength={6}
+              maxLength={128}
               style={inputStyle}
             />
           </div>

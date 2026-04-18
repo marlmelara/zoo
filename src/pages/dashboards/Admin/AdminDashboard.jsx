@@ -595,7 +595,7 @@ function ReactivatePanel() {
         setLoading(true);
         try {
             const qs = query.trim()
-                ? (tab === 'animals' ? `?name=${encodeURIComponent(query)}` : `?email=${encodeURIComponent(query)}`)
+                ? (tab === 'animals' ? `?name=${encodeURIComponent(query)}` : `?q=${encodeURIComponent(query)}`)
                 : '';
             const path = tab === 'customers' ? `/api/customers/deactivated${qs}`
                        : tab === 'staff'     ? `/api/employees/deactivated${qs}`
@@ -634,7 +634,7 @@ function ReactivatePanel() {
 
     const label = (r) =>
         tab === 'customers' ? `${r.first_name} ${r.last_name} — ${r.email}`
-      : tab === 'staff'     ? `${r.first_name} ${r.last_name} (${r.role}${r.dept_name ? ` · ${r.dept_name}` : ''})`
+      : tab === 'staff'     ? `${r.first_name} ${r.last_name}${r.email ? ` — ${r.email}` : ''} (${r.role}${r.dept_name ? ` · ${r.dept_name}` : ''})`
       :                       `${r.name} — ${r.species_common_name}${r.zone_name ? ` · ${r.zone_name}` : ''}`;
 
     const id = (r) =>
@@ -666,7 +666,7 @@ function ReactivatePanel() {
             <div style={{ display: 'flex', gap: '8px', marginBottom: '14px' }}>
                 <input
                     className="glass-input"
-                    placeholder={tab === 'animals' ? 'Search by name...' : 'Search by email...'}
+                    placeholder={tab === 'animals' ? 'Search by name...' : 'Search by name or email...'}
                     value={query}
                     onChange={e => setQuery(e.target.value)}
                     onKeyDown={e => { if (e.key === 'Enter') runSearch(); }}

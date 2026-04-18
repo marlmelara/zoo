@@ -1,4 +1,5 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Bell, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { getNotifications } from '../api/notifications';
 
@@ -9,6 +10,9 @@ export default function NotificationsBell() {
     const [items, setItems] = useState([]);
     const [loading, setLoading] = useState(false);
     const wrapperRef = useRef(null);
+    const buttonRef  = useRef(null);
+    const panelRef   = useRef(null);
+    const [panelPos, setPanelPos] = useState({ left: 0, bottom: 0, maxHeight: 480 });
 
     async function load() {
         try {
@@ -33,11 +37,45 @@ export default function NotificationsBell() {
 
     useEffect(() => {
         function onClick(e) {
-            if (wrapperRef.current && !wrapperRef.current.contains(e.target)) setOpen(false);
+            if (wrapperRef.current && wrapperRef.current.contains(e.target)) return;
+            if (panelRef.current   && panelRef.current.contains(e.target))   return;
+            setOpen(false);
         }
         document.addEventListener('mousedown', onClick);
         return () => document.removeEventListener('mousedown', onClick);
     }, []);
+
+    // Anchor the panel to the right of the bell (portaled to <body> + fixed
+    // so no ancestor backdrop-filter/sticky can trap it). We anchor the
+    // panel's BOTTOM edge to the bell's bottom so it sits right next to the
+    // bell no matter how few items it has — no floating-above-the-bell gap.
+    useLayoutEffect(() => {
+        if (!open || !buttonRef.current) return;
+        const update = () => {
+            const rect = buttonRef.current.getBoundingClientRect();
+            const panelWidth = 360;
+            const gap        = 10;
+            const viewportH  = window.innerHeight;
+            const viewportW  = window.innerWidth;
+            // Horizontal: prefer right of the bell; flip if no room.
+            let left = rect.right + gap;
+            if (left + panelWidth > viewportW - 10) {
+                left = Math.max(10, rect.left - panelWidth - gap);
+            }
+            // Vertical: anchor panel bottom to bell bottom. The panel grows
+            // upward from there, capped to what fits above.
+            const bottom = Math.max(10, viewportH - rect.bottom);
+            const maxHeight = Math.min(480, viewportH - bottom - 10);
+            setPanelPos({ left, bottom, maxHeight });
+        };
+        update();
+        window.addEventListener('scroll', update, true);
+        window.addEventListener('resize', update);
+        return () => {
+            window.removeEventListener('scroll', update, true);
+            window.removeEventListener('resize', update);
+        };
+    }, [open]);
 
     // Split by resolution state. Unresolved = still actionable work.
     const unresolved = items.filter(n => !n.is_resolved);
@@ -68,6 +106,7 @@ export default function NotificationsBell() {
             `}</style>
 
             <button
+                ref={buttonRef}
                 onClick={() => setOpen(o => !o)}
                 aria-label="Notifications"
                 style={{
@@ -103,20 +142,20 @@ export default function NotificationsBell() {
                 )}
             </button>
 
-            {open && (
-                <div style={{
-                    position: 'absolute',
-                    left: 'calc(100% + 10px)',
-                    bottom: 0,
+            {open && createPortal(
+                <div ref={panelRef} style={{
+                    position: 'fixed',
+                    left: panelPos.left,
+                    bottom: panelPos.bottom,
                     width: '360px',
-                    maxHeight: '480px',
+                    maxHeight: panelPos.maxHeight,
                     overflowY: 'auto',
                     background: 'white',
                     color: 'var(--color-text-dark)',
                     borderRadius: '12px',
-                    boxShadow: '0 12px 32px rgba(0,0,0,0.18)',
-                    border: '1px solid rgba(0,0,0,0.06)',
-                    zIndex: 50,
+                    boxShadow: '0 12px 32px rgba(0,0,0,0.25)',
+                    border: '1px solid rgba(0,0,0,0.08)',
+                    zIndex: 10000,
                 }}>
                     <div style={{
                         padding: '12px 14px', borderBottom: '1px solid rgba(0,0,0,0.08)',
@@ -157,7 +196,8 @@ export default function NotificationsBell() {
                             )}
                         </>
                     )}
-                </div>
+                </div>,
+                document.body
             )}
         </div>
     );

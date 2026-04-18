@@ -20,12 +20,25 @@ export default function GenEmployeeDashboard() {
     const [resolvedEmpId, setResolvedEmpId] = useState(employeeId);
     const [resolvedDeptId, setResolvedDeptId] = useState(deptId);
 
-    // Supplies state
+    // Supplies state — both operational and retail. Retail employees can
+    // request restocks for shop inventory in addition to operational supplies.
     const [supplies, setSupplies] = useState([]);
+    const [retailItems, setRetailItems] = useState([]);
     const [suppliesLoading, setSuppliesLoading] = useState(true);
     const [myRequests, setMyRequests] = useState([]);
     const [showRequestForm, setShowRequestForm] = useState(false);
+    // supply_id now carries a composite key like "op-123" or "retail-45" so
+    // we can tell which list to hit.
     const [requestForm, setRequestForm] = useState({ supply_id: '', quantity: '', reason: '' });
+
+    const isRetail = role === 'retail';
+
+    // Recommended restock quantity: aim for ~2x threshold so we have a buffer.
+    const recommendRestock = (stock, threshold) => {
+        const t = Number(threshold) || 0;
+        const s = Number(stock)     || 0;
+        return Math.max(Math.round(t * 2 - s), 1);
+    };
 
     // Events state
     const [events, setEvents] = useState([]);
@@ -51,6 +64,15 @@ export default function GenEmployeeDashboard() {
                 if (data.dept_id) {
                     const supplyData = await getSuppliesByDepartment(data.dept_id);
                     setSupplies(supplyData);
+                }
+                // Retail associates can also request shop inventory restocks.
+                if (data.role === 'retail' || role === 'retail') {
+                    try {
+                        const retailData = await api.get('/inventory');
+                        setRetailItems(retailData || []);
+                    } catch (err) {
+                        console.error('Error fetching retail inventory:', err);
+                    }
                 }
                 if (data.employee_id) {
                     const reqData = await getMySupplyRequests(data.employee_id);
@@ -110,30 +132,44 @@ export default function GenEmployeeDashboard() {
 
     async function handleRequestSubmit(e) {
         e.preventDefault();
-        const supply = supplies.find(s => s.supply_id === parseInt(requestForm.supply_id));
         const empId = resolvedEmpId || employeeId;
-        if (!supply || !empId) return;
+        if (!requestForm.supply_id || !empId) return;
+
+        // supply_id is "op-<id>" or "retail-<id>" so we know which catalog it came from.
+        const [kind, rawId] = String(requestForm.supply_id).split('-');
+        const itemId = parseInt(rawId, 10);
+        const item = kind === 'retail'
+            ? retailItems.find(r => r.item_id === itemId)
+            : supplies.find(s => s.supply_id === itemId);
+        if (!item) return;
+        const supplyType = kind === 'retail' ? 'retail' : 'operational';
+        const itemName   = item.item_name;
+
         try {
             const newRequest = await createSupplyRequest({
                 requested_by: empId,
-                supply_type: 'operational',
-                item_id: supply.supply_id,
-                item_name: supply.item_name,
+                supply_type: supplyType,
+                item_id: itemId,
+                item_name: itemName,
                 requested_quantity: parseInt(requestForm.quantity),
-                reason: requestForm.reason
+                reason: requestForm.reason,
             });
             await logActivity({
                 action_type: 'supply_request_created',
-                description: `Requested ${requestForm.quantity}x ${supply.item_name}`,
+                description: `Requested ${requestForm.quantity}x ${itemName}`,
                 performed_by: empId,
                 target_type: 'supply_request',
                 target_id: newRequest.request_id,
-                metadata: { item_name: supply.item_name, quantity: parseInt(requestForm.quantity), reason: requestForm.reason }
+                metadata: { item_name: itemName, supply_type: supplyType,
+                            quantity: parseInt(requestForm.quantity), reason: requestForm.reason },
             });
             setShowRequestForm(false);
             setRequestForm({ supply_id: '', quantity: '', reason: '' });
             fetchMyRequests();
             fetchSupplies();
+            if (isRetail) {
+                try { setRetailItems(await api.get('/inventory')); } catch {}
+            }
         } catch (err) {
             console.error('Error creating supply request:', err);
             alert('Failed to submit request: ' + err.message);
@@ -287,6 +323,7 @@ export default function GenEmployeeDashboard() {
             )}
 
             {/* ═══════════ SUPPLIES TAB ═══════════ */}
+            {/* (StockRow used below is defined at file scope) */}
             {activeTab === 'Supplies' && (
                 <div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
@@ -304,13 +341,41 @@ export default function GenEmployeeDashboard() {
                         <div className="glass-panel" style={{ padding: '20px', marginBottom: '20px', border: '1px solid var(--color-accent)' }}>
                             <h3 style={{ marginTop: 0 }}>New Supply Request</h3>
                             <form onSubmit={handleRequestSubmit} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
-                                <select required className="glass-input" value={requestForm.supply_id} onChange={e => setRequestForm({ ...requestForm, supply_id: e.target.value })}>
+                                <select required className="glass-input" value={requestForm.supply_id} onChange={e => {
+                                    const v = e.target.value;
+                                    // Auto-fill quantity with recommended restock if the selected item is low.
+                                    let rec = '';
+                                    if (v) {
+                                        const [kind, rawId] = v.split('-');
+                                        const id = parseInt(rawId, 10);
+                                        const item = kind === 'retail'
+                                            ? retailItems.find(r => r.item_id === id)
+                                            : supplies.find(s => s.supply_id === id);
+                                        if (item && item.is_low_stock) {
+                                            rec = String(recommendRestock(item.stock_count, item.restock_threshold));
+                                        }
+                                    }
+                                    setRequestForm({ ...requestForm, supply_id: v, quantity: rec || requestForm.quantity });
+                                }}>
                                     <option value="">Select Supply...</option>
-                                    {supplies.map(s => (
-                                        <option key={s.supply_id} value={s.supply_id}>
-                                            {s.item_name} (Stock: {s.stock_count})
-                                        </option>
-                                    ))}
+                                    {supplies.length > 0 && (
+                                        <optgroup label="Operational Supplies">
+                                            {supplies.map(s => (
+                                                <option key={`op-${s.supply_id}`} value={`op-${s.supply_id}`}>
+                                                    {s.item_name} — stock {s.stock_count} / threshold {s.restock_threshold}
+                                                </option>
+                                            ))}
+                                        </optgroup>
+                                    )}
+                                    {isRetail && retailItems.length > 0 && (
+                                        <optgroup label="Shop Inventory (Retail)">
+                                            {retailItems.map(r => (
+                                                <option key={`retail-${r.item_id}`} value={`retail-${r.item_id}`}>
+                                                    {r.item_name} — stock {r.stock_count} / threshold {r.restock_threshold}
+                                                </option>
+                                            ))}
+                                        </optgroup>
+                                    )}
                                 </select>
                                 <input type="number" min="1" required placeholder="Quantity Needed" className="glass-input" value={requestForm.quantity} onChange={e => setRequestForm({ ...requestForm, quantity: e.target.value })} />
                                 <div style={{ gridColumn: '1 / -1' }}>
@@ -327,39 +392,43 @@ export default function GenEmployeeDashboard() {
                     )}
 
                     {suppliesLoading ? <p>Loading supplies...</p> : supplies.length === 0 ? (
-                        <p style={{ color: 'var(--color-text-muted)' }}>No supplies found for your department.</p>
+                        <p style={{ color: 'var(--color-text-dark)' }}>No supplies found for your department.</p>
                     ) : (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '30px' }}>
                             {supplies.map(item => (
-                                <div key={item.supply_id} style={{
-                                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                                    background: 'rgba(255,255,255,0.05)', padding: '15px', borderRadius: '10px',
-                                    border: item.is_low_stock ? '1px solid rgba(244, 63, 94, 0.3)' : '1px solid transparent'
-                                }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                        <Package size={18} color="var(--color-text-muted)" />
-                                        <div>
-                                            <span style={{ fontWeight: 'bold', display: 'block' }}>{item.item_name}</span>
-                                            <span style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>
-                                                {item.category} {item.description && `- ${item.description}`}
-                                            </span>
-                                        </div>
-                                    </div>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-                                        <div style={{ textAlign: 'right' }}>
-                                            <span style={{ fontWeight: 'bold', fontSize: '18px', display: 'block' }}>{item.stock_count}</span>
-                                            <span style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>Stock</span>
-                                        </div>
-                                        {item.is_low_stock && (
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '5px', color: 'var(--color-accent)', background: 'rgba(244, 63, 94, 0.1)', padding: '5px 8px', borderRadius: '6px' }}>
-                                                <AlertTriangle size={14} />
-                                                <span style={{ fontSize: '12px', fontWeight: 'bold' }}>Low</span>
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
+                                <StockRow
+                                    key={item.supply_id}
+                                    name={item.item_name}
+                                    subtitle={`${item.category || 'Supplies'}${item.description ? ' - ' + item.description : ''}`}
+                                    stock={item.stock_count}
+                                    threshold={item.restock_threshold}
+                                    isLow={!!item.is_low_stock}
+                                    recommend={recommendRestock(item.stock_count, item.restock_threshold)}
+                                />
                             ))}
                         </div>
+                    )}
+
+                    {/* ── Retail associates also see shop inventory ── */}
+                    {isRetail && retailItems.length > 0 && (
+                        <>
+                            <h3 style={{ display: 'flex', alignItems: 'center', gap: '10px', color: 'var(--color-text-dark)' }}>
+                                <Package size={20} /> Shop Inventory
+                            </h3>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '30px' }}>
+                                {retailItems.map(item => (
+                                    <StockRow
+                                        key={item.item_id}
+                                        name={item.item_name}
+                                        subtitle={`${item.category || 'Retail'}`}
+                                        stock={item.stock_count}
+                                        threshold={item.restock_threshold}
+                                        isLow={!!item.is_low_stock}
+                                        recommend={recommendRestock(item.stock_count, item.restock_threshold)}
+                                    />
+                                ))}
+                            </div>
+                        </>
                     )}
 
                     {/* My Requests */}
@@ -367,15 +436,19 @@ export default function GenEmployeeDashboard() {
                         <ClipboardList size={20} /> My Requests
                     </h3>
                     {myRequests.length === 0 ? (
-                        <p style={{ color: 'var(--color-text-muted)' }}>No supply requests submitted yet.</p>
+                        <p style={{ color: 'var(--color-text-dark)' }}>No supply requests submitted yet.</p>
                     ) : (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                             {myRequests.map(req => (
-                                <div key={req.request_id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.05)', padding: '12px 15px', borderRadius: '10px' }}>
+                                <div key={req.request_id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.6)', padding: '12px 15px', borderRadius: '10px', border: '1px solid rgba(121,162,128,0.25)' }}>
                                     <div>
-                                        <span style={{ fontWeight: 'bold' }}>{req.item_name}</span>
-                                        <span style={{ color: 'var(--color-text-muted)', fontSize: '13px', marginLeft: '10px' }}>Qty: {req.requested_quantity}</span>
-                                        {req.reason && <p style={{ fontSize: '12px', color: 'var(--color-text-muted)', margin: '4px 0 0' }}>{req.reason}</p>}
+                                        <span style={{ fontWeight: 700, color: 'var(--color-text-dark)' }}>{req.item_name}</span>
+                                        <span style={{ color: 'var(--color-text-dark)', fontSize: '13px', marginLeft: '10px' }}>Qty: <strong>{req.requested_quantity}</strong></span>
+                                        {req.reason && (
+                                            <p style={{ fontSize: '13px', color: 'var(--color-text-dark)', margin: '4px 0 0' }}>
+                                                <strong>Reason:</strong> {req.reason}
+                                            </p>
+                                        )}
                                     </div>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                         {statusIcon(req.status)}
@@ -387,6 +460,49 @@ export default function GenEmployeeDashboard() {
                     )}
                 </div>
             )}
+        </div>
+    );
+}
+
+// ─── Reusable stock row ────────────────────────────────────────
+function StockRow({ name, subtitle, stock, threshold, isLow, recommend }) {
+    return (
+        <div style={{
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            background: 'rgba(255, 255, 255, 0.6)',
+            padding: '14px 16px', borderRadius: '10px',
+            border: isLow ? '1px solid rgba(239, 68, 68, 0.45)'
+                          : '1px solid rgba(121, 162, 128, 0.25)',
+        }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
+                <Package size={20} color={isLow ? '#dc2626' : 'rgb(102, 122, 66)'} />
+                <div style={{ minWidth: 0 }}>
+                    <div style={{ fontWeight: 700, color: 'var(--color-text-dark)', fontSize: '15px' }}>{name}</div>
+                    <div style={{ fontSize: '12px', color: 'var(--color-text-dark)', opacity: 0.8 }}>{subtitle}</div>
+                </div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '18px', flexShrink: 0 }}>
+                <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: '13px', color: 'var(--color-text-dark)' }}>
+                        <strong style={{ fontSize: '18px' }}>{stock}</strong>
+                        <span style={{ opacity: 0.7 }}> / threshold {threshold}</span>
+                    </div>
+                    {isLow ? (
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px',
+                                      marginTop: '4px', color: '#dc2626', background: 'rgba(239,68,68,0.12)',
+                                      padding: '3px 8px', borderRadius: '6px', fontSize: '12px', fontWeight: 700 }}>
+                            <AlertTriangle size={12} /> Low — recommended restock: {recommend}
+                        </div>
+                    ) : (
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px',
+                                      marginTop: '4px', color: 'rgb(102, 122, 66)',
+                                      background: 'rgba(16,185,129,0.12)',
+                                      padding: '3px 8px', borderRadius: '6px', fontSize: '12px', fontWeight: 700 }}>
+                            <CheckCircle size={12} /> Healthy stock
+                        </div>
+                    )}
+                </div>
+            </div>
         </div>
     );
 }

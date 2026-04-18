@@ -85,10 +85,11 @@ export default function Layout() {
                     color: 'white',
                     borderRadius: '16px',
                     boxShadow: '0 8px 24px rgba(123, 144, 79, 0.25)',
-                    overflow: 'hidden',
+                    // overflow: visible so the notifications dropdown
+                    // (position:absolute, left: calc(100% + 10px)) isn't clipped.
                 }}
             >
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', overflow: 'hidden' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', minHeight: 0, flex: 1 }}>
                     <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: '10px', textDecoration: 'none', color: 'white' }}>
                         <img src={logo} alt="Home" style={{ width: '150px', height: 'auto', objectFit: 'contain', filter: 'brightness(0) invert(1)' }} />
                     </Link>

@@ -261,9 +261,13 @@ export default function ManagerDashboard() {
     async function handleAssignVet(animalId, vetEmployeeId) {
         try {
             await api.post(`/animals/${animalId}/vet-assign`, { vet_id: vetEmployeeId });
+            const animal = allAnimals.find(a => a.animal_id === animalId);
+            const vet    = vets.find(v => v.employee_id === vetEmployeeId);
+            const animalLabel = animal ? animal.name : `animal #${animalId}`;
+            const vetLabel    = vet ? `${vet.first_name} ${vet.last_name}` : `vet #${vetEmployeeId}`;
             await logActivity({
                 action_type: 'animal_vet_assigned',
-                description: `Assigned vet to animal #${animalId}`,
+                description: `Assigned ${vetLabel} to ${animalLabel}`,
                 performed_by: resolvedEmpId || employeeId,
                 target_type: 'animal',
                 target_id: animalId
@@ -287,9 +291,13 @@ export default function ManagerDashboard() {
     async function handleAssignCaretaker(animalId, caretakerEmployeeId) {
         try {
             await api.post(`/animals/${animalId}/caretaker-assign`, { caretaker_id: caretakerEmployeeId });
+            const animal    = allAnimals.find(a => a.animal_id === animalId);
+            const caretaker = caretakers.find(c => c.employee_id === caretakerEmployeeId);
+            const animalLabel    = animal ? animal.name : `animal #${animalId}`;
+            const caretakerLabel = caretaker ? `${caretaker.first_name} ${caretaker.last_name}` : `caretaker #${caretakerEmployeeId}`;
             await logActivity({
                 action_type: 'animal_caretaker_assigned',
-                description: `Assigned caretaker to animal #${animalId}`,
+                description: `Assigned ${caretakerLabel} to ${animalLabel}`,
                 performed_by: resolvedEmpId || employeeId,
                 target_type: 'animal',
                 target_id: animalId
@@ -313,9 +321,13 @@ export default function ManagerDashboard() {
     async function handleAssignEmployeeToEvent(eventId, empIdToAssign) {
         try {
             await api.post(`/events/${eventId}/assign-employee`, { employee_id: empIdToAssign });
+            const event = events.find(e => e.event_id === eventId);
+            const emp   = staff.find(s => s.employee_id === empIdToAssign);
+            const eventLabel = event ? event.title : `event #${eventId}`;
+            const empLabel   = emp ? `${emp.first_name} ${emp.last_name}` : `employee #${empIdToAssign}`;
             await logActivity({
                 action_type: 'event_employee_assigned',
-                description: `Assigned employee #${empIdToAssign} to event #${eventId}`,
+                description: `Assigned ${empLabel} to ${eventLabel}`,
                 performed_by: resolvedEmpId || employeeId,
                 target_type: 'event',
                 target_id: eventId
@@ -534,8 +546,8 @@ export default function ManagerDashboard() {
                                     </div>
 
                                     {req.reason && (
-                                        <p style={{ fontSize: '13px', color: 'var(--color-text-muted)', margin: '0 0 15px', fontStyle: 'italic' }}>
-                                            "{req.reason}"
+                                        <p style={{ fontSize: '14px', color: 'var(--color-text-dark)', margin: '0 0 15px', fontWeight: 500 }}>
+                                            <strong style={{ color: 'rgb(102, 122, 66)' }}>Reason:</strong> {req.reason}
                                         </p>
                                     )}
 

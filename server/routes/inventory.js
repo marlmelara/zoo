@@ -64,8 +64,9 @@ router.get('/:id', async (req, res) => {
     }
 });
 
-// POST /api/inventory
-router.post('/', requireRole('admin','manager','retail'), async (req, res) => {
+// POST /api/inventory — add/delete restricted to admin + manager per spec.
+// Retail associates can still restock existing items (PATCH /:id/restock).
+router.post('/', requireRole('admin','manager'), async (req, res) => {
     const { outlet_id, item_name, stock_count, restock_threshold,
             cost_to_restock_cents, category, price_cents, image_url } = req.body;
     try {
@@ -126,6 +127,18 @@ router.post('/:id/decrement', requireRole('admin','manager','retail'), async (re
             'UPDATE inventory SET stock_count = GREATEST(0, stock_count - ?) WHERE item_id = ?',
             [quantity, req.params.id]
         );
+        return res.json({ success: true });
+    } catch (err) {
+        return res.status(500).json({ error: err.message });
+    }
+});
+
+// DELETE /api/inventory/:id — hard delete a retail item. Admin + manager only.
+// sale_items / shop_items FKs are ON DELETE SET NULL / CASCADE so history stays intact.
+router.delete('/:id', requireRole('admin','manager'), async (req, res) => {
+    try {
+        await db.query('DELETE FROM shop_items WHERE item_id = ?', [req.params.id]);
+        await db.query('DELETE FROM inventory WHERE item_id = ?', [req.params.id]);
         return res.json({ success: true });
     } catch (err) {
         return res.status(500).json({ error: err.message });

@@ -1,12 +1,18 @@
 import React, { useEffect, useState } from 'react';
 import { getAdminEvents as fetchEventsApi } from '../../../../api/events';
 import api from '../../../../lib/api';
-import { Calendar, Users, X, Plus, User, Cat, MapPin, Clock, Trash2, AlertTriangle } from 'lucide-react';
+import { Calendar, Users, X, Plus, User, Cat, MapPin, Clock, Trash2, AlertTriangle, Archive } from 'lucide-react';
+import { StatusFilter } from '../../../../components/AnimalsPanel';
 
 export default function Events() {
   const [events, setEvents] = useState([]);
   const [venues, setVenues] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  // Filter + manage state
+  const [filter, setFilter] = useState('upcoming'); // upcoming | past | all | archived
+  const [manageMode, setManageMode] = useState(false);
+  const [selected, setSelected] = useState(() => new Set());
 
   // Modal states
   const [selectedEvent, setSelectedEvent] = useState(null);
@@ -185,17 +191,46 @@ export default function Events() {
     }
   }
 
-  // ── Delete event ──
-  async function handleDeleteEvent(eventId) {
+  // ── Archive event (soft-delete). Existing tickets/receipts still resolve.
+  async function handleArchiveEvent(eventId) {
     try {
       await api.delete(`/events/${eventId}`);
       setDeleteConfirm(null);
       setSelectedEvent(null);
       loadEvents();
     } catch (err) {
-      console.error('Error deleting event:', err);
-      alert('Failed to delete event: ' + err.message);
+      console.error('Error archiving event:', err);
+      alert('Failed to archive event: ' + err.message);
     }
+  }
+
+  // ── Bulk manage helpers ──
+  function toggleSelect(id) {
+    setSelected(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+  function selectAllVisible() {
+    setSelected(new Set(filteredEvents.filter(e => !e.is_archived).map(e => e.event_id)));
+  }
+  function exitManageMode() {
+    setManageMode(false);
+    setSelected(new Set());
+  }
+  async function handleArchiveSelected() {
+    if (selected.size === 0) return;
+    const confirmed = window.confirm(
+      `Archive ${selected.size} event${selected.size === 1 ? '' : 's'}? This hides them from listings but preserves tickets already sold. Archives are permanent — create a new event if you need to bring one back.`
+    );
+    if (!confirmed) return;
+    const ids = Array.from(selected);
+    const results = await Promise.allSettled(ids.map(id => api.delete(`/events/${id}`)));
+    const failed = results.filter(r => r.status === 'rejected');
+    if (failed.length) alert(`${failed.length} archive${failed.length === 1 ? '' : 's'} failed.`);
+    exitManageMode();
+    loadEvents();
   }
 
   const getVenueName = (venueId) => {
@@ -203,37 +238,106 @@ export default function Events() {
     return v ? v.venue_name : 'No venue';
   };
 
+  // ── Derived filter: upcoming / past / all / archived (date-based + archive flag)
+  const todayStr = new Date().toISOString().split('T')[0];
+  const filteredEvents = (events || []).filter(ev => {
+    const archived = !!ev.is_archived;
+    if (filter === 'archived') return archived;
+    if (archived) return false;
+    if (filter === 'upcoming') return ev.event_date >= todayStr;
+    if (filter === 'past')     return ev.event_date <  todayStr;
+    return true; // 'all'
+  });
+
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '20px' }}>
         <h1 style={{ margin: 0 }}>Events</h1>
-        <button className="glass-button" onClick={() => setShowCreate(true)} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <Plus size={16} /> Create Event
-        </button>
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <button className="glass-button" onClick={() => setShowCreate(true)} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <Plus size={16} /> Create Event
+          </button>
+          {manageMode ? (
+            <button className="glass-button" onClick={exitManageMode}
+              style={{ background: 'rgba(239,68,68,0.18)', color: '#b91c1c', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 600 }}>
+              × Exit Archive
+            </button>
+          ) : (
+            <button className="glass-button" onClick={() => setManageMode(true)}
+              style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Archive size={14} /> Manage Events
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div style={{ marginBottom: '20px' }}>
+        <StatusFilter
+          label="Filter"
+          tabs={[
+            { key: 'upcoming', label: 'Upcoming' },
+            { key: 'past',     label: 'Past' },
+            { key: 'all',      label: 'All' },
+            { key: 'archived', label: 'Archived' },
+          ]}
+          value={filter}
+          onChange={setFilter}
+        />
       </div>
 
       {loading ? (
         <p>Loading events...</p>
-      ) : (events?.length ?? 0) === 0 ? (
+      ) : filteredEvents.length === 0 ? (
         <div className="glass-panel" style={{ padding: '40px', textAlign: 'center' }}>
-          <p>No events yet. Create one to get started.</p>
+          <p>No {filter === 'all' ? '' : filter} events to display.</p>
         </div>
       ) : (
-        <div className="grid-cards">
-          {events.map((event) => {
+        <div className="grid-cards" style={{ paddingBottom: manageMode ? '90px' : 0 }}>
+          {filteredEvents.map((event) => {
             const isPast = new Date(event.event_date + 'T00:00:00') < new Date(new Date().toDateString());
+            const isArchived = !!event.is_archived;
+            const selectable = manageMode && !isArchived;
+            const checked = selected.has(event.event_id);
+            const badgeLabel = isArchived ? 'Archived' : isPast ? 'Past' : 'Upcoming';
+            const badgeBg    = isArchived ? '#6b7280' : isPast ? 'gray' : 'var(--color-primary)';
             return (
               <div
                 key={event.event_id}
                 className="glass-panel"
-                style={{ padding: '20px', position: 'relative', overflow: 'hidden', cursor: 'pointer', transition: 'transform 0.2s', opacity: isPast ? 0.6 : 1 }}
-                onClick={() => openEventModal(event)}
+                style={{
+                  padding: '20px', position: 'relative', overflow: 'hidden',
+                  cursor: selectable ? 'pointer' : (manageMode ? 'default' : 'pointer'),
+                  transition: 'transform 0.2s',
+                  opacity: isArchived ? 0.5 : isPast ? 0.75 : 1,
+                  outline: checked ? '2px solid #ef4444' : 'none',
+                }}
+                onClick={() => {
+                  if (manageMode) {
+                    if (selectable) toggleSelect(event.event_id);
+                  } else {
+                    openEventModal(event);
+                  }
+                }}
               >
-                <div style={{ position: 'absolute', top: 0, right: 0, padding: '5px 10px', background: isPast ? 'gray' : 'var(--color-primary)', borderBottomLeftRadius: '10px', fontSize: '12px', fontWeight: 'bold' }}>
-                  {isPast ? 'Past' : 'Upcoming'}
+                {manageMode && !isArchived && (
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={() => toggleSelect(event.event_id)}
+                    onClick={(e) => e.stopPropagation()}
+                    style={{ position: 'absolute', top: '10px', left: '10px', width: '18px', height: '18px', accentColor: '#ef4444', zIndex: 2 }}
+                  />
+                )}
+                <div style={{ position: 'absolute', top: 0, right: 0, padding: '5px 10px', background: badgeBg, borderBottomLeftRadius: '10px', fontSize: '12px', fontWeight: 'bold' }}>
+                  {badgeLabel}
                 </div>
 
-                <h3 style={{ margin: '0 0 8px', paddingRight: '60px' }}>{event.title || 'Untitled Event'}</h3>
+                <h3 style={{ margin: '0 0 4px', paddingRight: '70px', paddingLeft: manageMode && !isArchived ? '28px' : 0 }}>{event.title || 'Untitled Event'}</h3>
+                {event.description && (
+                  <p style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)', margin: '0 0 10px', paddingLeft: manageMode && !isArchived ? '28px' : 0 }}>
+                    {event.description}
+                  </p>
+                )}
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
                   <Calendar size={14} color="var(--color-secondary)" />
@@ -270,6 +374,32 @@ export default function Events() {
         </div>
       )}
 
+      {manageMode && (
+        <div style={{
+          position: 'fixed', bottom: '24px', left: '50%', transform: 'translateX(-50%)',
+          background: '#1a1f2e', border: '1px solid rgba(239,68,68,0.3)',
+          borderRadius: '14px', padding: '10px 14px',
+          display: 'flex', alignItems: 'center', gap: '14px',
+          boxShadow: '0 10px 30px rgba(0,0,0,0.5)', zIndex: 999,
+        }}>
+          <span style={{ fontSize: '13px', color: 'var(--color-text-muted)' }}>
+            <strong style={{ color: 'white' }}>{selected.size}</strong> selected
+          </span>
+          <button onClick={selectAllVisible}
+            style={{ background: 'rgba(255,255,255,0.08)', color: 'white', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '8px', padding: '8px 14px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
+            Select All
+          </button>
+          <button onClick={handleArchiveSelected} disabled={selected.size === 0}
+            style={{ background: selected.size === 0 ? 'rgba(239,68,68,0.25)' : '#ef4444', color: 'white', border: 'none', borderRadius: '8px', padding: '8px 14px', fontSize: '12px', fontWeight: 700, cursor: selected.size === 0 ? 'not-allowed' : 'pointer' }}>
+            Archive Selected
+          </button>
+          <button onClick={exitManageMode}
+            style={{ background: 'transparent', color: 'white', border: '1px solid rgba(255,255,255,0.18)', borderRadius: '8px', padding: '8px 14px', fontSize: '12px', cursor: 'pointer' }}>
+            Cancel
+          </button>
+        </div>
+      )}
+
       {/* ══ Event Detail Modal ══ */}
       {selectedEvent && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(5px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
@@ -277,9 +407,11 @@ export default function Events() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
               <h2 style={{ margin: 0 }}>{selectedEvent.title || 'Event Details'}</h2>
               <div style={{ display: 'flex', gap: '8px' }}>
-                <button onClick={() => setDeleteConfirm(selectedEvent.event_id)} style={{ background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '8px', padding: '6px 10px', color: '#fca5a5', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.8rem' }}>
-                  <Trash2 size={14} /> Delete
-                </button>
+                {!selectedEvent.is_archived && (
+                  <button onClick={() => setDeleteConfirm(selectedEvent.event_id)} style={{ background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '8px', padding: '6px 10px', color: '#fca5a5', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.8rem' }}>
+                    <Archive size={14} /> Archive
+                  </button>
+                )}
                 <button onClick={() => setSelectedEvent(null)} style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer' }}>
                   <X />
                 </button>
@@ -289,9 +421,11 @@ export default function Events() {
             {deleteConfirm === selectedEvent.event_id && (
               <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '8px', padding: '12px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
                 <AlertTriangle size={16} color="#fca5a5" />
-                <span style={{ fontSize: '0.85rem', color: '#fca5a5', flex: 1 }}>This will delete the event and all associated assignments and tickets.</span>
-                <button onClick={() => handleDeleteEvent(selectedEvent.event_id)} style={{ background: '#ef4444', border: 'none', borderRadius: '6px', padding: '6px 14px', color: 'white', cursor: 'pointer', fontWeight: '600', fontSize: '0.8rem' }}>
-                  Confirm Delete
+                <span style={{ fontSize: '0.85rem', color: '#fca5a5', flex: 1 }}>
+                  Archive this event? Already-purchased tickets stay visible to customers, but the event disappears from public listings. Archives are permanent — create a new event to bring it back.
+                </span>
+                <button onClick={() => handleArchiveEvent(selectedEvent.event_id)} style={{ background: '#ef4444', border: 'none', borderRadius: '6px', padding: '6px 14px', color: 'white', cursor: 'pointer', fontWeight: '600', fontSize: '0.8rem' }}>
+                  Confirm Archive
                 </button>
                 <button onClick={() => setDeleteConfirm(null)} style={{ background: 'transparent', border: '1px solid var(--glass-border)', borderRadius: '6px', padding: '6px 14px', color: 'white', cursor: 'pointer', fontSize: '0.8rem' }}>
                   Cancel

@@ -4,13 +4,25 @@ import { requireRole, requireAuth } from '../middleware/auth.js';
 
 const router = Router();
 
-// GET /api/events — public: all events with venue
+// GET /api/events
+// Non-admin callers (or any caller without ?include_archived=1) receive
+// only non-archived events. Admin UIs pass include_archived=1 when they
+// want the full picture.
+// Optional ?filter=upcoming|past|archived narrows the result set.
 router.get('/', async (req, res) => {
     try {
+        const { include_archived, filter } = req.query;
+        const where = [];
+        if (include_archived !== '1') where.push('COALESCE(e.is_archived, 0) = 0');
+        if (filter === 'upcoming') where.push('e.event_date >= CURDATE()');
+        if (filter === 'past')     where.push('e.event_date <  CURDATE()');
+        if (filter === 'archived') { where.length = 0; where.push('COALESCE(e.is_archived, 0) = 1'); }
+        const clause = where.length ? 'WHERE ' + where.join(' AND ') : '';
         const [rows] = await db.query(
             `SELECT e.*, v.venue_name, v.location AS venue_location, v.capacity AS venue_capacity
              FROM events e
              LEFT JOIN venues v ON e.venue_id = v.venue_id
+             ${clause}
              ORDER BY e.event_date DESC`
         );
         return res.json(rows);
@@ -44,6 +56,7 @@ router.get('/with-assignments', requireRole('admin', 'manager'), async (req, res
             `SELECT e.*, v.venue_name, v.location AS venue_location
              FROM events e
              LEFT JOIN venues v ON e.venue_id = v.venue_id
+             WHERE COALESCE(e.is_archived, 0) = 0
              ORDER BY e.event_date DESC`
         );
 
@@ -189,21 +202,20 @@ router.delete('/assignments/:assignmentId', requireRole('admin', 'manager'), asy
     }
 });
 
-// DELETE /api/events/:id — cascades to assignments and tickets
+// DELETE /api/events/:id — soft-archive.
+// Preserves tickets + receipts + assignments so prior purchasers still
+// see the event on their dashboard. Not reversible.
 router.delete('/:id', requireRole('admin', 'manager'), async (req, res) => {
-    const conn = await db.getConnection();
     try {
-        await conn.beginTransaction();
-        await conn.query('DELETE FROM event_assignments WHERE event_id = ?', [req.params.id]);
-        await conn.query('DELETE FROM tickets WHERE event_id = ?', [req.params.id]);
-        await conn.query('DELETE FROM events WHERE event_id = ?', [req.params.id]);
-        await conn.commit();
-        return res.json({ success: true });
+        await db.query(
+            `UPDATE events
+                SET is_archived = 1, archived_at = NOW()
+              WHERE event_id = ?`,
+            [req.params.id]
+        );
+        return res.json({ success: true, archived: true });
     } catch (err) {
-        await conn.rollback();
         return res.status(500).json({ error: err.message });
-    } finally {
-        conn.release();
     }
 });
 

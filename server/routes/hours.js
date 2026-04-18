@@ -114,6 +114,31 @@ router.get('/my', requireAuth, async (req, res) => {
     }
 });
 
+// GET /api/hours/reviewed-by-me — every request the current manager/admin
+// has personally approved or denied. Serves the "My Reviews" tab.
+router.get('/reviewed-by-me', requireRole('admin', 'manager'), async (req, res) => {
+    const { employeeId } = req.user;
+    if (!employeeId) return res.json([]);
+    const conn = await db.getConnection();
+    try {
+        const [rows] = await conn.query(
+            `SELECT request_id FROM hours_requests
+             WHERE reviewed_by = ?
+             ORDER BY reviewed_at DESC`,
+            [employeeId]
+        );
+        const results = [];
+        for (const r of rows) {
+            results.push(await getRequestWithEntries(conn, r.request_id));
+        }
+        return res.json(results);
+    } catch (err) {
+        return res.status(500).json({ error: err.message });
+    } finally {
+        conn.release();
+    }
+});
+
 // GET /api/hours — admin: everything. manager: requests from their dept.
 router.get('/', requireRole('admin', 'manager'), async (req, res) => {
     const { role, deptId } = req.user;

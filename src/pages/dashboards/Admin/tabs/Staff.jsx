@@ -1,31 +1,36 @@
 import React, { useEffect, useState } from 'react';
 import api from '../../../../lib/api';
 import { useAuth } from '../../../../contexts/AuthContext';
-import { User, Stethoscope, Briefcase, Shield } from 'lucide-react';
+import { User, Stethoscope, Briefcase, Shield, Trash2, PawPrint, ShoppingBag } from 'lucide-react';
+import { StatusFilter } from '../../../../components/AnimalsPanel';
 
 export default function Staff() {
     const { role } = useAuth();
+    const canManage = role === 'admin';
     const [staff, setStaff] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showForm, setShowForm] = useState(false);
     const [departments, setDepartments] = useState([]);
+    const [statusFilter, setStatusFilter] = useState('active');
+    const [manageMode, setManageMode] = useState(false);
+    const [selected, setSelected] = useState(() => new Set());
     const [formData, setFormData] = useState({
         first_name: '', last_name: '', contact_info: '', pay_rate_cents: '', shift_timeframe: '', dept_id: '',
         email: '', password: '', role: 'general',
-        // Role specific
-        license_no: '', specialty: '',        // Vet
-        specialization_species: '',            // Caretaker
-        office_location: ''                    // Manager
+        license_no: '', specialty: '',
+        specialization_species: '',
+        office_location: ''
     });
 
     useEffect(() => {
         fetchStaff();
         fetchDepartments();
-    }, []);
+    }, [statusFilter]);
 
     async function fetchStaff() {
+        setLoading(true);
         try {
-            const data = await api.get('/employees');
+            const data = await api.get(`/employees?status=${statusFilter}`);
             setStaff(data || []);
         } catch (error) {
             console.error('Error fetching staff:', error);
@@ -42,7 +47,6 @@ export default function Staff() {
     async function handleSubmit(e) {
         e.preventDefault();
         try {
-            // Determine role from department name if not explicitly set
             let derivedRole = formData.role;
             const selectedDept = departments.find(d => d.dept_id == formData.dept_id);
             if (selectedDept) {
@@ -81,11 +85,44 @@ export default function Staff() {
         }
     }
 
+    function toggleSelect(id) {
+        setSelected(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id); else next.add(id);
+            return next;
+        });
+    }
+
+    function selectAllVisible() {
+        setSelected(new Set(filteredStaff.filter(p => p.is_active).map(p => p.employee_id)));
+    }
+
+    function exitManageMode() {
+        setManageMode(false);
+        setSelected(new Set());
+    }
+
+    async function handleRemoveSelected() {
+        if (selected.size === 0) return;
+        const confirmed = window.confirm(
+            `Deactivate ${selected.size} staff member${selected.size === 1 ? '' : 's'}? They can be reactivated from the Reactivate tab.`
+        );
+        if (!confirmed) return;
+        const ids = Array.from(selected);
+        const results = await Promise.allSettled(ids.map(id => api.delete(`/employees/${id}`)));
+        const failed = results.filter(r => r.status === 'rejected');
+        if (failed.length) alert(`${failed.length} deactivation${failed.length === 1 ? '' : 's'} failed.`);
+        exitManageMode();
+        fetchStaff();
+    }
+
     const getRoleIcon = (deptName) => {
         switch (deptName) {
             case 'Veterinary Services': return <Stethoscope size={20} color="var(--color-primary)" />;
-            case 'Administration': return <Briefcase size={20} color="var(--color-secondary)" />;
-            case 'Security': return <Shield size={20} color="var(--color-accent)" />;
+            case 'Animal Care':         return <PawPrint size={20} color="rgb(123, 144, 79)" />;
+            case 'Administration':      return <Briefcase size={20} color="var(--color-secondary)" />;
+            case 'Security':            return <Shield size={20} color="var(--color-accent)" />;
+            case 'Retail & Operations': return <ShoppingBag size={20} color="#c2410c" />;
             default: return <User size={20} color="var(--color-text-muted)" />;
         }
     };
@@ -98,9 +135,15 @@ export default function Staff() {
         (person.dept_name || '').toLowerCase().includes(searchTerm.toLowerCase())
     );
 
+    const STATUS_TABS = [
+        { key: 'active',   label: 'Active' },
+        { key: 'inactive', label: 'Inactive' },
+        { key: 'all',      label: 'All' },
+    ];
+
     return (
         <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px', flexWrap: 'wrap', gap: '20px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '20px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '20px', flex: 1 }}>
                     <h1 style={{ margin: 0 }}>Staff Management</h1>
                     <input
@@ -113,14 +156,38 @@ export default function Staff() {
                     />
                 </div>
                 {(role === 'admin' || role === 'manager') && (
-                    <button
-                        className="glass-button"
-                        onClick={() => setShowForm(!showForm)}
-                        style={{ background: showForm ? 'var(--color-accent)' : 'rgba(255,255,255,0.1)' }}
-                    >
-                        {showForm ? 'Cancel' : '+ Add Staff'}
-                    </button>
+                    <div style={{ display: 'flex', gap: '10px' }}>
+                        <button
+                            className="glass-button"
+                            onClick={() => setShowForm(!showForm)}
+                            style={{ background: showForm ? 'var(--color-accent)' : 'rgba(255,255,255,0.1)' }}
+                        >
+                            {showForm ? 'Cancel' : '+ Add Staff'}
+                        </button>
+                        {canManage && (
+                            manageMode ? (
+                                <button className="glass-button" onClick={exitManageMode}
+                                    style={{ background: 'rgba(239,68,68,0.18)', color: '#b91c1c', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 600 }}>
+                                    × Exit Removal
+                                </button>
+                            ) : (
+                                <button className="glass-button" onClick={() => setManageMode(true)}
+                                    style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    <Trash2 size={14} /> Manage Staff
+                                </button>
+                            )
+                        )}
+                    </div>
                 )}
+            </div>
+
+            <div style={{ marginBottom: '20px' }}>
+                <StatusFilter
+                    label="Status"
+                    tabs={STATUS_TABS}
+                    value={statusFilter}
+                    onChange={setStatusFilter}
+                />
             </div>
 
             {showForm && (
@@ -140,7 +207,6 @@ export default function Staff() {
                             {departments.map(d => <option key={d.dept_id} value={d.dept_id}>{d.dept_name}</option>)}
                         </select>
 
-                        {/* Dynamic Fields based on Dept */}
                         {departments.find(d => d.dept_id == formData.dept_id)?.dept_name.toLowerCase().includes('vet') && (
                             <>
                                 <input placeholder="License Number" required className="glass-input" value={formData.license_no} onChange={e => setFormData({ ...formData, license_no: e.target.value })} />
@@ -163,49 +229,122 @@ export default function Staff() {
 
             {loading ? (
                 <p>Loading staff...</p>
+            ) : filteredStaff.length === 0 ? (
+                <div className="glass-panel" style={{ padding: '40px', textAlign: 'center', color: 'var(--color-text-muted)' }}>
+                    <p>No {statusFilter === 'all' ? '' : statusFilter} staff to display.</p>
+                </div>
             ) : (
-                <div className="grid-cards">
-                    {filteredStaff.map(person => (
-                        <div key={person.employee_id} className="glass-panel" style={{ padding: '20px' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '15px' }}>
-                                <div>
-                                    <h3 style={{ margin: '0 0 5px' }}>{person.first_name} {person.last_name}</h3>
+                <div className="grid-cards" style={{ paddingBottom: manageMode ? '90px' : 0 }}>
+                    {filteredStaff.map(person => {
+                        const inactive = person.is_active === 0;
+                        const selectable = manageMode && !inactive;
+                        const checked = selected.has(person.employee_id);
+                        return (
+                            <div
+                                key={person.employee_id}
+                                className="glass-panel"
+                                onClick={() => selectable && toggleSelect(person.employee_id)}
+                                style={{
+                                    padding: '20px', position: 'relative',
+                                    opacity: inactive ? 0.55 : 1,
+                                    cursor: selectable ? 'pointer' : 'default',
+                                    outline: checked ? '2px solid #ef4444' : 'none',
+                                    transition: 'outline 120ms',
+                                }}
+                            >
+                                {manageMode && !inactive && (
+                                    <input
+                                        type="checkbox"
+                                        checked={checked}
+                                        onChange={() => toggleSelect(person.employee_id)}
+                                        onClick={(e) => e.stopPropagation()}
+                                        style={{ position: 'absolute', top: '12px', left: '12px', width: '18px', height: '18px', accentColor: '#ef4444', zIndex: 2 }}
+                                    />
+                                )}
+                                {inactive && (
                                     <span style={{
-                                        fontSize: '12px',
-                                        padding: '4px 8px',
-                                        borderRadius: '20px',
-                                        background: 'rgba(255,255,255,0.1)',
-                                        color: 'var(--color-text-muted)'
-                                    }}>
-                                        {person.dept_name || 'Unassigned'}
-                                    </span>
+                                        position: 'absolute', top: '12px', left: '12px',
+                                        fontSize: '10px', padding: '2px 8px', borderRadius: '10px',
+                                        background: 'rgba(239,68,68,0.18)', color: '#b91c1c', fontWeight: 700, textTransform: 'uppercase',
+                                    }}>Inactive</span>
+                                )}
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '15px', paddingLeft: (manageMode && !inactive) || inactive ? '28px' : 0, transition: 'padding 150ms' }}>
+                                    <div>
+                                        <h3 style={{ margin: '0 0 5px' }}>{person.first_name} {person.last_name}</h3>
+                                        <span style={{
+                                            fontSize: '12px',
+                                            padding: '4px 8px',
+                                            borderRadius: '20px',
+                                            background: 'rgba(255,255,255,0.1)',
+                                            color: 'var(--color-text-muted)'
+                                        }}>
+                                            {person.dept_name || 'Unassigned'}
+                                        </span>
+                                    </div>
+                                    {getRoleIcon(person.dept_name)}
                                 </div>
-                                {getRoleIcon(person.dept_name)}
-                            </div>
 
-                            <div style={{ fontSize: '14px', color: 'var(--color-text-muted)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                <p>Shift: {person.shift_timeframe}</p>
+                                <div style={{ fontSize: '14px', color: 'var(--color-text-muted)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                    <p>Shift: {person.shift_timeframe}</p>
 
-                                {/* Role Specific Details */}
-                                {person.license_no && (
-                                    <div style={{ color: 'var(--color-primary)' }}>
-                                        <p>Vet License: {person.license_no}</p>
-                                        <p>Specialty: {person.specialty}</p>
-                                    </div>
-                                )}
-                                {person.specialization_species && (
-                                    <div style={{ color: 'var(--color-text)' }}>
-                                        <p>Specialization: {person.specialization_species}</p>
-                                    </div>
-                                )}
-                                {person.office_location && (
-                                    <p>Office: {person.office_location}</p>
-                                )}
+                                    {person.license_no && (
+                                        <div style={{ color: 'var(--color-primary)' }}>
+                                            <p>Vet License: {person.license_no}</p>
+                                            <p>Specialty: {person.specialty}</p>
+                                        </div>
+                                    )}
+                                    {person.specialization_species && (
+                                        <div style={{ color: 'var(--color-text)' }}>
+                                            <p>Specialization: {person.specialization_species}</p>
+                                        </div>
+                                    )}
+                                    {person.office_location && (
+                                        <p>Office: {person.office_location}</p>
+                                    )}
+                                </div>
                             </div>
-                        </div>
-                    ))}
+                        );
+                    })}
                 </div>
             )}
+
+            {manageMode && (
+                <BulkActionBar
+                    count={selected.size}
+                    onSelectAll={selectAllVisible}
+                    onRemove={handleRemoveSelected}
+                    onCancel={exitManageMode}
+                    actionLabel="Deactivate Selected"
+                />
+            )}
+        </div>
+    );
+}
+
+function BulkActionBar({ count, onSelectAll, onRemove, onCancel, actionLabel }) {
+    return (
+        <div style={{
+            position: 'fixed', bottom: '24px', left: '50%', transform: 'translateX(-50%)',
+            background: '#1a1f2e', border: '1px solid rgba(239,68,68,0.3)',
+            borderRadius: '14px', padding: '10px 14px',
+            display: 'flex', alignItems: 'center', gap: '14px',
+            boxShadow: '0 10px 30px rgba(0,0,0,0.5)', zIndex: 999,
+        }}>
+            <span style={{ fontSize: '13px', color: 'var(--color-text-muted)' }}>
+                <strong style={{ color: 'white' }}>{count}</strong> selected
+            </span>
+            <button onClick={onSelectAll}
+                style={{ background: 'rgba(255,255,255,0.08)', color: 'white', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '8px', padding: '8px 14px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
+                Select All
+            </button>
+            <button onClick={onRemove} disabled={count === 0}
+                style={{ background: count === 0 ? 'rgba(239,68,68,0.25)' : '#ef4444', color: 'white', border: 'none', borderRadius: '8px', padding: '8px 14px', fontSize: '12px', fontWeight: 700, cursor: count === 0 ? 'not-allowed' : 'pointer' }}>
+                {actionLabel}
+            </button>
+            <button onClick={onCancel}
+                style={{ background: 'transparent', color: 'white', border: '1px solid rgba(255,255,255,0.18)', borderRadius: '8px', padding: '8px 14px', fontSize: '12px', cursor: 'pointer' }}>
+                Cancel
+            </button>
         </div>
     );
 }

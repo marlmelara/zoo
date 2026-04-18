@@ -290,7 +290,13 @@ export default function Checkout() {
       for (const evt of eventTicketList) {
         const base = evt.price_cents;
         const price = memberDiscount > 0 ? Math.round(base * (1 - memberDiscount)) : base;
-        receiptItems.push({ description: `Event: ${evt.title}`, quantity: evt.quantity || 1, unitPriceCents: price });
+        receiptItems.push({
+          description: `Event: ${evt.title}`,
+          subtext: evt.description || evt.event_description || null,
+          event_id: evt.event_id || null,
+          quantity: evt.quantity || 1,
+          unitPriceCents: price,
+        });
       }
       for (const item of shopItems) {
         const price = memberDiscount > 0 ? Math.round(item.price_cents * (1 - memberDiscount)) : item.price_cents;

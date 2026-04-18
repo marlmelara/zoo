@@ -9,8 +9,14 @@ const router = Router();
 // Active by default; pass ?include_inactive=1 to get everyone.
 router.get('/', requireRole('admin', 'manager'), async (req, res) => {
     try {
-        const { include_inactive } = req.query;
-        const where = include_inactive === '1' ? '' : ' WHERE e.is_active = 1';
+        const { include_inactive, status } = req.query;
+        // `status` (active|inactive|all) takes precedence over legacy
+        // include_inactive so the admin UI can ask for a single bucket.
+        let where = '';
+        if (status === 'active')        where = ' WHERE e.is_active = 1';
+        else if (status === 'inactive') where = ' WHERE e.is_active = 0';
+        else if (status === 'all')      where = '';
+        else where = include_inactive === '1' ? '' : ' WHERE e.is_active = 1';
         const [rows] = await db.query(
             `SELECT e.*, d.dept_name,
                     m.first_name AS manager_first, m.last_name AS manager_last,

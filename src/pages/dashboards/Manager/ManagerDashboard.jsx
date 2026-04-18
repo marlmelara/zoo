@@ -372,10 +372,10 @@ export default function ManagerDashboard() {
                 {overviewStats.pendingRequests > 0 && (
                     <div className="glass-panel" style={{
                         padding: '10px 20px', display: 'flex', alignItems: 'center', gap: '10px',
-                        border: '1px solid rgba(245, 158, 11, 0.3)', background: 'rgba(245, 158, 11, 0.1)'
+                        border: '1px solid rgba(241, 41, 31, 0.1)', background: 'rgba(241, 41, 31, 0.1)'
                     }}>
-                        <AlertTriangle color="#f59e0b" size={20} />
-                        <span style={{ fontWeight: 600 }}>{overviewStats.pendingRequests} Pending Request{overviewStats.pendingRequests !== 1 ? 's' : ''}</span>
+                        <AlertTriangle color="#ef4444" size={20} />
+                        <span style={{ color:"#ef4444", fontWeight: 600 }}>{overviewStats.pendingRequests} Pending Request{overviewStats.pendingRequests !== 1 ? 's' : ''}</span>
                     </div>
                 )}
             </div>
@@ -388,7 +388,8 @@ export default function ManagerDashboard() {
                         className="glass-button"
                         onClick={() => setActiveTab(tab)}
                         style={{
-                            background: activeTab === tab ? 'var(--color-secondary)' : 'rgba(255,255,255,0.05)',
+                            background: activeTab === tab ? 'var(--zoo-accent)' : 'rgba(255,255,255,0.05)',
+                            color: activeTab === tab ? 'white' : 'var(--zoo-muted)',
                             padding: '10px 20px',
                             fontSize: '14px',
                             fontWeight: activeTab === tab ? 700 : 400,
@@ -415,8 +416,8 @@ export default function ManagerDashboard() {
             {activeTab === 'Overview' && (
                 <div>
                     <div className="grid-cards" style={{ marginBottom: '30px' }}>
-                        <div className="glass-panel" style={{ padding: '20px' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
+                        <div className="glass-panel" style={{ background: 'rgba(255,255,255,0.5)', padding: '20px' }}>
+                            <div style={{ color: 'var(--zoo-muted)',display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
                                 <h3 style={{ margin: 0 }}>Department Staff</h3>
                                 <Users size={20} color="var(--color-primary)" />
                             </div>
@@ -424,8 +425,8 @@ export default function ManagerDashboard() {
                                 {overviewLoading ? '...' : overviewStats.staffCount}
                             </p>
                         </div>
-                        <div className="glass-panel" style={{ padding: '20px' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
+                        <div className="glass-panel" style={{background: 'rgba(255,255,255,0.5)', padding: '20px' }}>
+                            <div style={{ color: 'var(--zoo-muted)', display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
                                 <h3 style={{ margin: 0 }}>Pending Requests</h3>
                                 <ClipboardList size={20} color="#f59e0b" />
                             </div>
@@ -433,8 +434,8 @@ export default function ManagerDashboard() {
                                 {overviewLoading ? '...' : overviewStats.pendingRequests}
                             </p>
                         </div>
-                        <div className="glass-panel" style={{ padding: '20px' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
+                        <div className="glass-panel" style={{ background: 'rgba(255,255,255,0.5)',padding: '20px' }}>
+                            <div style={{color: 'var(--zoo-muted)', display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
                                 <h3 style={{ margin: 0 }}>Low Stock Items</h3>
                                 <AlertTriangle size={20} color="var(--color-accent)" />
                             </div>
@@ -442,8 +443,8 @@ export default function ManagerDashboard() {
                                 {overviewLoading ? '...' : overviewStats.lowStockCount}
                             </p>
                         </div>
-                        <div className="glass-panel" style={{ padding: '20px' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
+                        <div className="glass-panel" style={{ background: 'rgba(255,255,255,0.5)',padding: '20px' }}>
+                            <div style={{ color: 'var(--zoo-muted)',display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
                                 <h3 style={{ margin: 0 }}>Upcoming Events</h3>
                                 <Calendar size={20} color="var(--color-secondary)" />
                             </div>
@@ -495,7 +496,8 @@ export default function ManagerDashboard() {
                                     onClick={() => setRequestFilter(f)}
                                     style={{
                                         padding: '6px 14px', fontSize: '12px',
-                                        background: requestFilter === f ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.03)',
+                                        background: requestFilter === f ? 'var(--zoo-accent)' : 'rgba(255,255,255,0.03)',
+                                        color: requestFilter === f ? 'white' : 'var(--zoo-muted)',
                                         textTransform: 'capitalize'
                                     }}
                                 >
@@ -514,8 +516,10 @@ export default function ManagerDashboard() {
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                             {filteredRequests.map(req => (
                                 <div key={req.request_id} className="glass-panel" style={{
+                                    color: 'var(--zoo-muted)',
+                                    background: 'rgba(255,255,255, 0.5)',
                                     padding: '20px',
-                                    border: req.status === 'pending' ? '1px solid rgba(245, 158, 11, 0.3)' : '1px solid var(--glass-border)'
+                                    border: req.status === 'pending' ? '1px solid var(--zoo-accent)' : '1px solid var(--glass-border)'
                                 }}>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '10px' }}>
                                         <div>
@@ -529,25 +533,25 @@ export default function ManagerDashboard() {
                                                 )}
                                             </span>
                                         </div>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                            {req.status === 'pending' ? <Clock size={16} color="#f59e0b" /> :
-                                                req.status === 'approved' ? <CheckCircle size={16} color="#10b981" /> :
-                                                    <XCircle size={16} color="#ef4444" />}
+                                        <div style={{ color: 'var(--zoo-muted)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                            {req.status === 'pending' ? <Clock size={16} color="var(--zoo-muted)" /> :
+                                                req.status === 'approved' ? <CheckCircle size={16} color="var(--zoo-muted)" /> :
+                                                    <XCircle size={16} color="var(--zoo-accent)" />}
                                             <span style={{ color: statusColor(req.status), fontWeight: 600, textTransform: 'capitalize' }}>
                                                 {req.status}
                                             </span>
                                         </div>
                                     </div>
 
-                                    <div style={{ display: 'flex', gap: '20px', fontSize: '14px', color: 'var(--color-text-muted)', marginBottom: '10px' }}>
-                                        <span>Quantity: <strong style={{ color: 'white' }}>{req.requested_quantity}</strong></span>
-                                        <span>Type: <strong style={{ color: 'white', textTransform: 'capitalize' }}>{req.supply_type}</strong></span>
-                                        <span>Date: {new Date(req.created_at).toLocaleDateString()}</span>
+                                    <div style={{ color: 'var(--zoo-muted)', display: 'flex', gap: '20px', fontSize: '14px', marginBottom: '10px' }}>
+                                        <span>Quantity: <strong style={{ color: 'var(--zoo-accent)' }}>{req.requested_quantity}</strong></span>
+                                        <span>Type: <strong style={{ color: 'var(--zoo-accent)', textTransform: 'capitalize' }}>{req.supply_type}</strong></span>
+                                        <span>Date: <strong style={{ color: 'var(--zoo-accent)' }}>{new Date(req.created_at).toLocaleDateString()}</strong></span>
                                     </div>
 
                                     {req.reason && (
-                                        <p style={{ fontSize: '14px', color: 'var(--color-text-dark)', margin: '0 0 15px', fontWeight: 500 }}>
-                                            <strong style={{ color: 'rgb(102, 122, 66)' }}>Reason:</strong> {req.reason}
+                                        <p style={{ fontSize: '14px', color: 'var(--zoo-muted)', margin: '0 0 15px', fontWeight: 500 }}>
+                                            Reason: <strong style={{ color: 'var(--zoo-accent)' }}>{req.reason}</strong>
                                         </p>
                                     )}
 
@@ -556,7 +560,7 @@ export default function ManagerDashboard() {
                                             <button
                                                 className="glass-button"
                                                 onClick={() => handleReview(req.request_id, 'approved')}
-                                                style={{ background: 'rgba(16, 185, 129, 0.2)', color: '#10b981', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+                                                style={{ background: 'rgba(123, 144, 79, 0.3)', color: 'var(--color-primary)', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
                                             >
                                                 <CheckCircle size={16} /> Approve & Restock
                                             </button>
@@ -595,18 +599,19 @@ export default function ManagerDashboard() {
                     ) : (
                         <div className="grid-cards">
                             {staff.map(person => (
-                                <div key={person.employee_id} className="glass-panel" style={{ padding: '20px' }}>
+                                <div key={person.employee_id} className="glass-panel" style={{ background: 'rgba(255,255,255,0.5)', padding: '20px' }}>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '15px' }}>
                                         <div>
-                                            <h3 style={{ margin: '0 0 5px' }}>{person.first_name} {person.last_name}</h3>
+                                            <h3 style={{ color: 'var(--zoo-muted)',margin: '0 0 5px' }}>{person.first_name} {person.last_name}</h3>
                                             <span style={{
                                                 fontSize: '12px', padding: '4px 8px', borderRadius: '20px',
-                                                background: 'rgba(255,255,255,0.1)', color: 'var(--color-text-muted)'
+                                                background: 'rgba(255,255,255,0.1)', color: 'var(--zoo-muted)'
                                             }}>
                                                 {person.dept_name || 'Unassigned'}
                                             </span>
                                         </div>
                                         <span style={{
+                                            color: 'var(--zoo-accent)', fontWeight: 600,
                                             fontSize: '11px', padding: '3px 8px', borderRadius: '10px',
                                             background: person.role === 'vet' ? 'rgba(16,185,129,0.2)' :
                                                 person.role === 'caretaker' ? 'rgba(59,130,246,0.2)' :
@@ -645,8 +650,8 @@ export default function ManagerDashboard() {
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                             {activityLog.map(log => (
                                 <div key={log.log_id} style={{
-                                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                                    background: 'rgba(255,255,255,0.05)', padding: '14px 18px', borderRadius: '10px',
+                                    display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: 'var(--zoo-accent)',
+                                    background: 'rgba(255,255,255,0.8)', padding: '14px 18px', borderRadius: '10px',
                                     borderLeft: `3px solid ${
                                         log.action_type.includes('approved') ? '#10b981' :
                                         log.action_type.includes('denied') ? '#ef4444' :
@@ -703,14 +708,14 @@ export default function ManagerDashboard() {
                                 const assignedCtIds = assignedCts.map(a => a.caretaker_id);
 
                                 return (
-                                    <div key={animal.animal_id} className="glass-panel" style={{ padding: '20px' }}>
+                                    <div key={animal.animal_id} className="glass-panel" style={{ background: 'rgba(255,255,255,0.5)', padding: '20px' }}>
                                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', flexWrap: 'wrap', gap: '15px' }}>
                                             <div style={{ minWidth: '220px' }}>
-                                                <h3 style={{ margin: '0 0 5px', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                                <h3 style={{ color: 'var(--zoo-muted)',margin: '0 0 5px', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                                                     {animal.name}
                                                     <HealthBadge status={animal.health_status} />
                                                 </h3>
-                                                <p style={{ color: 'var(--color-secondary)', fontSize: '14px', margin: '0 0 3px' }}>
+                                                <p style={{ color: 'var(--zoo-accent)', fontSize: '14px', margin: '0 0 3px' }}>
                                                     {animal.species_common_name}
                                                 </p>
                                                 {animal.species_binomial && (
@@ -745,15 +750,15 @@ export default function ManagerDashboard() {
                                             <div style={{ display: 'flex', gap: '15px', flexWrap: 'wrap' }}>
                                                 {/* Vet Assignments (multiple) */}
                                                 <div style={{ background: 'rgba(255,255,255,0.05)', padding: '12px', borderRadius: '10px', minWidth: '220px' }}>
-                                                    <p style={{ fontSize: '12px', color: 'var(--color-text-muted)', margin: '0 0 8px' }}>Assigned Vets</p>
+                                                    <p style={{ fontSize: '13px', color: 'var(--color-text-muted)', margin: '0 0 8px' }}>Assigned Vets</p>
                                                     {assignedVets.length > 0 && (
                                                         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '8px' }}>
                                                             {assignedVets.map(a => (
                                                                 <div key={a.vet_id} style={{
-                                                                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                                                                    display: 'flex', alignItems: 'center', justifyContent: 'space-between', color: 'var(--zoo-accent)',
                                                                     background: 'rgba(255,255,255,0.08)', padding: '4px 8px', borderRadius: '6px', fontSize: '13px'
                                                                 }}>
-                                                                    <span>{a.first_name} {a.last_name}</span>
+                                                                    <span><strong>{a.first_name} {a.last_name}</strong></span>
                                                                     <button
                                                                         onClick={() => handleRemoveVetAssignment(a.vet_id, animal.animal_id)}
                                                                         style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '0 2px', fontSize: '16px', lineHeight: 1 }}
@@ -787,15 +792,15 @@ export default function ManagerDashboard() {
 
                                                 {/* Caretaker Assignments (multiple) */}
                                                 <div style={{ background: 'rgba(255,255,255,0.05)', padding: '12px', borderRadius: '10px', minWidth: '220px' }}>
-                                                    <p style={{ fontSize: '12px', color: 'var(--color-text-muted)', margin: '0 0 8px' }}>Assigned Caretakers</p>
+                                                    <p style={{ fontSize: '13px', color: 'var(--color-text-muted)', margin: '0 0 8px' }}>Assigned Caretakers</p>
                                                     {assignedCts.length > 0 && (
                                                         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '8px' }}>
                                                             {assignedCts.map(a => (
                                                                 <div key={a.caretaker_id} style={{
-                                                                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                                                                    display: 'flex', alignItems: 'center', justifyContent: 'space-between', color: 'var(--zoo-accent)',
                                                                     background: 'rgba(255,255,255,0.08)', padding: '4px 8px', borderRadius: '6px', fontSize: '13px'
                                                                 }}>
-                                                                    <span>{a.first_name} {a.last_name}</span>
+                                                                    <span><strong> {a.first_name} {a.last_name} </strong></span>
                                                                     <button
                                                                         onClick={() => handleRemoveCaretakerAssignment(a.caretaker_id, animal.animal_id)}
                                                                         style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '0 2px', fontSize: '16px', lineHeight: 1 }}
@@ -876,12 +881,12 @@ export default function ManagerDashboard() {
                             {events.map(event => {
                                 const assigned = event.assignments || [];
                                 return (
-                                    <div key={event.event_id} className="glass-panel" style={{ padding: '20px' }}>
+                                    <div key={event.event_id} className="glass-panel" style={{ background: 'rgba(255, 255, 255, 0.5)', padding: '20px' }}>
                                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '10px' }}>
                                             <div>
                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '5px' }}>
                                                     <Calendar color="var(--color-secondary)" size={20} />
-                                                    <h3 style={{ margin: 0 }}>{event.title}</h3>
+                                                    <h3 style={{ color: 'var(--zoo-muted)', margin: 0 }}>{event.title}</h3>
                                                 </div>
                                                 <p style={{ fontSize: '14px', color: 'var(--color-text-muted)', margin: '5px 0' }}>{event.description}</p>
                                                 <p style={{ color: 'var(--color-secondary)', fontWeight: 600, fontSize: '14px' }}>
@@ -912,11 +917,11 @@ export default function ManagerDashboard() {
                                                     <span style={{ fontSize: '13px', color: 'var(--color-text-muted)', fontStyle: 'italic' }}>No staff assigned</span>
                                                 ) : assigned.filter(a => a.employee_id).map(a => (
                                                     <div key={a.assignment_id} style={{
-                                                        display: 'flex', alignItems: 'center', gap: '6px',
+                                                        display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--zoo-accent)',
                                                         background: 'rgba(255,255,255,0.08)', padding: '5px 10px', borderRadius: '8px', fontSize: '13px'
                                                     }}>
                                                         <Users size={14} />
-                                                        <span>{a.first_name} {a.last_name}</span>
+                                                        <span><strong>{a.first_name} {a.last_name}</strong></span>
                                                         <button
                                                             onClick={() => handleRemoveEventAssignment(a.assignment_id)}
                                                             style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '0 2px', fontSize: '16px', lineHeight: 1 }}
@@ -934,11 +939,11 @@ export default function ManagerDashboard() {
                                                     <span style={{ fontSize: '13px', color: 'var(--color-text-muted)', fontStyle: 'italic' }}>No animals assigned</span>
                                                 ) : assigned.filter(a => a.animal_id).map(a => (
                                                     <div key={a.assignment_id} style={{
-                                                        display: 'flex', alignItems: 'center', gap: '6px',
+                                                        display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--zoo-accent)',
                                                         background: 'rgba(255,255,255,0.08)', padding: '5px 10px', borderRadius: '8px', fontSize: '13px'
                                                     }}>
                                                         <Cat size={14} />
-                                                        <span>{a.animal_name}</span>
+                                                        <span><strong>{a.animal_name}</strong></span>
                                                         <button
                                                             onClick={() => handleRemoveEventAssignment(a.assignment_id)}
                                                             style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '0 2px', fontSize: '16px', lineHeight: 1 }}
@@ -970,7 +975,7 @@ export default function ManagerDashboard() {
                                                 </select>
                                                 <button
                                                     className="glass-button"
-                                                    style={{ background: 'var(--color-secondary)', padding: '8px 16px', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '5px' }}
+                                                    style={{ background: 'var(--zoo-accent)', padding: '8px 16px', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '5px' }}
                                                     onClick={() => {
                                                         const sel = document.getElementById(`event-assign-${event.event_id}`);
                                                         if (sel.value) {

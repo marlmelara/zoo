@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import AnimalsPanel from '../../../../components/AnimalsPanel';
 
 export default function Animals() {

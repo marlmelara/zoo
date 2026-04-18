@@ -106,13 +106,18 @@ router.get('/', requireRole('admin', 'manager'), async (req, res) => {
     }
 });
 
-// GET /api/customers/deactivated — admin: list soft-deleted customers
+// GET /api/customers/deactivated — admin: list soft-deleted customers.
+// Search by name OR email via `?q=...` (legacy `?email=` also supported).
 router.get('/deactivated', requireRole('admin'), async (req, res) => {
     try {
-        const { email } = req.query;
+        const q = (req.query.q || req.query.email || '').trim();
         let sql = 'SELECT * FROM customers WHERE is_active = 0';
         const params = [];
-        if (email) { sql += ' AND email LIKE ?'; params.push(`%${email}%`); }
+        if (q) {
+            sql += ' AND (email LIKE ? OR first_name LIKE ? OR last_name LIKE ? OR CONCAT(first_name, " ", last_name) LIKE ?)';
+            const like = `%${q}%`;
+            params.push(like, like, like, like);
+        }
         sql += ' ORDER BY customer_id DESC';
         const [rows] = await db.query(sql, params);
         return res.json(rows);

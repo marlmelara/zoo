@@ -8,8 +8,10 @@
   --color-secondary: #d19233;
   --color-accent: #f43f5e;
   --color-text: #FFBF69;
-  --color-text-muted: #94a3b8;
-  --color-text-dark: #3d4f3e;
+  /* Darkened muted text so labels/reasons/descriptions stay legible on
+     cream + glass panels. The old #94a3b8 washed out against them. */
+  --color-text-muted: #5a6b5d;
+  --color-text-dark: #2d3a2e;
 
   --glass-bg-light: rgba(255, 245, 231, 0.75);
   --glass-bg-medium: rgba(255, 255, 255, 0.85);

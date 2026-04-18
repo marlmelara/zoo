@@ -534,8 +534,8 @@ export default function ManagerDashboard() {
                                     </div>
 
                                     {req.reason && (
-                                        <p style={{ fontSize: '13px', color: 'var(--color-text-muted)', margin: '0 0 15px', fontStyle: 'italic' }}>
-                                            "{req.reason}"
+                                        <p style={{ fontSize: '14px', color: 'var(--color-text-dark)', margin: '0 0 15px', fontWeight: 500 }}>
+                                            <strong style={{ color: 'rgb(102, 122, 66)' }}>Reason:</strong> {req.reason}
                                         </p>
                                     )}
 

@@ -32,16 +32,21 @@ router.get('/', requireRole('admin', 'manager'), async (req, res) => {
     }
 });
 
-// GET /api/employees/deactivated — admin: list soft-deleted employees
+// GET /api/employees/deactivated — admin: list soft-deleted employees.
+// Search by name OR email via `?q=...` (legacy `?email=` also supported).
 router.get('/deactivated', requireRole('admin'), async (req, res) => {
     try {
-        const { email } = req.query;
-        let sql = `SELECT e.*, d.dept_name FROM employees e
+        const q = (req.query.q || req.query.email || '').trim();
+        let sql = `SELECT e.*, d.dept_name, u.email FROM employees e
                    LEFT JOIN departments d ON d.dept_id = e.dept_id
                    LEFT JOIN users u ON u.user_id = e.user_id
                    WHERE e.is_active = 0`;
         const params = [];
-        if (email) { sql += ' AND u.email LIKE ?'; params.push(`%${email}%`); }
+        if (q) {
+            sql += ' AND (u.email LIKE ? OR e.first_name LIKE ? OR e.last_name LIKE ? OR CONCAT(e.first_name, " ", e.last_name) LIKE ?)';
+            const like = `%${q}%`;
+            params.push(like, like, like, like);
+        }
         sql += ' ORDER BY e.employee_id DESC';
         const [rows] = await db.query(sql, params);
         return res.json(rows);

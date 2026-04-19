@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { FaClock, FaMapMarkerAlt, FaPhone, FaEnvelope } from 'react-icons/fa';
 import logo from '../../../images/logo.png';
@@ -70,26 +70,57 @@ const animals = [
 
 export default function AnimalGallery() {
   const [selectedZone, setSelectedZone] = useState('All Zones');
-  
+  const [selectedAnimal, setSelectedAnimal] = useState(null);
+  const [dbAnimals, setDbAnimals] = useState([]);
+  useEffect(() => {
+    fetch('http://localhost:3001/api/animals')
+      .then(res => res.json())
+      .then(data => setDbAnimals(data))
+      .catch(err => console.error(err));
+  }, []);
+
   const zones = ['All Zones', 'World of Primates', 'Elephants of Asia', 'Big Cat Zone', 'Reptile Lair', 'Animals of Africa', "Children's Zoo", 'Birds of the World', 'Galapagos Islands'];
-  
-  const filteredAnimals = selectedZone === 'All Zones' 
-    ? animals 
-    : animals.filter(animal => animal.zone === selectedZone);
+
+  const filteredAnimals = (selectedZone === 'All Zones'
+    ? animals
+    : animals.filter(animal => animal.zone === selectedZone)
+  ).filter(animal =>
+    dbAnimals.some(a => a.species_common_name === animal.name && a.is_active === 1)
+  );
 
   return (
     <main className="animals-page">
-      {/* Navigation Bar */}
       <Navbar />
+
+      {/* Popup */}
+      {selectedAnimal && (
+        <div className="animal-popup-overlay" onClick={() => setSelectedAnimal(null)}>
+          <div className="animal-popup" onClick={e => e.stopPropagation()}>
+            <button className="animal-popup-close" onClick={() => setSelectedAnimal(null)}>✕</button>
+            <img src={selectedAnimal.src} alt={selectedAnimal.name} />
+            <h2>{selectedAnimal.name}</h2>
+            <div className="animal-popup-names">
+              {(() => {
+                const names = dbAnimals
+                  .filter(a => a.species_common_name === selectedAnimal.name && a.is_active === 1)
+                  .map(a => a.name);
+                return names.length === 0
+                  ? <p>None currently at the zoo</p>
+                  : <p>Meet our {selectedAnimal.name}{names.length > 1 ? 's' : ''}: {names.join(', ')}</p>;
+              })()}
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="animals-page-inner">
         <h1 className="animals-title">Our Animals</h1>
 
         <div className="zone-filter">
           <label htmlFor="zone-select">Filter by Zone:</label>
-          <select 
+          <select
             id="zone-select"
-            value={selectedZone} 
+            value={selectedZone}
             onChange={(e) => setSelectedZone(e.target.value)}
             className="zone-select"
           >
@@ -100,13 +131,18 @@ export default function AnimalGallery() {
         </div>
 
         <section className="animals-grid">
-        {filteredAnimals.map(animal => (
-          <article key={animal.name} className="animal-card">
-            <img src={animal.src} alt={animal.name} loading="lazy" />
-            <div className="animal-name">{animal.name}</div>
-          </article>
-        ))}
-      </section>
+          {filteredAnimals.map(animal => (
+            <article
+              key={animal.name}
+              className="animal-card"
+              onClick={() => setSelectedAnimal(animal)}
+              style={{ cursor: 'pointer' }}
+            >
+              <img src={animal.src} alt={animal.name} loading="lazy" />
+              <div className="animal-name">{animal.name}</div>
+            </article>
+          ))}
+        </section>
       </div>
       {/* Footer */}
             <footer className="footer" style={{background: "rgb(123, 144, 79)"}}>

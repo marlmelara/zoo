@@ -3,6 +3,7 @@ import { useAuth } from '../../../contexts/AuthContext';
 import api from '../../../lib/api';
 import { getSuppliesByDepartment, createSupplyRequest, getMySupplyRequests } from '../../../api/supplies';
 import { logActivity } from '../../../api/activityLog';
+import { useToast } from '../../../components/Feedback';
 import {
     Clock, Package, AlertTriangle, Calendar,
     ClipboardList, CheckCircle, XCircle, Send, User
@@ -12,6 +13,7 @@ const TABS = ['My Schedule', 'My Events', 'Supplies'];
 
 export default function GenEmployeeDashboard() {
     const { user, employeeId, deptId, role } = useAuth();
+    const toast = useToast();
     const [activeTab, setActiveTab] = useState('My Schedule');
 
     // Profile state — holds the full employee record + resolved IDs
@@ -172,7 +174,7 @@ export default function GenEmployeeDashboard() {
             }
         } catch (err) {
             console.error('Error creating supply request:', err);
-            alert('Failed to submit request: ' + err.message);
+            toast.error('Failed to submit request: ' + err.message);
         }
     }
 

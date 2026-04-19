@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate, Outlet } from 'react-
 
 import Layout from './components/Layout';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { FeedbackProvider } from './components/Feedback';
 
 import Home from './pages/public/Home/Home';
 import PublicTickets from './pages/public/Tickets/Tickets';
@@ -90,6 +91,7 @@ function App() {
   return (
     <Router>
       <AuthProvider>
+       <FeedbackProvider>
         <Routes>
           {/* Public Routes */}
           <Route path="/" element={<Home />} />
@@ -151,6 +153,7 @@ function App() {
           {/* Fallback */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
+       </FeedbackProvider>
       </AuthProvider>
     </Router>
   );

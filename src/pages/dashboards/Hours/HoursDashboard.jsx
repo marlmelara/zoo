@@ -9,6 +9,7 @@ import {
     Clock, Plus, Trash2, CheckCircle, XCircle, Calendar, User
 } from 'lucide-react';
 import { DateRangeFilter } from '../../../components/AnimalsPanel';
+import { useToast, usePrompt } from '../../../components/Feedback';
 
 const GREEN = 'rgb(123, 144, 79)';
 const GREEN_DARK = 'rgb(102, 122, 66)';
@@ -25,6 +26,8 @@ function hoursBetween(start, end) {
 
 export default function HoursDashboard() {
     const { role } = useAuth();
+    const toast = useToast();
+    const prompt = usePrompt();
     const canReview = role === 'admin' || role === 'manager';
 
     // Managers/admins don't submit their own hours here — they only see
@@ -81,11 +84,12 @@ export default function HoursDashboard() {
     async function handleSubmit(e) {
         e.preventDefault();
         for (const entry of entries) {
-            if (!entry.work_date) return alert('Each entry needs a work date.');
-            if (!entry.start_time || !entry.end_time) return alert('Each entry needs a start and end time.');
+            if (!entry.work_date) { toast.warn('Each entry needs a work date.'); return; }
+            if (!entry.start_time || !entry.end_time) { toast.warn('Each entry needs a start and end time.'); return; }
             const h = hoursBetween(entry.start_time, entry.end_time);
             if (!(h > 0 && h <= 24)) {
-                return alert('End time must be after start time, and total hours ≤ 24.');
+                toast.warn('End time must be after start time, and total hours ≤ 24.');
+                return;
             }
         }
         try {
@@ -100,24 +104,27 @@ export default function HoursDashboard() {
             })));
             setEntries([blankEntry()]);
             await loadAll();
-            alert('Hours submitted. Your manager will review the request.');
+            toast.success('Hours submitted. Your manager will review the request.');
             setTab('mine');
         } catch (err) {
-            alert('Failed to submit: ' + err.message);
+            toast.error('Failed to submit: ' + err.message);
         } finally {
             setSubmitting(false);
         }
     }
 
     async function handleReview(id, status) {
-        const notes = window.prompt(
-            `${status === 'approved' ? 'Approve' : 'Deny'} — optional note for the employee:`, '');
+        const notes = await prompt({
+            title: `${status === 'approved' ? 'Approve' : 'Deny'} hours request`,
+            message: 'Optional note for the employee:',
+            defaultValue: '',
+        });
         if (notes === null) return;
         try {
             await reviewHoursRequest(id, status, notes || null);
             await loadAll();
         } catch (err) {
-            alert('Failed to update: ' + err.message);
+            toast.error('Failed to update: ' + err.message);
         }
     }
 

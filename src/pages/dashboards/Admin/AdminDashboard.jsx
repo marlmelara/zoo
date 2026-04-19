@@ -1,5 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { LayoutDashboard, Users, Ticket, ShoppingBag, DollarSign, Database, ChevronDown, ChevronUp } from 'lucide-react';
+import api from '../../../lib/api';
+import LifecycleLogModal, { LifecycleLogButton } from '../../../components/LifecycleLogModal';
+import { useToast, useConfirm } from '../../../components/Feedback';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import {
     getAdminDashboardStats,
@@ -13,6 +16,7 @@ import {
 } from '../../../api/dashboard';
 
 export default function AdminDashboard() {
+    const toast   = useToast();
     const [stats, setStats] = useState({
         totalRevenueCents: 0,
         ticketRevenueCents: 0,
@@ -100,17 +104,17 @@ export default function AdminDashboard() {
     const handleCreateUser = async (e) => {
         e.preventDefault();
         if (newUser.password !== confirmPassword) {
-            alert('Passwords do not match. Please re-enter.');
+            toast.warn('Passwords do not match. Please re-enter.');
             return;
         }
         try {
             await createZooUser(newUser);
-            alert('User created successfully!');
+            toast.success({ title: 'User created', message: `${newUser.first_name} ${newUser.last_name} can now sign in.` });
             closeCreateUser();
             fetchAdminData();
         } catch (error) {
             console.error('Error creating user:', error);
-            alert('Failed to create user: ' + error.message);
+            toast.error('Failed to create user: ' + error.message);
         }
     };
 
@@ -607,49 +611,70 @@ export default function AdminDashboard() {
 }
 
 function ReactivatePanel() {
+    const toast   = useToast();
+    const confirm = useConfirm();
     const [tab, setTab] = useState('customers');
     const [query, setQuery] = useState('');
     const [rows, setRows] = useState([]);
     const [loading, setLoading] = useState(false);
+    const [logTarget, setLogTarget] = useState(null);
 
-    const runSearch = async () => {
+    // Single helper — api client auto-attaches the auth header and
+    // throws on non-2xx responses. The previous raw fetch() swallowed
+    // server errors by dropping non-array JSON into setRows([]), which
+    // is why "No deactivated staff found" appeared even when rows existed.
+    const runSearch = async (nextTab = tab, nextQuery = query) => {
         setLoading(true);
+        // Clear rows immediately so stale data from the previous tab
+        // doesn't get re-keyed with the new tab's id() accessor (React
+        // warns about duplicate undefined keys when e.g. 'animals' rows
+        // linger while the tab is now 'customers').
+        setRows([]);
         try {
-            const qs = query.trim()
-                ? (tab === 'animals' ? `?name=${encodeURIComponent(query)}` : `?q=${encodeURIComponent(query)}`)
+            const qs = nextQuery.trim()
+                ? (nextTab === 'animals'
+                    ? `?name=${encodeURIComponent(nextQuery)}`
+                    : `?q=${encodeURIComponent(nextQuery)}`)
                 : '';
-            const path = tab === 'customers' ? `/api/customers/deactivated${qs}`
-                       : tab === 'staff'     ? `/api/employees/deactivated${qs}`
-                       :                       `/api/animals/deactivated${qs}`;
-            const res = await fetch(path, {
-                headers: { Authorization: `Bearer ${localStorage.getItem('zoo_token') || ''}` },
-            });
-            const data = await res.json();
+            const path = nextTab === 'customers' ? `/customers/deactivated${qs}`
+                       : nextTab === 'staff'     ? `/employees/deactivated${qs}`
+                       :                           `/animals/deactivated${qs}`;
+            const data = await api.get(path);
             setRows(Array.isArray(data) ? data : []);
         } catch (err) {
-            alert('Lookup failed: ' + err.message);
+            setRows([]);
+            toast.error('Lookup failed: ' + err.message);
         } finally {
             setLoading(false);
         }
     };
 
-    // Refresh when tab changes
-    React.useEffect(() => { setRows([]); setQuery(''); }, [tab]);
+    // Auto-load when the tab mounts or changes so "staff" and "animals"
+    // show their deactivated entries without requiring a Search click.
+    useEffect(() => {
+        setQuery('');
+        runSearch(tab, '');
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [tab]);
 
     const reactivate = async (id) => {
-        if (!window.confirm('Reactivate this account?')) return;
-        const path = tab === 'customers' ? `/api/customers/${id}/reactivate`
-                   : tab === 'staff'     ? `/api/employees/${id}/reactivate`
-                   :                       `/api/animals/${id}/reactivate`;
+        const ok = await confirm({
+            title: tab === 'animals' ? 'Return this animal to the zoo?' : 'Reactivate this account?',
+            message: tab === 'animals'
+                ? 'The animal will be flagged as currently present and appear in active rosters again.'
+                : 'The account will be restored and the user can sign in again.',
+            confirmLabel: tab === 'animals' ? 'Return' : 'Reactivate',
+        });
+        if (!ok) return;
+        const path = tab === 'customers' ? `/customers/${id}/reactivate`
+                   : tab === 'staff'     ? `/employees/${id}/reactivate`
+                   :                       `/animals/${id}/reactivate`;
         try {
-            const res = await fetch(path, {
-                method: 'POST',
-                headers: { Authorization: `Bearer ${localStorage.getItem('zoo_token') || ''}` },
-            });
-            if (!res.ok) throw new Error((await res.json()).error || 'Failed');
+            await api.post(path);
+            toast.success(tab === 'animals' ? 'Animal returned.' : 'Account reactivated.');
             await runSearch();
         } catch (err) {
-            alert('Reactivate failed: ' + err.message);
+            toast.error('Reactivate failed: ' + err.message);
         }
     };
 
@@ -662,6 +687,11 @@ function ReactivatePanel() {
         tab === 'customers' ? r.customer_id
       : tab === 'staff'     ? r.employee_id
       :                       r.animal_id;
+
+    const entityFor = (t) =>
+        t === 'customers' ? 'customer'
+      : t === 'staff'     ? 'employee'
+      :                     'animal';
 
     return (
         <div className="glass-panel" style={{ padding: '24px' }}>
@@ -693,7 +723,7 @@ function ReactivatePanel() {
                     onKeyDown={e => { if (e.key === 'Enter') runSearch(); }}
                     style={{ flex: 1 }}
                 />
-                <button className="glass-button" onClick={runSearch}
+                <button className="glass-button" onClick={() => runSearch()}
                     style={{ background: 'rgb(123, 144, 79)', color: 'white' }}>
                     {loading ? 'Searching...' : 'Search'}
                 </button>
@@ -708,21 +738,47 @@ function ReactivatePanel() {
             ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                     {rows.map(r => (
-                        <div key={id(r)} style={{
+                        // Key is tab-scoped so rows briefly held in state
+                        // during a tab switch can't collide with the new
+                        // tab's id accessor (which may return undefined
+                        // for the wrong entity shape).
+                        <div key={`${tab}-${id(r) ?? `idx${rows.indexOf(r)}`}`} style={{
                             display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                             padding: '12px 14px', borderRadius: '10px',
                             background: 'rgba(255, 245, 231, 0.65)',
                             border: '1px solid rgba(121,162,128,0.25)',
+                            gap: '10px',
                         }}>
-                            <span>{label(r)}</span>
-                            <button className="glass-button"
-                                onClick={() => reactivate(id(r))}
-                                style={{ background: 'rgb(123, 144, 79)', color: 'white', padding: '6px 14px', fontSize: '12px' }}>
-                                Reactivate
-                            </button>
+                            <span style={{ flex: 1, minWidth: 0 }}>{label(r)}</span>
+                            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                <LifecycleLogButton
+                                    compact
+                                    onClick={() => setLogTarget({
+                                        entity: entityFor(tab),
+                                        id: id(r),
+                                        name: tab === 'animals'
+                                            ? r.name
+                                            : `${r.first_name} ${r.last_name}`,
+                                    })}
+                                />
+                                <button className="glass-button"
+                                    onClick={() => reactivate(id(r))}
+                                    style={{ background: 'rgb(123, 144, 79)', color: 'white', padding: '6px 14px', fontSize: '12px' }}>
+                                    Reactivate
+                                </button>
+                            </div>
                         </div>
                     ))}
                 </div>
+            )}
+
+            {logTarget && (
+                <LifecycleLogModal
+                    entity={logTarget.entity}
+                    id={logTarget.id}
+                    name={logTarget.name}
+                    onClose={() => setLogTarget(null)}
+                />
             )}
         </div>
     );

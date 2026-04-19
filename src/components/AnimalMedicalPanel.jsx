@@ -6,6 +6,7 @@ import {
 import {
     Stethoscope, FileText, Plus, Calendar, User, Activity,
 } from 'lucide-react';
+import { useToast } from './Feedback';
 
 const GREEN      = 'rgb(123, 144, 79)';
 const GREEN_DARK = 'rgb(102, 122, 66)';
@@ -213,6 +214,7 @@ function Tag({ bg, fg, children }) {
 }
 
 function MedicalForm({ animalId, onSaved }) {
+    const toast = useToast();
     const [form, setForm] = useState({
         diagnosis: '', injury: '', disease: '',
         treatment: '', medications: '',
@@ -228,7 +230,8 @@ function MedicalForm({ animalId, onSaved }) {
     async function submit(e) {
         e.preventDefault();
         if (!form.diagnosis && !form.injury && !form.disease && !form.notes) {
-            return alert('Please provide at least a diagnosis, injury, disease, or notes.');
+            toast.warn('Please provide at least a diagnosis, injury, disease, or notes.');
+            return;
         }
         try {
             setSaving(true);
@@ -240,7 +243,7 @@ function MedicalForm({ animalId, onSaved }) {
             });
             onSaved();
         } catch (err) {
-            alert('Failed: ' + err.message);
+            toast.error('Failed: ' + err.message);
         } finally {
             setSaving(false);
         }
@@ -300,20 +303,21 @@ function MedicalForm({ animalId, onSaved }) {
 }
 
 function CareForm({ animalId, onSaved }) {
+    const toast = useToast();
     const [logType, setLogType] = useState('observation');
     const [notes, setNotes]     = useState('');
     const [saving, setSaving]   = useState(false);
 
     async function submit(e) {
         e.preventDefault();
-        if (!notes.trim()) return alert('Please write some notes.');
+        if (!notes.trim()) { toast.warn('Please write some notes.'); return; }
         try {
             setSaving(true);
             await addCareLog(animalId, { log_type: logType, notes });
             setNotes(''); setLogType('observation');
             onSaved();
         } catch (err) {
-            alert('Failed: ' + err.message);
+            toast.error('Failed: ' + err.message);
         } finally {
             setSaving(false);
         }

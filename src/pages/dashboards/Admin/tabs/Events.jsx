@@ -4,11 +4,15 @@ import { getAdminEvents as fetchEventsApi } from '../../../../api/events';
 import api from '../../../../lib/api';
 import { Calendar, Users, X, Plus, User, Cat, MapPin, Clock, Trash2, AlertTriangle, Archive, Pencil } from 'lucide-react';
 import { StatusFilter } from '../../../../components/AnimalsPanel';
+import BulkActionBar from '../../../../components/BulkActionBar';
+import { useToast, useConfirm } from '../../../../components/Feedback';
 
 const GREEN      = 'rgb(123, 144, 79)';
 const GREEN_DARK = 'rgb(102, 122, 66)';
 
 export default function Events() {
+  const toast   = useToast();
+  const confirm = useConfirm();
   const [events, setEvents] = useState([]);
   const [venues, setVenues] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -261,10 +265,11 @@ export default function Events() {
       await api.delete(`/events/${eventId}`);
       setDeleteConfirm(null);
       setSelectedEvent(null);
+      toast.success('Event archived.');
       loadEvents();
     } catch (err) {
       console.error('Error archiving event:', err);
-      alert('Failed to archive event: ' + err.message);
+      toast.error('Failed to archive event: ' + err.message);
     }
   }
 
@@ -285,14 +290,21 @@ export default function Events() {
   }
   async function handleArchiveSelected() {
     if (selected.size === 0) return;
-    const confirmed = window.confirm(
-      `Archive ${selected.size} event${selected.size === 1 ? '' : 's'}? This hides them from listings but preserves tickets already sold. Archives are permanent — create a new event if you need to bring one back.`
-    );
-    if (!confirmed) return;
+    const ok = await confirm({
+      title: `Archive ${selected.size} event${selected.size === 1 ? '' : 's'}?`,
+      message: 'Hides them from listings but preserves tickets already sold. Archives are permanent — you\'d have to create a new event to bring one back.',
+      confirmLabel: 'Archive',
+      tone: 'danger',
+    });
+    if (!ok) return;
     const ids = Array.from(selected);
     const results = await Promise.allSettled(ids.map(id => api.delete(`/events/${id}`)));
     const failed = results.filter(r => r.status === 'rejected');
-    if (failed.length) alert(`${failed.length} archive${failed.length === 1 ? '' : 's'} failed.`);
+    if (failed.length) {
+      toast.error(`${failed.length} archive${failed.length === 1 ? '' : 's'} failed.`);
+    } else {
+      toast.success(`Archived ${ids.length} event${ids.length === 1 ? '' : 's'}.`);
+    }
     exitManageMode();
     loadEvents();
   }
@@ -446,29 +458,13 @@ export default function Events() {
       )}
 
       {manageMode && (
-        <div style={{
-          position: 'fixed', bottom: '24px', left: '50%', transform: 'translateX(-50%)',
-          background: '#1a1f2e', border: '1px solid rgba(239,68,68,0.3)',
-          borderRadius: '14px', padding: '10px 14px',
-          display: 'flex', alignItems: 'center', gap: '14px',
-          boxShadow: '0 10px 30px rgba(0,0,0,0.5)', zIndex: 999,
-        }}>
-          <span style={{ fontSize: '13px', color: 'var(--color-text-muted)' }}>
-            <strong style={{ color: 'white' }}>{selected.size}</strong> selected
-          </span>
-          <button onClick={selectAllVisible}
-            style={{ background: 'rgba(255,255,255,0.08)', color: 'white', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '8px', padding: '8px 14px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
-            Select All
-          </button>
-          <button onClick={handleArchiveSelected} disabled={selected.size === 0}
-            style={{ background: selected.size === 0 ? 'rgba(239,68,68,0.25)' : '#ef4444', color: 'white', border: 'none', borderRadius: '8px', padding: '8px 14px', fontSize: '12px', fontWeight: 700, cursor: selected.size === 0 ? 'not-allowed' : 'pointer' }}>
-            Archive Selected
-          </button>
-          <button onClick={exitManageMode}
-            style={{ background: 'transparent', color: 'white', border: '1px solid rgba(255,255,255,0.18)', borderRadius: '8px', padding: '8px 14px', fontSize: '12px', cursor: 'pointer' }}>
-            Cancel
-          </button>
-        </div>
+        <BulkActionBar
+          count={selected.size}
+          onSelectAll={selectAllVisible}
+          onRemove={handleArchiveSelected}
+          onCancel={exitManageMode}
+          actionLabel="Archive Selected"
+        />
       )}
 
       {/* ══ Event Detail Modal ══ */}

@@ -6,11 +6,16 @@ import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import api from '../lib/api';
 import { Activity, X, Trash2, Pencil } from 'lucide-react';
+import BulkActionBar from './BulkActionBar';
+import LifecycleLogModal, { LifecycleLogButton } from './LifecycleLogModal';
+import { useToast, useConfirm } from './Feedback';
 
 const GREEN = 'rgb(123, 144, 79)';
 const GREEN_DARK = 'rgb(102, 122, 66)';
 
 export default function AnimalsPanel({ title = 'Animals', accentColor = 'var(--color-primary)' }) {
+    const toast   = useToast();
+    const confirm = useConfirm();
     const [animals, setAnimals] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showForm, setShowForm] = useState(false);
@@ -39,6 +44,7 @@ export default function AnimalsPanel({ title = 'Animals', accentColor = 'var(--c
     });
 
     const [searchTerm, setSearchTerm] = useState('');
+    const [logTarget, setLogTarget]   = useState(null);
 
     useEffect(() => {
         fetchAnimals();
@@ -116,7 +122,7 @@ export default function AnimalsPanel({ title = 'Animals', accentColor = 'var(--c
             fetchAnimals();
         } catch (error) {
             console.error('Error saving animal:', error);
-            alert('Failed to save animal: ' + error.message);
+            toast.error('Failed to save animal: ' + error.message);
         }
     }
 
@@ -156,14 +162,21 @@ export default function AnimalsPanel({ title = 'Animals', accentColor = 'var(--c
     }
     async function handleRemoveSelected() {
         if (selected.size === 0) return;
-        const confirmed = window.confirm(
-            `Mark ${selected.size} animal${selected.size === 1 ? '' : 's'} as departed? They can be restored by an admin from the Reactivate tab.`
-        );
-        if (!confirmed) return;
+        const ok = await confirm({
+            title: `Mark ${selected.size} animal${selected.size === 1 ? '' : 's'} as departed?`,
+            message: 'They can be restored by an admin from the Reactivate tab.',
+            confirmLabel: 'Mark Departed',
+            tone: 'danger',
+        });
+        if (!ok) return;
         const ids = Array.from(selected);
         const results = await Promise.allSettled(ids.map(id => api.delete(`/animals/${id}`)));
         const failed = results.filter(r => r.status === 'rejected');
-        if (failed.length) alert(`${failed.length} removal${failed.length === 1 ? '' : 's'} failed.`);
+        if (failed.length) {
+            toast.error(`${failed.length} removal${failed.length === 1 ? '' : 's'} failed.`);
+        } else {
+            toast.success(`Marked ${ids.length} animal${ids.length === 1 ? '' : 's'} as departed.`);
+        }
         exitManageMode();
         fetchAnimals();
     }
@@ -332,7 +345,7 @@ export default function AnimalsPanel({ title = 'Animals', accentColor = 'var(--c
                                         </p>
                                     )}
                                 </div>
-                                <div style={{ display: 'flex', gap: '8px' }}>
+                                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                                     <button
                                         className="glass-button"
                                         style={{ flex: 1, fontSize: '12px', padding: '8px' }}
@@ -354,6 +367,13 @@ export default function AnimalsPanel({ title = 'Animals', accentColor = 'var(--c
                                             <Pencil size={12} /> Edit
                                         </button>
                                     )}
+                                    <LifecycleLogButton
+                                        compact
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setLogTarget({ entity: 'animal', id: animal.animal_id, name: animal.name });
+                                        }}
+                                    />
                                 </div>
                             </div>
                         );
@@ -368,6 +388,15 @@ export default function AnimalsPanel({ title = 'Animals', accentColor = 'var(--c
                     onRemove={handleRemoveSelected}
                     onCancel={exitManageMode}
                     actionLabel="Mark Departed"
+                />
+            )}
+
+            {logTarget && (
+                <LifecycleLogModal
+                    entity={logTarget.entity}
+                    id={logTarget.id}
+                    name={logTarget.name}
+                    onClose={() => setLogTarget(null)}
                 />
             )}
 
@@ -505,30 +534,4 @@ export function DateRangeFilter({ from, to, onFrom, onTo, label = 'Date range' }
     );
 }
 
-function BulkActionBar({ count, onSelectAll, onRemove, onCancel, actionLabel }) {
-    return (
-        <div style={{
-            position: 'fixed', bottom: '24px', left: '50%', transform: 'translateX(-50%)',
-            background: '#1a1f2e', border: '1px solid rgba(239,68,68,0.3)',
-            borderRadius: '14px', padding: '10px 14px',
-            display: 'flex', alignItems: 'center', gap: '14px',
-            boxShadow: '0 10px 30px rgba(0,0,0,0.5)', zIndex: 999,
-        }}>
-            <span style={{ fontSize: '13px', color: 'var(--color-text-muted)' }}>
-                <strong style={{ color: 'white' }}>{count}</strong> selected
-            </span>
-            <button onClick={onSelectAll}
-                style={{ background: 'rgba(255,255,255,0.08)', color: 'white', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '8px', padding: '8px 14px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
-                Select All
-            </button>
-            <button onClick={onRemove} disabled={count === 0}
-                style={{ background: count === 0 ? 'rgba(239,68,68,0.25)' : '#ef4444', color: 'white', border: 'none', borderRadius: '8px', padding: '8px 14px', fontSize: '12px', fontWeight: 700, cursor: count === 0 ? 'not-allowed' : 'pointer' }}>
-                {actionLabel}
-            </button>
-            <button onClick={onCancel}
-                style={{ background: 'transparent', color: 'white', border: '1px solid rgba(255,255,255,0.18)', borderRadius: '8px', padding: '8px 14px', fontSize: '12px', cursor: 'pointer' }}>
-                Cancel
-            </button>
-        </div>
-    );
-}
+// BulkActionBar now lives in ./BulkActionBar.jsx (shared + portaled).

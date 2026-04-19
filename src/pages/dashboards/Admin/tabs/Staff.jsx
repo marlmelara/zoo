@@ -4,22 +4,31 @@ import api from '../../../../lib/api';
 import { useAuth } from '../../../../contexts/AuthContext';
 import { User, Stethoscope, Briefcase, Shield, Trash2, PawPrint, ShoppingBag, X } from 'lucide-react';
 import { StatusFilter } from '../../../../components/AnimalsPanel';
+import BulkActionBar from '../../../../components/BulkActionBar';
+import LifecycleLogModal, { LifecycleLogButton } from '../../../../components/LifecycleLogModal';
+import { useToast, useConfirm } from '../../../../components/Feedback';
 
 const GREEN      = 'rgb(123, 144, 79)';
 const GREEN_DARK = 'rgb(102, 122, 66)';
 
 export default function Staff() {
     const { role } = useAuth();
+    const toast   = useToast();
+    const confirm = useConfirm();
     const canManage = role === 'admin';
     const [staff, setStaff] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showForm, setShowForm] = useState(false);
     const [departments, setDepartments] = useState([]);
     const [statusFilter, setStatusFilter] = useState('active');
+    const [deptFilter, setDeptFilter]     = useState('all');
     const [manageMode, setManageMode] = useState(false);
     const [selected, setSelected] = useState(() => new Set());
     const [editing, setEditing] = useState(null);
     const [editForm, setEditForm] = useState({});
+    // Lifecycle log modal — viewing activation/deactivation history for
+    // one staff member at a time.
+    const [logTarget, setLogTarget] = useState(null);
     const [formData, setFormData] = useState({
         first_name: '', last_name: '', contact_info: '', pay_rate_cents: '', shift_timeframe: '', dept_id: '',
         email: '', password: '', role: 'general',
@@ -87,7 +96,7 @@ export default function Staff() {
             fetchStaff();
         } catch (error) {
             console.error('Error adding staff:', error);
-            alert('Failed to add staff: ' + error.message);
+            toast.error('Failed to add staff: ' + error.message);
         }
     }
 
@@ -135,20 +144,27 @@ export default function Staff() {
             cancelEdit();
             fetchStaff();
         } catch (err) {
-            alert('Failed to save: ' + err.message);
+            toast.error('Failed to save: ' + err.message);
         }
     }
 
     async function handleRemoveSelected() {
         if (selected.size === 0) return;
-        const confirmed = window.confirm(
-            `Deactivate ${selected.size} staff member${selected.size === 1 ? '' : 's'}? They can be reactivated from the Reactivate tab.`
-        );
-        if (!confirmed) return;
+        const ok = await confirm({
+            title: `Deactivate ${selected.size} staff member${selected.size === 1 ? '' : 's'}?`,
+            message: 'They can be reactivated later from the Reactivate tab.',
+            confirmLabel: 'Deactivate',
+            tone: 'danger',
+        });
+        if (!ok) return;
         const ids = Array.from(selected);
         const results = await Promise.allSettled(ids.map(id => api.delete(`/employees/${id}`)));
         const failed = results.filter(r => r.status === 'rejected');
-        if (failed.length) alert(`${failed.length} deactivation${failed.length === 1 ? '' : 's'} failed.`);
+        if (failed.length) {
+            toast.error(`${failed.length} deactivation${failed.length === 1 ? '' : 's'} failed.`);
+        } else {
+            toast.success(`Deactivated ${ids.length} staff member${ids.length === 1 ? '' : 's'}.`);
+        }
         exitManageMode();
         fetchStaff();
     }
@@ -166,11 +182,16 @@ export default function Staff() {
 
     const [searchTerm, setSearchTerm] = useState('');
 
-    const filteredStaff = staff.filter(person =>
-        person.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        person.last_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (person.dept_name || '').toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const filteredStaff = staff.filter(person => {
+        const q = searchTerm.toLowerCase();
+        const matchesSearch =
+            person.first_name.toLowerCase().includes(q) ||
+            person.last_name.toLowerCase().includes(q) ||
+            (person.dept_name || '').toLowerCase().includes(q);
+        const matchesDept =
+            deptFilter === 'all' || String(person.dept_id) === String(deptFilter);
+        return matchesSearch && matchesDept;
+    });
 
     const STATUS_TABS = [
         { key: 'active',   label: 'Active' },
@@ -218,12 +239,21 @@ export default function Staff() {
                 )}
             </div>
 
-            <div style={{ marginBottom: '20px' }}>
+            <div style={{ marginBottom: '20px', display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
                 <StatusFilter
                     label="Status"
                     tabs={STATUS_TABS}
                     value={statusFilter}
                     onChange={setStatusFilter}
+                />
+                <StatusFilter
+                    label="Dept"
+                    tabs={[
+                        { key: 'all', label: 'All' },
+                        ...departments.map(d => ({ key: String(d.dept_id), label: d.dept_name })),
+                    ]}
+                    value={deptFilter}
+                    onChange={setDeptFilter}
                 />
             </div>
 
@@ -307,14 +337,25 @@ export default function Staff() {
                                         style={{ position: 'absolute', top: '12px', left: '12px', width: '18px', height: '18px', accentColor: '#ef4444', zIndex: 2 }}
                                     />
                                 )}
+                                {/* Inactive badge moved to the top-right ribbon so it sits
+                                    next to the role icon instead of crashing into the name
+                                    on the left. When the manage-mode checkbox is present we
+                                    keep left-padding for it but never for the badge. */}
                                 {inactive && (
                                     <span style={{
-                                        position: 'absolute', top: '12px', left: '12px',
-                                        fontSize: '10px', padding: '2px 8px', borderRadius: '10px',
+                                        position: 'absolute', top: '12px', right: '14px',
+                                        fontSize: '10px', padding: '3px 10px', borderRadius: '12px',
                                         background: 'rgba(239,68,68,0.18)', color: '#b91c1c', fontWeight: 700, textTransform: 'uppercase',
+                                        letterSpacing: '0.06em', zIndex: 2,
                                     }}>Inactive</span>
                                 )}
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '15px', paddingLeft: (manageMode && !inactive) || inactive ? '28px' : 0, transition: 'padding 150ms' }}>
+                                <div style={{
+                                    display: 'flex', justifyContent: 'space-between', alignItems: 'start',
+                                    marginBottom: '15px',
+                                    paddingLeft: manageMode && !inactive ? '28px' : 0,
+                                    paddingRight: inactive ? '70px' : '0',
+                                    transition: 'padding 150ms',
+                                }}>
                                     <div>
                                         <h3 style={{ margin: '0 0 5px' }}>{person.first_name} {person.last_name}</h3>
                                         <span style={{
@@ -327,7 +368,7 @@ export default function Staff() {
                                             {person.dept_name || 'Unassigned'}
                                         </span>
                                     </div>
-                                    {getRoleIcon(person.dept_name)}
+                                    {!inactive && getRoleIcon(person.dept_name)}
                                 </div>
 
                                 <div style={{ fontSize: '14px', color: 'var(--color-text-muted)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -349,10 +390,36 @@ export default function Staff() {
                                     )}
                                 </div>
 
+                                {/* Lifecycle log button — always visible, always admin-clickable */}
+                                {canManage && (
+                                    <div style={{ marginTop: '12px', borderTop: '1px dashed rgba(121,162,128,0.3)', paddingTop: '10px', display: 'flex', justifyContent: 'flex-end' }}>
+                                        <LifecycleLogButton
+                                            compact
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setLogTarget({
+                                                    entity: 'employee',
+                                                    id:   person.employee_id,
+                                                    name: `${person.first_name} ${person.last_name}`,
+                                                });
+                                            }}
+                                        />
+                                    </div>
+                                )}
+
                             </div>
                         );
                     })}
                 </div>
+            )}
+
+            {logTarget && (
+                <LifecycleLogModal
+                    entity={logTarget.entity}
+                    id={logTarget.id}
+                    name={logTarget.name}
+                    onClose={() => setLogTarget(null)}
+                />
             )}
 
             {/* Portaled edit modal — escapes the parent glass-panel backdrop-filter. */}
@@ -433,33 +500,7 @@ export default function Staff() {
     );
 }
 
-function BulkActionBar({ count, onSelectAll, onRemove, onCancel, actionLabel }) {
-    return (
-        <div style={{
-            position: 'fixed', bottom: '24px', left: '50%', transform: 'translateX(-50%)',
-            background: '#1a1f2e', border: '1px solid rgba(239,68,68,0.3)',
-            borderRadius: '14px', padding: '10px 14px',
-            display: 'flex', alignItems: 'center', gap: '14px',
-            boxShadow: '0 10px 30px rgba(0,0,0,0.5)', zIndex: 999,
-        }}>
-            <span style={{ fontSize: '13px', color: 'var(--color-text-muted)' }}>
-                <strong style={{ color: 'white' }}>{count}</strong> selected
-            </span>
-            <button onClick={onSelectAll}
-                style={{ background: 'rgba(255,255,255,0.08)', color: 'white', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '8px', padding: '8px 14px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
-                Select All
-            </button>
-            <button onClick={onRemove} disabled={count === 0}
-                style={{ background: count === 0 ? 'rgba(239,68,68,0.25)' : '#ef4444', color: 'white', border: 'none', borderRadius: '8px', padding: '8px 14px', fontSize: '12px', fontWeight: 700, cursor: count === 0 ? 'not-allowed' : 'pointer' }}>
-                {actionLabel}
-            </button>
-            <button onClick={onCancel}
-                style={{ background: 'transparent', color: 'white', border: '1px solid rgba(255,255,255,0.18)', borderRadius: '8px', padding: '8px 14px', fontSize: '12px', cursor: 'pointer' }}>
-                Cancel
-            </button>
-        </div>
-    );
-}
+// BulkActionBar moved to /components/BulkActionBar.jsx (shared + portaled).
 
 const staffLabelStyle = {
     display: 'block',

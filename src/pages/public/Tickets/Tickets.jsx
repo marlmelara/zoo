@@ -7,6 +7,7 @@ import api from '../../../lib/api';
 import Navbar from '../../../components/Navbar';
 import { getUpcomingEvents } from '../../../api/public';
 import ShopCartPanel, { useZooCart } from '../../../components/ShopCart';
+import { useToast } from '../../../components/Feedback';
 import './tickets.css';
 import logo from '../../../images/logo.png';
 
@@ -18,6 +19,7 @@ export default function Tickets() {
   const navigate = useNavigate();
   const { user, role, customerId } = useAuth();
   const cartHook = useZooCart();
+  const toast = useToast();
   const [cartOpen, setCartOpen] = useState(false);
 
   // Customer profile for welcome message
@@ -132,9 +134,9 @@ export default function Tickets() {
 
   // Add admission tickets to unified cart
   const handleAddAdmissionToCart = () => {
-    if (!selectedDate) return alert('Please select a date');
-    if (!selectedTime) return alert('Please select a time');
-    if (getTotalTickets() === 0) return alert('Please select at least one ticket');
+    if (!selectedDate) { toast.warn('Please select a date'); return; }
+    if (!selectedTime) { toast.warn('Please select a time'); return; }
+    if (getTotalTickets() === 0) { toast.warn('Please select at least one ticket'); return; }
 
     const dateLabel = selectedDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
     cartHook.setAdmission({ date: dateLabel, time: selectedTime, quantities: { ...quantities } });
@@ -189,7 +191,7 @@ export default function Tickets() {
   const handleSelectMembership = (plan) => {
     if (!user) {
       // Don't persist the plan — guests must not carry a membership in cart.
-      alert('Please sign in or create an account to purchase a membership.');
+      toast.warn('Please sign in or create an account to purchase a membership.');
       navigate('/account');
       return;
     }

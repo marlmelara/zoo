@@ -12,6 +12,7 @@ import { getRecentActivity, getDepartmentActivity, logActivity } from '../../../
 import { setHealthStatus } from '../../../api/animals';
 import AnimalMedicalPanel from '../../../components/AnimalMedicalPanel';
 import { StatusFilter, DateRangeFilter } from '../../../components/AnimalsPanel';
+import { useToast } from '../../../components/Feedback';
 import {
     LayoutDashboard, Users, ClipboardList, Calendar, Package,
     CheckCircle, XCircle, Clock, AlertTriangle, Shield, Activity,
@@ -47,6 +48,7 @@ const TABS = ['Overview', 'Supply Requests', 'My Staff', 'Animal Assignments', '
 
 export default function ManagerDashboard() {
     const { user, employeeId, deptId, role } = useAuth();
+    const toast = useToast();
     const [activeTab, setActiveTab] = useState('Overview');
 
     // Resolved IDs — fetched directly from DB to avoid context timing issues
@@ -92,6 +94,17 @@ export default function ManagerDashboard() {
     const [vets, setVets] = useState([]);
     const [caretakers, setCaretakers] = useState([]);
     const [expandedAnimalId, setExpandedAnimalId] = useState(null);
+
+    // Search + zone filter for Animal Assignments.
+    // animalSearch — matches animal name, species, assigned vet/caretaker name.
+    // zoneFilter  — single zone_name or 'all'.
+    const [animalSearch, setAnimalSearch] = useState('');
+    const [zoneFilter,   setZoneFilter]   = useState('all');
+
+    // Search for My Staff + Events. Events search also matches vet/caretaker
+    // (assignee) names so the manager can find "which event has Sarah on it".
+    const [staffSearch, setStaffSearch] = useState('');
+    const [eventSearch, setEventSearch] = useState('');
 
 
     const isAdmin = role === 'admin';
@@ -214,7 +227,7 @@ export default function ManagerDashboard() {
             fetchActivityLog(resolvedDeptId);
         } catch (err) {
             console.error('Error reviewing request:', err);
-            alert('Failed to review request: ' + err.message);
+            toast.error('Failed to review request: ' + err.message);
         }
     }
 
@@ -287,7 +300,7 @@ export default function ManagerDashboard() {
             fetchAnimalsWithAssignments();
         } catch (err) {
             console.error('Error assigning vet:', err);
-            alert('Failed to assign vet: ' + err.message);
+            toast.error('Failed to assign vet: ' + err.message);
         }
     }
 
@@ -317,7 +330,7 @@ export default function ManagerDashboard() {
             fetchAnimalsWithAssignments();
         } catch (err) {
             console.error('Error assigning caretaker:', err);
-            alert('Failed to assign caretaker: ' + err.message);
+            toast.error('Failed to assign caretaker: ' + err.message);
         }
     }
 
@@ -347,7 +360,7 @@ export default function ManagerDashboard() {
             fetchEvents();
         } catch (err) {
             console.error('Error assigning employee to event:', err);
-            alert('Failed to assign: ' + err.message);
+            toast.error('Failed to assign: ' + err.message);
         }
     }
 
@@ -401,11 +414,58 @@ export default function ManagerDashboard() {
         if (eventWhen === 'past'     && !(ev.event_date <  todayStr)) return false;
         if (eventFrom && ev.event_date <  eventFrom) return false;
         if (eventTo   && ev.event_date >  eventTo)   return false;
+        // Search matches title OR any assigned staff/animal name so the
+        // manager can ask "which events is Sarah on?" or "where's Leo?"
+        if (eventSearch.trim()) {
+            const q = eventSearch.toLowerCase();
+            const inTitle   = (ev.title || '').toLowerCase().includes(q);
+            const inDesc    = (ev.description || '').toLowerCase().includes(q);
+            const inVenue   = (ev.venue_name || '').toLowerCase().includes(q);
+            const assigned  = ev.assignments || [];
+            const inPerson  = assigned.some(a =>
+                (`${a.first_name || ''} ${a.last_name || ''}`).toLowerCase().includes(q));
+            const inAnimal  = assigned.some(a =>
+                (a.animal_name || '').toLowerCase().includes(q));
+            if (!(inTitle || inDesc || inVenue || inPerson || inAnimal)) return false;
+        }
         return true;
     }).sort((a, b) => {
         if (eventWhen === 'upcoming') return a.event_date.localeCompare(b.event_date);
         return b.event_date.localeCompare(a.event_date);
     });
+
+    // My Staff — case-insensitive match on name, role, dept, and
+    // vet specialty / caretaker species.
+    const filteredStaff = staff.filter(p => {
+        if (!staffSearch.trim()) return true;
+        const q = staffSearch.toLowerCase();
+        return [
+            p.first_name, p.last_name, p.dept_name, p.role,
+            p.shift_timeframe, p.contact_info,
+            p.vets?.specialty, p.animal_caretakers?.specialization_species,
+        ].some(v => (v || '').toString().toLowerCase().includes(q));
+    });
+
+    // Animal Assignments — alphabetical by name by default, with optional
+    // zone filter and a search that matches animal name/species, zone, or
+    // any currently-assigned vet/caretaker name.
+    const zoneOptions = Array.from(new Set(
+        (allAnimals || [])
+            .map(a => a.zone_name)
+            .filter(Boolean)
+    )).sort((a, b) => a.localeCompare(b));
+
+    const filteredAnimals = (allAnimals || [])
+        .filter(a => zoneFilter === 'all' || a.zone_name === zoneFilter)
+        .filter(a => {
+            if (!animalSearch.trim()) return true;
+            const q = animalSearch.toLowerCase();
+            const hit = (v) => (v || '').toString().toLowerCase().includes(q);
+            const vetHit = (a.vet_assignments || []).some(v => hit(`${v.first_name} ${v.last_name}`));
+            const ctHit  = (a.caretaker_assignments || []).some(c => hit(`${c.first_name} ${c.last_name}`));
+            return hit(a.name) || hit(a.species_common_name) || hit(a.species_binomial) || hit(a.zone_name) || vetHit || ctHit;
+        })
+        .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
 
     return (
         <div>
@@ -651,14 +711,27 @@ export default function ManagerDashboard() {
             {activeTab === 'My Staff' && (
                 <div>
                     <h2>Department Staff</h2>
+                    <input
+                        type="text"
+                        placeholder="Search staff by name, role, specialty..."
+                        className="glass-input"
+                        value={staffSearch}
+                        onChange={e => setStaffSearch(e.target.value)}
+                        style={{ maxWidth: '440px', marginBottom: '14px', display: 'block' }}
+                    />
                     {staffLoading ? <p>Loading staff...</p> : staff.length === 0 ? (
                         <div className="glass-panel" style={{ padding: '40px', textAlign: 'center', color: 'var(--color-text-muted)' }}>
                             <Users size={48} style={{ marginBottom: '15px', opacity: 0.3 }} />
                             <p>No staff in your department.</p>
                         </div>
+                    ) : filteredStaff.length === 0 ? (
+                        <div className="glass-panel" style={{ padding: '40px', textAlign: 'center', color: 'var(--color-text-muted)' }}>
+                            <Users size={48} style={{ marginBottom: '15px', opacity: 0.3 }} />
+                            <p>No staff match "{staffSearch}".</p>
+                        </div>
                     ) : (
                         <div className="grid-cards">
-                            {staff.map(person => {
+                            {filteredStaff.map(person => {
                                 const roleColor = person.role === 'vet' ? { bg: 'rgba(16,185,129,0.18)', fg: '#047857' }
                                     : person.role === 'caretaker' ? { bg: 'rgba(59,130,246,0.18)', fg: '#1d4ed8' }
                                     : person.role === 'security'  ? { bg: 'rgba(168,85,247,0.18)', fg: '#7e22ce' }
@@ -763,18 +836,46 @@ export default function ManagerDashboard() {
                     <h2 style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                         <Cat size={24} /> Animal Assignments
                     </h2>
-                    <p style={{ color: 'var(--color-text-muted)', marginBottom: '20px' }}>
+                    <p style={{ color: 'var(--color-text-muted)', marginBottom: '14px' }}>
                         Assign vets and caretakers to animals.
                     </p>
+
+                    {/* Search + zone filter. Search matches animal, species, and
+                        any currently-assigned vet/caretaker name so the manager
+                        can quickly find every animal someone is caring for. */}
+                    <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center', marginBottom: '16px' }}>
+                        <input
+                            type="text"
+                            placeholder="Search by animal, species, or assigned vet/caretaker..."
+                            className="glass-input"
+                            value={animalSearch}
+                            onChange={e => setAnimalSearch(e.target.value)}
+                            style={{ maxWidth: '380px', flex: 1, minWidth: '240px' }}
+                        />
+                        <StatusFilter
+                            label="Zone"
+                            tabs={[
+                                { key: 'all', label: 'All' },
+                                ...zoneOptions.map(z => ({ key: z, label: z })),
+                            ]}
+                            value={zoneFilter}
+                            onChange={setZoneFilter}
+                        />
+                    </div>
 
                     {animalsLoading ? <p>Loading animals...</p> : allAnimals.length === 0 ? (
                         <div className="glass-panel" style={{ padding: '40px', textAlign: 'center', color: 'var(--color-text-muted)' }}>
                             <Cat size={48} style={{ marginBottom: '15px', opacity: 0.3 }} />
                             <p>No animals found.</p>
                         </div>
+                    ) : filteredAnimals.length === 0 ? (
+                        <div className="glass-panel" style={{ padding: '40px', textAlign: 'center', color: 'var(--color-text-muted)' }}>
+                            <Cat size={48} style={{ marginBottom: '15px', opacity: 0.3 }} />
+                            <p>No animals match the current search/zone filter.</p>
+                        </div>
                     ) : (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                            {allAnimals.map(animal => {
+                            {filteredAnimals.map(animal => {
                                 const assignedVets = animal.vet_assignments || [];
                                 const assignedVetIds = assignedVets.map(a => a.vet_id);
                                 const assignedCts = animal.caretaker_assignments || [];
@@ -807,7 +908,7 @@ export default function ManagerDashboard() {
                                                             await setHealthStatus(animal.animal_id, e.target.value);
                                                             fetchAnimalsWithAssignments();
                                                         } catch (err) {
-                                                            alert('Failed to update: ' + err.message);
+                                                            toast.error('Failed to update: ' + err.message);
                                                         }
                                                     }}
                                                     style={{ fontSize: '12px', padding: '6px 8px' }}
@@ -956,6 +1057,17 @@ export default function ManagerDashboard() {
                             onChange={setEventWhen}
                         />
                     </div>
+                    {/* Search also matches the names of assigned staff and
+                        animals, so the manager can track "which events is
+                        Sarah on?" or "where's Leo this week?" */}
+                    <input
+                        type="text"
+                        placeholder="Search by title, venue, animal, or assigned vet/caretaker..."
+                        className="glass-input"
+                        value={eventSearch}
+                        onChange={e => setEventSearch(e.target.value)}
+                        style={{ maxWidth: '440px', marginBottom: '14px', display: 'block' }}
+                    />
                     <DateRangeFilter
                         label="Event date between"
                         from={eventFrom} to={eventTo}

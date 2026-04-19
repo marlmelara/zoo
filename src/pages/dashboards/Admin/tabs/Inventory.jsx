@@ -12,8 +12,9 @@ import BulkActionBar from '../../../../components/BulkActionBar';
 import {
     createOperationalSupply, deleteOperationalSupply, deleteInventoryItem,
 } from '../../../../api/supplies';
-import { getRecentActivity } from '../../../../api/activityLog';
+import { queryActivity } from '../../../../api/activityLog';
 import { useToast, useConfirm, usePrompt } from '../../../../components/Feedback';
+import ZooPaginator from '../../../../components/ZooPaginator';
 
 const GREEN      = 'rgb(123, 144, 79)';
 const GREEN_DARK = 'rgb(102, 122, 66)';
@@ -85,15 +86,31 @@ export default function Inventory() {
     const [manageMode, setManageMode] = useState(false);
     const [selected, setSelected] = useState(() => new Set());
 
-    // Activity log + date-range filter for the log tab
+    // Activity log state. Server-side pagination (25 per page) + search +
+    // date range. When date range is set we switch to "fetch all in range".
+    const ACTIVITY_PAGE_SIZE = 25;
     const [activity, setActivity] = useState([]);
     const [activityLoading, setActivityLoading] = useState(false);
+    const [activityTotal, setActivityTotal] = useState(0);
+    const [activityPage,  setActivityPage]  = useState(0);
+    const [activitySearch, setActivitySearch] = useState('');
     const [logFrom, setLogFrom] = useState('');
     const [logTo, setLogTo]     = useState('');
     const [searchTerm, setSearchTerm] = useState('');
 
     useEffect(() => { fetchAll(); }, []);
     useEffect(() => { if (mainTab === 'activity') loadActivity(); }, [mainTab]);
+    // Re-fetch when activity-log filters change. Debounced so search
+    // doesn't fire per keystroke.
+    useEffect(() => {
+        if (mainTab !== 'activity') return;
+        const h = setTimeout(() => loadActivity(), 220);
+        return () => clearTimeout(h);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [activityPage, logFrom, logTo, activitySearch, mainTab]);
+    // Reset to first page when filters change so narrowed results don't
+    // leave the user on a now-empty page 3.
+    useEffect(() => { setActivityPage(0); }, [logFrom, logTo, activitySearch]);
 
     async function fetchAll() {
         setLoading(true);
@@ -116,8 +133,17 @@ export default function Inventory() {
     async function loadActivity() {
         setActivityLoading(true);
         try {
-            const data = await getRecentActivity(200);
-            setActivity(data || []);
+            const hasRange = !!(logFrom || logTo);
+            const { rows, total } = await queryActivity({
+                limit:       hasRange ? 1000 : ACTIVITY_PAGE_SIZE,
+                offset:      hasRange ? 0 : activityPage * ACTIVITY_PAGE_SIZE,
+                actionTypes: Array.from(INV_ACTIONS),
+                from:        logFrom || '',
+                to:          logTo   || '',
+                search:      activitySearch,
+            });
+            setActivity(rows);
+            setActivityTotal(total);
         } catch (err) {
             console.error('Error loading activity log:', err);
         } finally {
@@ -208,24 +234,15 @@ export default function Inventory() {
         }
     }, [deptTabs, deptFilter]);
 
-    // Activity log derived view — only inventory-related actions, narrowed
-    // by dept pill + date range.
+    // Server filters by action_type whitelist, date range, and search.
+    // Client still narrows by dept pill because retail/ops bucketing
+    // depends on a mix of target_type and the performer's department —
+    // not something SQL would model cleanly here.
     //   • Retail pill → target_type === 'inventory' (shop-item restocks only).
-    //     Retail & Operations dept employees' OTHER activity (e.g. operational
-    //     supplies for their own dept) does NOT count as Retail.
     //   • A real department pill → performer works in that dept AND the event
     //     is not a shop-item restock (so shop restocks don't double-count).
     const filteredActivity = useMemo(() => {
-        const fromTs = logFrom ? new Date(logFrom + 'T00:00:00').getTime() : null;
-        const toTs   = logTo   ? new Date(logTo   + 'T23:59:59').getTime() : null;
         return (activity || []).filter(a => {
-            if (!INV_ACTIONS.has(a.action_type)) return false;
-            const ts = new Date(a.created_at).getTime();
-            if (fromTs && ts < fromTs) return false;
-            if (toTs   && ts > toTs)   return false;
-            // Classify this activity into a dept bucket so it can be filtered
-            // the same way items are: 'retail' for shop-inventory events,
-            // otherwise the performer's department.
             const bucket = a.target_type === 'inventory'
                 ? 'retail'
                 : String(a.performer?.dept_id || '');
@@ -234,7 +251,7 @@ export default function Inventory() {
             if (deptFilter === 'retail') return bucket === 'retail';
             return bucket === deptFilter;
         });
-    }, [activity, deptFilter, logFrom, logTo, allowedBuckets]);
+    }, [activity, deptFilter, allowedBuckets]);
 
     // ── Add / Delete handlers ──
     async function handleAddItem(e) {
@@ -616,6 +633,14 @@ export default function Inventory() {
             {/* ══ ACTIVITY LOG TAB ══ */}
             {mainTab === 'activity' && (
                 <>
+                    <input
+                        type="text"
+                        placeholder="Search by item, action, or person..."
+                        className="glass-input"
+                        value={activitySearch}
+                        onChange={e => setActivitySearch(e.target.value)}
+                        style={{ maxWidth: '440px', marginBottom: '14px', display: 'block' }}
+                    />
                     <DateRangeFilter
                         from={logFrom} to={logTo}
                         onFrom={setLogFrom} onTo={setLogTo}
@@ -624,6 +649,18 @@ export default function Inventory() {
                         loading={activityLoading}
                         items={filteredActivity}
                     />
+                    {!activityLoading && !(logFrom || logTo) && (
+                        <ZooPaginator
+                            page={activityPage}
+                            totalPages={Math.max(1, Math.ceil(activityTotal / ACTIVITY_PAGE_SIZE))}
+                            onChange={(p) => setActivityPage(p)}
+                        />
+                    )}
+                    {!activityLoading && (logFrom || logTo) && activityTotal > 0 && (
+                        <p style={{ marginTop: '12px', fontSize: '12px', color: GREEN_DARK, opacity: 0.8 }}>
+                            Showing all {activityTotal} inventory event{activityTotal === 1 ? '' : 's'} in the selected range.
+                        </p>
+                    )}
                 </>
             )}
 

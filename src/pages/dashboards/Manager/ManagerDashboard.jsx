@@ -8,11 +8,12 @@ import {
     restockOperationalSupply,
     getAllOperationalSupplies
 } from '../../../api/supplies';
-import { getRecentActivity, getDepartmentActivity, logActivity } from '../../../api/activityLog';
+import { queryActivity, logActivity } from '../../../api/activityLog';
 import { setHealthStatus } from '../../../api/animals';
 import AnimalMedicalPanel from '../../../components/AnimalMedicalPanel';
 import { StatusFilter, DateRangeFilter } from '../../../components/AnimalsPanel';
 import { useToast } from '../../../components/Feedback';
+import ZooPaginator from '../../../components/ZooPaginator';
 import {
     LayoutDashboard, Users, ClipboardList, Calendar, Package,
     CheckCircle, XCircle, Clock, AlertTriangle, Shield, Activity,
@@ -84,9 +85,15 @@ export default function ManagerDashboard() {
     // Supplies overview
     const [allSupplies, setAllSupplies] = useState([]);
 
-    // Activity log state
+    // Activity log state — paginated. Default page shows the 25 newest
+    // rows; Next/Prev walks back through history. When a date range is
+    // set we switch to "all rows in range" mode (one big fetch).
+    const ACTIVITY_PAGE_SIZE = 25;
     const [activityLog, setActivityLog] = useState([]);
     const [activityLoading, setActivityLoading] = useState(true);
+    const [activityTotal, setActivityTotal] = useState(0);
+    const [activityPage,  setActivityPage]  = useState(0);
+    const [activitySearch, setActivitySearch] = useState('');
 
     // Animal assignments state
     const [allAnimals, setAllAnimals] = useState([]);
@@ -149,6 +156,19 @@ export default function ManagerDashboard() {
         loadDashboard();
     }, [user?.userId, employeeId, deptId]);
 
+    // Re-fetch activity log when its filter inputs change. Debounced via
+    // setTimeout so typing in the search box doesn't fire a request per keystroke.
+    useEffect(() => {
+        if (!resolvedDeptId && !isAdmin) return;
+        const handle = setTimeout(() => fetchActivityLog(resolvedDeptId), 220);
+        return () => clearTimeout(handle);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [activityPage, logFrom, logTo, activitySearch, resolvedDeptId]);
+
+    // Reset to page 0 whenever the search / date inputs change so the
+    // user doesn't get stuck on an empty page 3 after narrowing results.
+    useEffect(() => { setActivityPage(0); }, [logFrom, logTo, activitySearch]);
+
     async function fetchOverview(depId) {
         try {
             const data = await api.get('/dashboard/stats');
@@ -192,11 +212,21 @@ export default function ManagerDashboard() {
 
     async function fetchActivityLog(depId) {
         const id = depId || resolvedDeptId || deptId;
+        setActivityLoading(true);
         try {
-            const data = isAdmin
-                ? await getRecentActivity(30)
-                : await getDepartmentActivity(id, 30);
-            setActivityLog(data);
+            // Date range set → fetch everything in the range (page controls
+            // are hidden in that mode). Otherwise page through 25 at a time.
+            const hasRange = !!(logFrom || logTo);
+            const { rows, total } = await queryActivity({
+                limit:  hasRange ? 1000 : ACTIVITY_PAGE_SIZE,
+                offset: hasRange ? 0 : activityPage * ACTIVITY_PAGE_SIZE,
+                deptId: isAdmin ? null : id,
+                from:   logFrom || '',
+                to:     logTo   || '',
+                search: activitySearch,
+            });
+            setActivityLog(rows);
+            setActivityTotal(total);
         } catch (err) {
             console.error('Error fetching activity log:', err);
         } finally {
@@ -401,9 +431,10 @@ export default function ManagerDashboard() {
         ? baseRequests.filter(r => inRange(r.created_at, reqFrom, reqTo))
         : baseRequests;
 
-    const filteredActivity = anyRange(logFrom, logTo)
-        ? activityLog.filter(l => inRange(l.created_at, logFrom, logTo))
-        : activityLog;
+    // Server already applied date/search filtering — just alias for the JSX below.
+    const filteredActivity = activityLog;
+    const activityHasRange = !!(logFrom || logTo);
+    const activityMaxPage = Math.max(0, Math.ceil(activityTotal / ACTIVITY_PAGE_SIZE) - 1);
 
     // Events filter: when (all/upcoming/past) + optional event_date range.
     // Upcoming reads best chronologically (soonest first); past/all stay
@@ -435,16 +466,22 @@ export default function ManagerDashboard() {
     });
 
     // My Staff — case-insensitive match on name, role, dept, and
-    // vet specialty / caretaker species.
-    const filteredStaff = staff.filter(p => {
-        if (!staffSearch.trim()) return true;
-        const q = staffSearch.toLowerCase();
-        return [
-            p.first_name, p.last_name, p.dept_name, p.role,
-            p.shift_timeframe, p.contact_info,
-            p.vets?.specialty, p.animal_caretakers?.specialization_species,
-        ].some(v => (v || '').toString().toLowerCase().includes(q));
-    });
+    // vet specialty / caretaker species. Sorted alphabetically by
+    // last name (then first) so the list is stable and scannable.
+    const filteredStaff = staff
+        .filter(p => {
+            if (!staffSearch.trim()) return true;
+            const q = staffSearch.toLowerCase();
+            return [
+                p.first_name, p.last_name, p.dept_name, p.role,
+                p.shift_timeframe, p.contact_info,
+                p.vets?.specialty, p.animal_caretakers?.specialization_species,
+            ].some(v => (v || '').toString().toLowerCase().includes(q));
+        })
+        .sort((a, b) => {
+            const lastCmp = (a.last_name || '').localeCompare(b.last_name || '');
+            return lastCmp !== 0 ? lastCmp : (a.first_name || '').localeCompare(b.first_name || '');
+        });
 
     // Animal Assignments — alphabetical by name by default, with optional
     // zone filter and a search that matches animal name/species, zone, or
@@ -776,6 +813,14 @@ export default function ManagerDashboard() {
                     <h2 style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                         <Activity size={24} /> Recent Activity
                     </h2>
+                    <input
+                        type="text"
+                        placeholder="Search by description, action, or person..."
+                        className="glass-input"
+                        value={activitySearch}
+                        onChange={e => setActivitySearch(e.target.value)}
+                        style={{ maxWidth: '440px', marginBottom: '14px', display: 'block' }}
+                    />
                     <DateRangeFilter
                         label="Happened between"
                         from={logFrom} to={logTo}
@@ -784,7 +829,7 @@ export default function ManagerDashboard() {
                     {activityLoading ? <p>Loading activity...</p> : filteredActivity.length === 0 ? (
                         <div className="glass-panel" style={{ padding: '40px', textAlign: 'center', color: 'var(--color-text-muted)' }}>
                             <Activity size={48} style={{ marginBottom: '15px', opacity: 0.3 }} />
-                            <p>{activityLog.length === 0 ? 'No activity recorded yet.' : 'No activity in this date range.'}</p>
+                            <p>{activityTotal === 0 ? 'No activity recorded yet.' : 'No activity matches this search or date range.'}</p>
                         </div>
                     ) : (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -826,6 +871,21 @@ export default function ManagerDashboard() {
                                 </div>
                             ))}
                         </div>
+                    )}
+
+                    {/* Pagination footer — hidden when a date range is active
+                        (the fetch already pulls everything in range). */}
+                    {!activityLoading && !activityHasRange && (
+                        <ZooPaginator
+                            page={activityPage}
+                            totalPages={activityMaxPage + 1}
+                            onChange={(p) => setActivityPage(p)}
+                        />
+                    )}
+                    {!activityLoading && activityHasRange && activityTotal > 0 && (
+                        <p style={{ marginTop: '12px', fontSize: '12px', color: MGR_GREEN_DARK, opacity: 0.8 }}>
+                            Showing all {activityTotal} result{activityTotal === 1 ? '' : 's'} in the selected range.
+                        </p>
                     )}
                 </div>
             )}
@@ -1206,3 +1266,7 @@ export default function ManagerDashboard() {
         </div>
     );
 }
+
+// ActivityPager removed — replaced by ZooPaginator
+// (src/components/ZooPaginator.jsx). The new paginator is Google-style
+// with numbered pages + ellipsis, shared across every list view.

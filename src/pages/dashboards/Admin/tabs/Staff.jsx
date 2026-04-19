@@ -182,16 +182,21 @@ export default function Staff() {
 
     const [searchTerm, setSearchTerm] = useState('');
 
-    const filteredStaff = staff.filter(person => {
-        const q = searchTerm.toLowerCase();
-        const matchesSearch =
-            person.first_name.toLowerCase().includes(q) ||
-            person.last_name.toLowerCase().includes(q) ||
-            (person.dept_name || '').toLowerCase().includes(q);
-        const matchesDept =
-            deptFilter === 'all' || String(person.dept_id) === String(deptFilter);
-        return matchesSearch && matchesDept;
-    });
+    const filteredStaff = staff
+        .filter(person => {
+            const q = searchTerm.toLowerCase();
+            const matchesSearch =
+                person.first_name.toLowerCase().includes(q) ||
+                person.last_name.toLowerCase().includes(q) ||
+                (person.dept_name || '').toLowerCase().includes(q);
+            const matchesDept =
+                deptFilter === 'all' || String(person.dept_id) === String(deptFilter);
+            return matchesSearch && matchesDept;
+        })
+        .sort((a, b) => {
+            const lastCmp = (a.last_name || '').localeCompare(b.last_name || '');
+            return lastCmp !== 0 ? lastCmp : (a.first_name || '').localeCompare(b.first_name || '');
+        });
 
     const STATUS_TABS = [
         { key: 'active',   label: 'Active' },
@@ -391,10 +396,12 @@ export default function Staff() {
                                     )}
                                 </div>
 
-                                {/* Log button at the bottom of the card, flush left, same
-                                    treatment as Animals' 3-button row — just a single pill here. */}
+                                {/* Log button anchored bottom-right — mirrors the visual
+                                    position Log occupies on the Animals cards (third item
+                                    in that row). Here it's the only button, so we pin it
+                                    to the right for consistency. */}
                                 {canManage && (
-                                    <div style={{ marginTop: '15px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                                    <div style={{ marginTop: '15px', display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                                         <LifecycleLogButton
                                             compact
                                             onClick={(e) => {

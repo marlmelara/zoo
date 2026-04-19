@@ -6,26 +6,61 @@ import { toIsoUtc } from '../lib/dates.js';
 const router = Router();
 
 // GET /api/activity-log
+// Supports:
+//   limit, offset   — page through the log (default 25 / 0)
+//   action_type     — legacy single filter
+//   action_types    — comma-separated list (Inventory uses this for its whitelist)
+//   dept_id         — scope to one department
+//   from, to        — YYYY-MM-DD date range (inclusive). When set, caller
+//                     typically passes a large limit to pull everything.
+//   search          — LIKE match against description / action_type / performer name
+//   include_total=1 — also return { total } so the client can render a
+//                     "page N of M" indicator
+//
+// Response: either an array (legacy) or { rows, total } when include_total=1.
 router.get('/', requireRole('admin','manager'), async (req, res) => {
     try {
-        const { limit = 100, offset = 0, action_type, dept_id } = req.query;
-        let query = `SELECT al.*,
-                            e.first_name, e.last_name, e.role, e.dept_id,
-                            d.dept_name
-                     FROM activity_log al
-                     LEFT JOIN employees   e ON al.performed_by = e.employee_id
-                     LEFT JOIN departments d ON e.dept_id        = d.dept_id`;
+        const {
+            limit = 25, offset = 0,
+            action_type, action_types,
+            dept_id, from, to, search,
+            include_total,
+        } = req.query;
         const where = [];
         const params = [];
         if (action_type) { where.push('al.action_type = ?'); params.push(action_type); }
-        if (dept_id)     { where.push('e.dept_id = ?');      params.push(parseInt(dept_id)); }
-        if (where.length) query += ' WHERE ' + where.join(' AND ');
-        query += ' ORDER BY al.created_at DESC LIMIT ? OFFSET ?';
-        params.push(parseInt(limit), parseInt(offset));
+        if (action_types) {
+            const arr = String(action_types).split(',').map(s => s.trim()).filter(Boolean);
+            if (arr.length) {
+                where.push(`al.action_type IN (${arr.map(() => '?').join(',')})`);
+                params.push(...arr);
+            }
+        }
+        if (dept_id) { where.push('e.dept_id = ?');      params.push(parseInt(dept_id)); }
+        if (from)    { where.push('al.created_at >= ?'); params.push(`${from} 00:00:00`); }
+        if (to)      { where.push('al.created_at <= ?'); params.push(`${to} 23:59:59`); }
+        if (search && String(search).trim()) {
+            const q = `%${String(search).trim()}%`;
+            where.push(`(al.description LIKE ?
+                       OR al.action_type LIKE ?
+                       OR CONCAT(COALESCE(e.first_name,''),' ',COALESCE(e.last_name,'')) LIKE ?)`);
+            params.push(q, q, q);
+        }
+        const whereSql = where.length ? ' WHERE ' + where.join(' AND ') : '';
 
-        const [rows] = await db.query(query, params);
-        // Reshape to include a nested performer for the frontend.
-        // created_at → ISO-UTC so toLocaleTimeString() shows the user's local time.
+        const baseFrom = `FROM activity_log al
+                          LEFT JOIN employees   e ON al.performed_by = e.employee_id
+                          LEFT JOIN departments d ON e.dept_id        = d.dept_id`;
+
+        const query = `SELECT al.*,
+                              e.first_name, e.last_name, e.role, e.dept_id,
+                              d.dept_name
+                       ${baseFrom}
+                       ${whereSql}
+                       ORDER BY al.created_at DESC
+                       LIMIT ? OFFSET ?`;
+        const [rows] = await db.query(query, [...params, parseInt(limit), parseInt(offset)]);
+
         const shaped = rows.map(r => ({
             ...r,
             created_at: toIsoUtc(r.created_at),
@@ -37,6 +72,14 @@ router.get('/', requireRole('admin','manager'), async (req, res) => {
                 dept_name:  r.dept_name,
             } : null,
         }));
+
+        if (include_total === '1') {
+            const [[{ total }]] = await db.query(
+                `SELECT COUNT(*) AS total ${baseFrom} ${whereSql}`,
+                params
+            );
+            return res.json({ rows: shaped, total });
+        }
         return res.json(shaped);
     } catch (err) {
         return res.status(500).json({ error: err.message });

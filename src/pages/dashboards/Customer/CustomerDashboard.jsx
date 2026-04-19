@@ -1,8 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../contexts/AuthContext';
 import api from '../../../lib/api';
 import { useToast } from '../../../components/Feedback';
+import { StatusFilter } from '../../../components/AnimalsPanel';
+import ZooPaginator from '../../../components/ZooPaginator';
 import {
     User, Ticket, Heart, Calendar, MapPin, Phone, Mail,
     Star, Gift, ShoppingCart, RefreshCw, Clock, Package, Trash2, AlertTriangle
@@ -41,6 +43,14 @@ export default function CustomerDashboard() {
     const [purchaseDateTo, setPurchaseDateTo] = useState('');
     const [ticketDateFrom, setTicketDateFrom] = useState('');
     const [ticketDateTo, setTicketDateTo] = useState('');
+    const [ticketFilter, setTicketFilter]   = useState('all'); // all | admission | events
+
+    // Client-side pagination for the list tabs — 25 per page, Google-style
+    // pager. Reset whenever the relevant filters narrow the list.
+    const PAGE_SIZE = 25;
+    const [purchasePage, setPurchasePage] = useState(0);
+    const [ticketPage,   setTicketPage]   = useState(0);
+    const [donationPage, setDonationPage] = useState(0);
     const [donationDateFrom, setDonationDateFrom] = useState('');
     const [donationDateTo, setDonationDateTo] = useState('');
     const [eventsFilter, setEventsFilter] = useState('upcoming');
@@ -55,6 +65,13 @@ export default function CustomerDashboard() {
         fetchEvents();
         fetchPurchases();
     }, [user?.userId]);
+
+    // Reset paginators when filters narrow the list. Prevents the user
+    // from landing on an empty page 3 after picking a date range that
+    // only contains a handful of rows.
+    useEffect(() => { setPurchasePage(0); }, [purchaseDateFrom, purchaseDateTo]);
+    useEffect(() => { setTicketPage(0);   }, [ticketDateFrom,   ticketDateTo,   ticketFilter]);
+    useEffect(() => { setDonationPage(0); }, [donationDateFrom, donationDateTo]);
 
     async function fetchProfile() {
         try {
@@ -80,6 +97,35 @@ export default function CustomerDashboard() {
         return req.every(k => p[k] && String(p[k]).trim() !== '');
     }
     const profileIncomplete = profile && !isProfileComplete(profile);
+
+    // Customer-facing numbering: DB primary keys are shared across the
+    // whole zoo (Ticket #32, Order #45) which leaks system state and looks
+    // confusing when the user's list jumps from #12 to #45. Instead, number
+    // each ticket / purchase within the customer's own history — oldest = 1,
+    // newest = N — so the list reads as a clean 1, 2, 3, ... sequence.
+    const ticketNumberByPK = useMemo(() => {
+        const sorted = tickets.slice().sort((a, b) => {
+            const ta = a.transactions?.transaction_date ? new Date(a.transactions.transaction_date).getTime() : 0;
+            const tb = b.transactions?.transaction_date ? new Date(b.transactions.transaction_date).getTime() : 0;
+            // Tiebreak on ticket_id so two tickets on the same transaction
+            // still get distinct numbers in a stable order.
+            return ta - tb || a.ticket_id - b.ticket_id;
+        });
+        const map = new Map();
+        sorted.forEach((t, i) => map.set(t.ticket_id, i + 1));
+        return map;
+    }, [tickets]);
+
+    const purchaseNumberByPK = useMemo(() => {
+        const sorted = purchases.slice().sort((a, b) => {
+            const ta = new Date(a.transaction_date).getTime();
+            const tb = new Date(b.transaction_date).getTime();
+            return ta - tb || a.transaction_id - b.transaction_id;
+        });
+        const map = new Map();
+        sorted.forEach((t, i) => map.set(t.transaction_id, i + 1));
+        return map;
+    }, [purchases]);
 
     async function fetchTickets() {
         try {
@@ -555,21 +601,30 @@ export default function CustomerDashboard() {
                                 Browse Tickets & Shop
                             </button>
                         </div>
-                    ) : (
+                    ) : (() => {
+                        // Compute once: what's visible *after* the date filter.
+                        // The total below sums this exact subset so it reflects
+                        // whatever the user is currently looking at.
+                        const filtered = purchases.filter(txn => {
+                            const d = new Date(txn.transaction_date);
+                            if (purchaseDateFrom && d < new Date(purchaseDateFrom + 'T00:00:00')) return false;
+                            if (purchaseDateTo && d > new Date(purchaseDateTo + 'T23:59:59')) return false;
+                            return true;
+                        });
+                        const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+                        const pageItems = filtered.slice(purchasePage * PAGE_SIZE, (purchasePage + 1) * PAGE_SIZE);
+                        const filteredTotalCents = filtered.reduce((sum, t) => sum + t.total_amount_cents, 0);
+                        const hasFilter = !!(purchaseDateFrom || purchaseDateTo);
+                        return (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                            {purchases.filter(txn => {
-                                const d = new Date(txn.transaction_date);
-                                if (purchaseDateFrom && d < new Date(purchaseDateFrom + 'T00:00:00')) return false;
-                                if (purchaseDateTo && d > new Date(purchaseDateTo + 'T23:59:59')) return false;
-                                return true;
-                            }).map(txn => {
+                            {pageItems.map(txn => {
                                 const lineItems = Array.isArray(txn.line_items) ? txn.line_items : (typeof txn.line_items === 'string' ? JSON.parse(txn.line_items || '[]') : []);
                                 return (
                                     <div key={txn.transaction_id} className="glass-panel" style={{ background: 'rgba(255, 245, 231, 0.65)', padding: '20px' }}>
                                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: lineItems.length > 0 ? '12px' : 0 }}>
                                             <div>
                                                 <h3 style={{ margin: '0 0 4px', fontSize: '1rem' }}>
-                                                    Order #{txn.transaction_id}
+                                                    Order #{purchaseNumberByPK.get(txn.transaction_id) || '—'}
                                                 </h3>
                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: 'var(--color-text)'}}>
                                                     <Clock size={12} />
@@ -612,14 +667,22 @@ export default function CustomerDashboard() {
                                     </div>
                                 );
                             })}
+                            <ZooPaginator
+                                page={purchasePage}
+                                totalPages={totalPages}
+                                onChange={setPurchasePage}
+                            />
                             <div style={{ background: 'rgba(0,0,0,0.05)', padding: '15px', borderRadius: '10px', textAlign: 'right' }}>
-                                <span style={{ color: 'var(--color-text-muted)', marginRight: '15px' }}>Total Spent:</span>
+                                <span style={{ color: 'var(--color-text-muted)', marginRight: '15px' }}>
+                                    {hasFilter ? 'Total in range' : 'Total Spent'}:
+                                </span>
                                 <span style={{ fontWeight: 'bold', fontSize: '20px', color: '#206718' }}>
-                                    ${(purchases.reduce((sum, t) => sum + t.total_amount_cents, 0) / 100).toFixed(2)}
+                                    ${(filteredTotalCents / 100).toFixed(2)}
                                 </span>
                             </div>
                         </div>
-                    )}
+                        );
+                    })()}
                 </div>
             )}
 
@@ -640,9 +703,20 @@ export default function CustomerDashboard() {
                             As a <strong style={{ textTransform: 'capitalize' }}>{profile.membership_type}</strong> member, you get free general admission and discounted rates on event tickets!
                         </div>
                     )}
-                    {/* Date Range Filter */}
+                    {/* Type pill filter (all / admission / events) + date range.
+                        Matches the StatusFilter style used everywhere else. */}
                     {tickets.length > 0 && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '15px', flexWrap: 'wrap' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '15px', flexWrap: 'wrap' }}>
+                            <StatusFilter
+                                label="Type"
+                                tabs={[
+                                    { key: 'all',       label: 'All'       },
+                                    { key: 'admission', label: 'Admission' },
+                                    { key: 'events',    label: 'Events'    },
+                                ]}
+                                value={ticketFilter}
+                                onChange={setTicketFilter}
+                            />
                             <span style={{ fontSize: '13px', color: 'var(--color-text-muted)' }}>Filter by date:</span>
                             <input type="date" className="glass-input" value={ticketDateFrom} onChange={e => setTicketDateFrom(e.target.value)} style={{ padding: '6px 10px', fontSize: '13px', width: 'auto' }} />
                             <span style={{ color: 'var(--color-text-muted)' }}>to</span>
@@ -706,7 +780,7 @@ export default function CustomerDashboard() {
                                                 ${(ticket.price_cents / 100).toFixed(2)}
                                             </p>
                                             <p style={{ fontSize: '11px', color: 'var(--color-text-muted)', margin: 0 }}>
-                                                Ticket #{ticket.ticket_id}
+                                                Ticket #{ticketNumberByPK.get(ticket.ticket_id) || '—'}
                                             </p>
                                         </div>
                                     </div>
@@ -767,7 +841,7 @@ export default function CustomerDashboard() {
                                                 ${(ticket.price_cents / 100).toFixed(2)}
                                             </p>
                                             <p style={{ fontSize: '11px', color: 'var(--color-text-muted)', margin: 0 }}>
-                                                Ticket #{ticket.ticket_id}
+                                                Ticket #{ticketNumberByPK.get(ticket.ticket_id) || '—'}
                                             </p>
                                         </div>
                                     </div>
@@ -775,32 +849,47 @@ export default function CustomerDashboard() {
                             );
                         };
 
+                        // Merge admission + events into a single stream, newest-first by
+                        // purchase date so the list reads like a chronological history.
+                        // The type pill narrows to one kind when the user picks it.
+                        const visible = (
+                            ticketFilter === 'admission' ? admissionTickets
+                          : ticketFilter === 'events'    ? eventTickets
+                          : [...admissionTickets, ...eventTickets]
+                        ).slice().sort((a, b) => {
+                            const ta = a.transactions?.transaction_date ? new Date(a.transactions.transaction_date).getTime() : 0;
+                            const tb = b.transactions?.transaction_date ? new Date(b.transactions.transaction_date).getTime() : 0;
+                            return tb - ta;
+                        });
+                        const renderAny = (t) => (t.type === 'event' && t.events) ? renderEvent(t) : renderAdmission(t);
+
+                        const totalPages = Math.max(1, Math.ceil(visible.length / PAGE_SIZE));
+                        const pageItems  = visible.slice(ticketPage * PAGE_SIZE, (ticketPage + 1) * PAGE_SIZE);
+                        // Total reflects the current filter view — date range,
+                        // type, and is exactly what "Total" visibly sums to.
+                        const visibleTotalCents = visible.reduce((sum, t) => sum + t.price_cents, 0);
+
                         return (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                                {admissionTickets.length > 0 && (
-                                    <div>
-                                        <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '0 0 10px', fontSize: '1rem', color: '#6d8243' }}>
-                                            <Ticket size={18} /> Admission Tickets ({admissionTickets.length})
-                                        </h3>
-                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                                            {admissionTickets.map(renderAdmission)}
-                                        </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                {visible.length === 0 ? (
+                                    <div className="glass-panel" style={{ background: 'rgba(255, 245, 231, 0.65)', padding: '30px', textAlign: 'center', color: 'var(--color-text-muted)' }}>
+                                        <Ticket size={36} style={{ marginBottom: '10px', opacity: 0.3 }} />
+                                        <p style={{ margin: 0 }}>
+                                            No {ticketFilter === 'admission' ? 'admission' : ticketFilter === 'events' ? 'event' : ''} tickets match this filter.
+                                        </p>
                                     </div>
-                                )}
-                                {eventTickets.length > 0 && (
-                                    <div>
-                                        <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '0 0 10px', fontSize: '1rem', color: '#fbbf24' }}>
-                                            <Calendar size={18} /> Event Tickets ({eventTickets.length})
-                                        </h3>
-                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                                            {eventTickets.map(renderEvent)}
-                                        </div>
-                                    </div>
-                                )}
-                                <div style={{ background: 'rgba(0,0,0,0.05)', padding: '15px', borderRadius: '10px', textAlign: 'right' }}>
-                                    <span style={{ color: 'var(--color-text-muted)', marginRight: '15px' }}>Total Spent:</span>
+                                ) : pageItems.map(renderAny)}
+                                <ZooPaginator
+                                    page={ticketPage}
+                                    totalPages={totalPages}
+                                    onChange={setTicketPage}
+                                />
+                                <div style={{ background: 'rgba(0,0,0,0.05)', padding: '15px', borderRadius: '10px', textAlign: 'right', marginTop: '8px' }}>
+                                    <span style={{ color: 'var(--color-text-muted)', marginRight: '15px' }}>
+                                        {ticketFilter === 'all' ? 'Total Spent' : ticketFilter === 'admission' ? 'Admission Spent' : 'Events Spent'}:
+                                    </span>
                                     <span style={{ fontWeight: 'bold', fontSize: '20px', color: '#6d8243' }}>
-                                        ${(inRange.reduce((sum, t) => sum + t.price_cents, 0) / 100).toFixed(2)}
+                                        ${(visibleTotalCents / 100).toFixed(2)}
                                     </span>
                                 </div>
                             </div>
@@ -841,15 +930,21 @@ export default function CustomerDashboard() {
                                 Donate Now
                             </button>
                         </div>
-                    ) : (
+                    ) : (() => {
+                        const filtered = donations.filter(donation => {
+                            const d = donation.donation_date ? new Date(donation.donation_date) : null;
+                            if (!d) return true;
+                            if (donationDateFrom && d < new Date(donationDateFrom + 'T00:00:00')) return false;
+                            if (donationDateTo && d > new Date(donationDateTo + 'T23:59:59')) return false;
+                            return true;
+                        });
+                        const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+                        const pageItems  = filtered.slice(donationPage * PAGE_SIZE, (donationPage + 1) * PAGE_SIZE);
+                        const filteredTotalCents = filtered.reduce((sum, d) => sum + d.amount_cents, 0);
+                        const hasFilter = !!(donationDateFrom || donationDateTo);
+                        return (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                            {donations.filter(donation => {
-                                const d = donation.donation_date ? new Date(donation.donation_date) : null;
-                                if (!d) return true;
-                                if (donationDateFrom && d < new Date(donationDateFrom + 'T00:00:00')) return false;
-                                if (donationDateTo && d > new Date(donationDateTo + 'T23:59:59')) return false;
-                                return true;
-                            }).map(donation => (
+                            {pageItems.map(donation => (
                                 <div key={donation.donation_id} className="glass-panel" style={{ background: 'rgba(255, 245, 231, 0.65)', padding: '20px' }}>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
@@ -876,14 +971,22 @@ export default function CustomerDashboard() {
                                     </div>
                                 </div>
                             ))}
+                            <ZooPaginator
+                                page={donationPage}
+                                totalPages={totalPages}
+                                onChange={setDonationPage}
+                            />
                             <div style={{ background: 'rgba(0,0,0,0.05)', padding: '15px', borderRadius: '10px', textAlign: 'right' }}>
-                                <span style={{ color: 'var(--color-text-muted)', marginRight: '15px' }}>Total Donated:</span>
+                                <span style={{ color: 'var(--color-text-muted)', marginRight: '15px' }}>
+                                    {hasFilter ? 'Total in range' : 'Total Donated'}:
+                                </span>
                                 <span style={{ fontWeight: 'bold', fontSize: '20px', color: '#ef4444' }}>
-                                    ${(donations.reduce((sum, d) => sum + d.amount_cents, 0) / 100).toFixed(2)}
+                                    ${(filteredTotalCents / 100).toFixed(2)}
                                 </span>
                             </div>
                         </div>
-                    )}
+                        );
+                    })()}
                 </div>
             )}
 

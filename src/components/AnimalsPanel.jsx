@@ -192,7 +192,8 @@ export default function AnimalsPanel({ title = 'Animals', accentColor = 'var(--c
                 animal.species_binomial?.toLowerCase().includes(q) ||
                 (animal.zone_name || '').toLowerCase().includes(q)
             );
-        });
+        })
+        .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
 
     const STATUS_TABS = [
         { key: 'active',   label: 'Active' },

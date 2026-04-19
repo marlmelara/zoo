@@ -10,7 +10,7 @@ export default function CustomerLogin() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const navigate = useNavigate();
-  const { user, role, signIn } = useAuth();
+  const { user, role, signIn, signOut } = useAuth();
 
   // If already logged in as customer, redirect to dashboard
   useEffect(() => {
@@ -27,6 +27,10 @@ export default function CustomerLogin() {
       const { data } = await signIn(email, password);
 
       if (data?.user?.role !== 'customer') {
+        // signIn already persisted the token + user — tear it down before
+        // surfacing the error, otherwise the staff session stays active
+        // when they navigate away from this page.
+        await signOut();
         setError('This account is not a customer account. Please use the Staff Portal.');
         return;
       }

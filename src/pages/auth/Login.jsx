@@ -10,7 +10,7 @@ export default function Login() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const navigate = useNavigate();
-    const { user, role, signIn } = useAuth();
+    const { user, role, signIn, signOut } = useAuth();
 
     // If already logged in as staff, redirect to dashboard
     useEffect(() => {
@@ -27,6 +27,11 @@ export default function Login() {
             const { data } = await signIn(email, password);
 
             if (data?.user?.role === 'customer') {
+                // signIn already set the token + localStorage + context state,
+                // so the session is live. Tear it down before surfacing the
+                // error — otherwise going Home and returning finds the user
+                // silently logged in as a customer on the wrong portal.
+                await signOut();
                 setError('This account is not a staff account. Please use the Customer Login.');
                 return;
             }

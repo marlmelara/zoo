@@ -324,7 +324,8 @@ export default function Events() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '20px' }}>
         <h1 style={{ margin: 0 }}>Events</h1>
         <div style={{ display: 'flex', gap: '10px' }}>
-          <button className="glass-button" onClick={() => setShowCreate(true)} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <button className="glass-button" onClick={() => setShowCreate(true)}
+            style={{ background: 'rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', gap: '6px' }}>
             <Plus size={16} /> Create Event
           </button>
           {manageMode ? (

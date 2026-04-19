@@ -81,12 +81,9 @@ export default function AnimalGallery() {
 
   const zones = ['All Zones', 'World of Primates', 'Elephants of Asia', 'Big Cat Zone', 'Reptile Lair', 'Animals of Africa', "Children's Zoo", 'Birds of the World', 'Galapagos Islands'];
 
-  const filteredAnimals = (selectedZone === 'All Zones'
+  const filteredAnimals = selectedZone === 'All Zones'
     ? animals
-    : animals.filter(animal => animal.zone === selectedZone)
-  ).filter(animal =>
-    dbAnimals.some(a => a.species_common_name === animal.name && a.is_active === 1)
-  );
+    : animals.filter(animal => animal.zone === selectedZone);
 
   return (
     <main className="animals-page">

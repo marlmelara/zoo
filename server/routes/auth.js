@@ -80,6 +80,16 @@ router.post('/signup', async (req, res) => {
 
         await conn.commit();
 
+        // Stamp a 'customer_created' lifecycle entry outside the transaction —
+        // a failure here shouldn't roll back the signup. Best-effort only.
+        try {
+            await db.query(
+                `INSERT INTO activity_log (action_type, description, performed_by, target_type, target_id)
+                 VALUES ('customer_created', ?, NULL, 'customer', ?)`,
+                [`${firstName} ${lastName} signed up`, custResult.insertId]
+            );
+        } catch { /* audit failure is non-fatal */ }
+
         const token = signToken({
             userId,
             customerId: custResult.insertId,

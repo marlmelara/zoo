@@ -22,6 +22,7 @@ const ACTION_STYLE = {
     employee_created:      { label: 'Activated',   color: '#10b981', Icon: UserCheck },
     employee_reactivated:  { label: 'Reactivated', color: '#10b981', Icon: UserCheck },
     employee_deactivated:  { label: 'Deactivated', color: '#b91c1c', Icon: UserX },
+    customer_created:      { label: 'Signed up',   color: '#10b981', Icon: UserCheck },
     customer_reactivated:  { label: 'Reactivated', color: '#10b981', Icon: UserCheck },
     customer_deactivated:  { label: 'Deactivated', color: '#b91c1c', Icon: UserX },
     animal_added:          { label: 'Arrived',     color: '#10b981', Icon: LogIn },

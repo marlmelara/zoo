@@ -308,39 +308,48 @@ export default function VetDashboard() {
                                 <button
                                     className="glass-button"
                                     onClick={() => setShowHistoryForm(true)}
-                                    style={{ width: '100%', marginBottom: '20px', background: 'rgba(255,255,255,0.05)' }}
+                                    style={{ width: '100%', marginBottom: '20px', background: 'rgba(121,162,128,0.18)', color: 'rgb(102, 122, 66)', fontWeight: 600 }}
                                 >
                                     <Plus size={16} style={{ marginRight: '5px' }} />
                                     Add Medical Entry
                                 </button>
                             ) : (
-                                <form onSubmit={handleHistorySubmit} style={{ marginBottom: '30px', background: 'rgba(255,255,255,0.05)', padding: '20px', borderRadius: '10px' }}>
-                                    <h4 style={{ marginTop: 0 }}>New Entry</h4>
-                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
+                                <form onSubmit={handleHistorySubmit} style={{
+                                    marginBottom: '24px',
+                                    background: 'rgba(255, 245, 231, 0.78)',
+                                    border: '1px solid rgba(121,162,128,0.25)',
+                                    padding: '18px', borderRadius: '10px',
+                                }}>
+                                    <h4 style={{ marginTop: 0, color: 'rgb(102, 122, 66)' }}>New Entry</h4>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                                         <input placeholder="Injury (optional)" className="glass-input" value={historyForm.injury} onChange={e => setHistoryForm({ ...historyForm, injury: e.target.value })} />
                                         <input placeholder="Disease (optional)" className="glass-input" value={historyForm.disease} onChange={e => setHistoryForm({ ...historyForm, disease: e.target.value })} />
                                         <input type="date" required className="glass-input" value={historyForm.date_treated} onChange={e => setHistoryForm({ ...historyForm, date_treated: e.target.value })} />
                                         <input type="number" placeholder="Age at Treatment" required className="glass-input" value={historyForm.animal_age_at_treatment} onChange={e => setHistoryForm({ ...historyForm, animal_age_at_treatment: e.target.value })} />
                                     </div>
-                                    <div style={{ display: 'flex', gap: '10px', marginTop: '15px' }}>
-                                        <button type="submit" className="glass-button" style={{ background: 'var(--color-primary)', flex: 1 }}>Save</button>
+                                    <div style={{ display: 'flex', gap: '10px', marginTop: '14px' }}>
+                                        <button type="submit" className="glass-button" style={{ background: 'rgb(123, 144, 79)', color: 'white', flex: 1, fontWeight: 700 }}>Save</button>
                                         <button type="button" className="glass-button" onClick={() => setShowHistoryForm(false)} style={{ flex: 1 }}>Cancel</button>
                                     </div>
                                 </form>
                             )}
 
-                            {historyLoading ? <p>Loading records...</p> : (
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                            {historyLoading ? <p style={{ color: 'rgb(102, 122, 66)' }}>Loading records...</p> : (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                                     {medicalHistory.length === 0 ? (
-                                        <p style={{ color: 'var(--color-text-muted)', textAlign: 'center' }}>No medical history found.</p>
+                                        <p style={{ color: 'var(--color-text-muted)', textAlign: 'center', fontStyle: 'italic' }}>No medical history found.</p>
                                     ) : medicalHistory.map(record => (
-                                        <div key={record.history_id} style={{ background: 'rgba(255,255,255,0.05)', padding: '15px', borderRadius: '10px' }}>
-                                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}>
-                                                <span style={{ fontWeight: 'bold' }}>{new Date(record.date_treated).toLocaleDateString()}</span>
-                                                <span style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>Age: {record.animal_age_at_treatment}</span>
+                                        <div key={record.history_id} style={{
+                                            background: 'rgba(255, 245, 231, 0.78)',
+                                            border: '1px solid rgba(121,162,128,0.25)',
+                                            padding: '14px', borderRadius: '10px',
+                                        }}>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                                                <span style={{ fontWeight: 700, color: 'rgb(102, 122, 66)' }}>{new Date(record.date_treated).toLocaleDateString()}</span>
+                                                <span style={{ fontSize: '12px', color: 'rgb(102, 122, 66)', opacity: 0.8 }}>Age: {record.animal_age_at_treatment}</span>
                                             </div>
-                                            {record.disease && <p style={{ margin: '5px 0', color: 'var(--color-primary)' }}>Disease: {record.disease}</p>}
-                                            {record.injury && <p style={{ margin: '5px 0', color: 'orange' }}>Injury: {record.injury}</p>}
+                                            {record.disease && <p style={{ margin: '4px 0', color: 'var(--color-text-dark)' }}><strong style={{ color: 'rgb(102, 122, 66)' }}>Disease:</strong> {record.disease}</p>}
+                                            {record.injury && <p style={{ margin: '4px 0', color: 'var(--color-text-dark)' }}><strong style={{ color: '#b45309' }}>Injury:</strong> {record.injury}</p>}
                                         </div>
                                     ))}
                                 </div>

@@ -201,18 +201,8 @@ export default function Staff() {
 
     return (
         <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '20px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '20px', flex: 1 }}>
-                    <h1 style={{ margin: 0 }}>Staff Management</h1>
-                    <input
-                        type="text"
-                        placeholder="Search staff..."
-                        className="glass-input"
-                        style={{ maxWidth: '300px' }}
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                    />
-                </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '14px' }}>
+                <h1 style={{ margin: 0 }}>Staff Management</h1>
                 {(role === 'admin' || role === 'manager') && (
                     <div style={{ display: 'flex', gap: '10px' }}>
                         <button
@@ -238,6 +228,17 @@ export default function Staff() {
                     </div>
                 )}
             </div>
+
+            {/* Search sits below the heading to match Animals + Manager
+                panels — same pattern across every list view. */}
+            <input
+                type="text"
+                placeholder="Search by name or department..."
+                className="glass-input"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                style={{ maxWidth: '440px', marginBottom: '14px', display: 'block' }}
+            />
 
             <div style={{ marginBottom: '20px', display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
                 <StatusFilter
@@ -390,9 +391,10 @@ export default function Staff() {
                                     )}
                                 </div>
 
-                                {/* Lifecycle log button — always visible, always admin-clickable */}
+                                {/* Log button at the bottom of the card, flush left, same
+                                    treatment as Animals' 3-button row — just a single pill here. */}
                                 {canManage && (
-                                    <div style={{ marginTop: '12px', borderTop: '1px dashed rgba(121,162,128,0.3)', paddingTop: '10px', display: 'flex', justifyContent: 'flex-end' }}>
+                                    <div style={{ marginTop: '15px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                                         <LifecycleLogButton
                                             compact
                                             onClick={(e) => {

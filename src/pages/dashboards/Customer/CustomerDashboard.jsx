@@ -980,37 +980,81 @@ export default function CustomerDashboard() {
                                                     </p>
                                                 )}
                                             </div>
-                                            <div style={{ textAlign: 'right', fontSize: '13px', flexShrink: 0, marginLeft: '12px' }}>
-                                                {!isPast && event.max_capacity && (
-                                                    <p style={{ margin: '0 0 8px', color: 'var(--color-text-muted)' }}>
-                                                        {event.max_capacity - (event.actual_attendance || 0)} spots left
-                                                    </p>
-                                                )}
-                                                {isPast && event.actual_attendance != null && (
-                                                    <p style={{ margin: '0 0 8px', color: 'var(--color-text-muted)' }}>
-                                                        {event.actual_attendance} attended
-                                                    </p>
-                                                )}
-                                                {!isPast && event.ticket_price_cents > 0 && (
-                                                    <button className="glass-button" onClick={() => {
-                                                        const cart = JSON.parse(localStorage.getItem('zooCart') || '{"admission":null,"events":{},"shop":{},"membership":null}');
-                                                        const eid = event.event_id;
-                                                        const existing = cart.events[eid];
-                                                        cart.events[eid] = {
-                                                            event_id: eid,
-                                                            title: event.title,
-                                                            date: eventDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }),
-                                                            venue: event.venue_name || null,
-                                                            price_cents: event.ticket_price_cents,
-                                                            quantity: existing ? existing.quantity + 1 : 1,
-                                                        };
-                                                        localStorage.setItem('zooCart', JSON.stringify(cart));
-                                                        navigate('/checkout');
-                                                    }} style={{ background: '#6d8243', padding: '6px 14px', fontSize: '0.8rem', color: 'white' }}>
-                                                        ${(event.ticket_price_cents / 100).toFixed(2)} — Add to Cart
-                                                    </button>
-                                                )}
-                                            </div>
+                                            {/* Capacity guard — mirrors /tickets so customers can't
+                                                stage a buy for an event that's sold out or overflow
+                                                past remaining spots. Server still does the atomic
+                                                check at checkout, but this stops the round-trip. */}
+                                            {(() => {
+                                                const cap = event.max_capacity;
+                                                const sold = event.actual_attendance || 0;
+                                                const currentCart = JSON.parse(localStorage.getItem('zooCart') || '{"admission":null,"events":{},"shop":{},"membership":null}');
+                                                const inCartQty = currentCart.events?.[event.event_id]?.quantity || 0;
+                                                const remaining = cap == null ? Infinity : Math.max(0, cap - sold);
+                                                const soldOut = cap != null && remaining <= 0;
+                                                const canAdd = remaining - inCartQty > 0;
+                                                return (
+                                                    <div style={{ textAlign: 'right', fontSize: '13px', flexShrink: 0, marginLeft: '12px' }}>
+                                                        {!isPast && cap != null && (
+                                                            <p style={{
+                                                                margin: '0 0 8px',
+                                                                color: soldOut ? '#b91c1c' : remaining <= 10 ? '#b45309' : 'var(--color-text-muted)',
+                                                                fontWeight: soldOut || remaining <= 10 ? 600 : 500,
+                                                            }}>
+                                                                {soldOut ? 'Sold out' : `${remaining} spots left`}
+                                                            </p>
+                                                        )}
+                                                        {isPast && event.actual_attendance != null && (
+                                                            <p style={{ margin: '0 0 8px', color: 'var(--color-text-muted)' }}>
+                                                                {event.actual_attendance} attended
+                                                            </p>
+                                                        )}
+                                                        {!isPast && event.ticket_price_cents > 0 && (
+                                                            soldOut ? (
+                                                                <span style={{
+                                                                    display: 'inline-block',
+                                                                    fontWeight: 700, fontSize: '0.8rem',
+                                                                    padding: '6px 14px', borderRadius: '8px',
+                                                                    background: 'rgba(239,68,68,0.15)', color: '#b91c1c',
+                                                                    border: '1px solid rgba(239,68,68,0.3)',
+                                                                }}>
+                                                                    Sold Out
+                                                                </span>
+                                                            ) : (
+                                                                <button
+                                                                    className="glass-button"
+                                                                    disabled={!canAdd}
+                                                                    title={!canAdd ? `Only ${remaining} seat${remaining === 1 ? '' : 's'} available and you already have ${inCartQty} in your cart` : ''}
+                                                                    onClick={() => {
+                                                                        if (!canAdd) return;
+                                                                        const cart = JSON.parse(localStorage.getItem('zooCart') || '{"admission":null,"events":{},"shop":{},"membership":null}');
+                                                                        const eid = event.event_id;
+                                                                        const existing = cart.events[eid];
+                                                                        cart.events[eid] = {
+                                                                            event_id: eid,
+                                                                            title: event.title,
+                                                                            date: eventDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }),
+                                                                            venue: event.venue_name || null,
+                                                                            price_cents: event.ticket_price_cents,
+                                                                            quantity: existing ? existing.quantity + 1 : 1,
+                                                                            max_capacity: cap,
+                                                                            actual_attendance: sold,
+                                                                        };
+                                                                        localStorage.setItem('zooCart', JSON.stringify(cart));
+                                                                        navigate('/checkout');
+                                                                    }}
+                                                                    style={{
+                                                                        background: canAdd ? '#6d8243' : 'rgba(109,130,67,0.4)',
+                                                                        padding: '6px 14px', fontSize: '0.8rem', color: 'white',
+                                                                        cursor: canAdd ? 'pointer' : 'not-allowed',
+                                                                    }}
+                                                                >
+                                                                    ${(event.ticket_price_cents / 100).toFixed(2)} — Add to Cart
+                                                                </button>
+                                                            )
+                                                        )}
+                                                    </div>
+                                                );
+                                            })()}
                                         </div>
                                     </div>
                                 );

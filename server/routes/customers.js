@@ -171,7 +171,7 @@ router.get('/:id/lifecycle-log', requireRole('admin', 'manager'), async (req, re
                LEFT JOIN employees e ON e.employee_id = al.performed_by
               WHERE al.target_type = 'customer'
                 AND al.target_id   = ?
-                AND al.action_type IN ('customer_deactivated','customer_reactivated')
+                AND al.action_type IN ('customer_created','customer_deactivated','customer_reactivated')
               ORDER BY al.created_at DESC`,
             [req.params.id]
         );

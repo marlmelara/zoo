@@ -44,6 +44,7 @@ export default function AnimalsPanel({ title = 'Animals', accentColor = 'var(--c
     });
 
     const [searchTerm, setSearchTerm] = useState('');
+    const [zoneFilter, setZoneFilter] = useState('all');
     const [logTarget, setLogTarget]   = useState(null);
 
     useEffect(() => {
@@ -181,11 +182,17 @@ export default function AnimalsPanel({ title = 'Animals', accentColor = 'var(--c
         fetchAnimals();
     }
 
-    const filteredAnimals = animals.filter(animal =>
-        animal.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        animal.species_common_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        animal.species_binomial?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const filteredAnimals = animals
+        .filter(a => zoneFilter === 'all' || String(a.zone_id) === String(zoneFilter))
+        .filter(animal => {
+            const q = searchTerm.toLowerCase();
+            return (
+                animal.name.toLowerCase().includes(q) ||
+                animal.species_common_name.toLowerCase().includes(q) ||
+                animal.species_binomial?.toLowerCase().includes(q) ||
+                (animal.zone_name || '').toLowerCase().includes(q)
+            );
+        });
 
     const STATUS_TABS = [
         { key: 'active',   label: 'Active' },
@@ -195,18 +202,8 @@ export default function AnimalsPanel({ title = 'Animals', accentColor = 'var(--c
 
     return (
         <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '20px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '20px', flex: 1 }}>
-                    <h1 style={{ margin: 0 }}>{title}</h1>
-                    <input
-                        type="text"
-                        placeholder="Search animals..."
-                        className="glass-input"
-                        style={{ maxWidth: '300px' }}
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                    />
-                </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '14px' }}>
+                <h1 style={{ margin: 0 }}>{title}</h1>
                 <div style={{ display: 'flex', gap: '10px' }}>
                     <button
                         className="glass-button"
@@ -229,12 +226,32 @@ export default function AnimalsPanel({ title = 'Animals', accentColor = 'var(--c
                 </div>
             </div>
 
-            <div style={{ marginBottom: '20px' }}>
+            {/* Search sits below the heading so it matches every other
+                list view (Manager's Animal Assignments, My Staff, Events). */}
+            <input
+                type="text"
+                placeholder="Search by name, species, or zone..."
+                className="glass-input"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                style={{ maxWidth: '440px', marginBottom: '14px', display: 'block' }}
+            />
+
+            <div style={{ marginBottom: '20px', display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
                 <StatusFilter
                     label="Status"
                     tabs={STATUS_TABS}
                     value={statusFilter}
                     onChange={setStatusFilter}
+                />
+                <StatusFilter
+                    label="Zone"
+                    tabs={[
+                        { key: 'all', label: 'All' },
+                        ...zones.map(z => ({ key: String(z.zone_id), label: z.zone_name })),
+                    ]}
+                    value={zoneFilter}
+                    onChange={setZoneFilter}
                 />
             </div>
 
@@ -403,55 +420,76 @@ export default function AnimalsPanel({ title = 'Animals', accentColor = 'var(--c
             {selectedAnimal && createPortal((
                 <div style={{
                     position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-                    background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(5px)',
+                    background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)',
                     display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
                 }} onClick={() => setSelectedAnimal(null)}>
-                    <div onClick={e => e.stopPropagation()} className="glass-panel" style={{ width: '600px', maxWidth: '90vw', maxHeight: '80vh', overflowY: 'auto', padding: '30px', background: '#0f172a', border: '1px solid var(--glass-border)' }}>
+                    <div onClick={e => e.stopPropagation()} style={{
+                        width: '600px', maxWidth: '90vw', maxHeight: '85vh', overflowY: 'auto',
+                        padding: '28px', background: 'rgba(255,255,255,0.98)',
+                        border: `1px solid ${GREEN}`, borderRadius: '14px',
+                        boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+                    }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                <Activity color="var(--color-accent)" />
-                                <h2 style={{ margin: 0 }}>Medical History: {selectedAnimal.name}</h2>
+                                <Activity color={GREEN_DARK} size={20} />
+                                <h2 style={{ margin: 0, color: GREEN_DARK, fontSize: '20px' }}>
+                                    Medical History: {selectedAnimal.name}
+                                </h2>
                             </div>
-                            <button onClick={() => setSelectedAnimal(null)} style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer' }}><X /></button>
+                            <button onClick={() => setSelectedAnimal(null)} style={{ background: 'none', border: 'none', color: GREEN_DARK, cursor: 'pointer' }}><X size={20} /></button>
                         </div>
 
                         {!showHistoryForm ? (
                             <button
                                 className="glass-button"
                                 onClick={() => setShowHistoryForm(true)}
-                                style={{ width: '100%', marginBottom: '20px', background: 'rgba(255,255,255,0.05)' }}
+                                style={{
+                                    width: '100%', marginBottom: '20px',
+                                    background: 'rgba(121,162,128,0.18)', color: GREEN_DARK,
+                                    fontWeight: 600,
+                                }}
                             >
                                 + Add Medical Entry
                             </button>
                         ) : (
-                            <form onSubmit={handleHistorySubmit} style={{ marginBottom: '30px', background: 'rgba(255,255,255,0.05)', padding: '20px', borderRadius: '10px' }}>
-                                <h4 style={{ marginTop: 0 }}>New Entry</h4>
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
-                                    <input placeholder="Injury (Optional)" className="glass-input" value={historyForm.injury} onChange={e => setHistoryForm({ ...historyForm, injury: e.target.value })} />
-                                    <input placeholder="Disease (Optional)" className="glass-input" value={historyForm.disease} onChange={e => setHistoryForm({ ...historyForm, disease: e.target.value })} />
+                            <form onSubmit={handleHistorySubmit} style={{
+                                marginBottom: '24px',
+                                background: 'rgba(255, 245, 231, 0.78)',
+                                border: '1px solid rgba(121,162,128,0.25)',
+                                padding: '18px', borderRadius: '10px',
+                            }}>
+                                <h4 style={{ marginTop: 0, color: GREEN_DARK }}>New Entry</h4>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                                    <input placeholder="Injury (optional)" className="glass-input" value={historyForm.injury} onChange={e => setHistoryForm({ ...historyForm, injury: e.target.value })} />
+                                    <input placeholder="Disease (optional)" className="glass-input" value={historyForm.disease} onChange={e => setHistoryForm({ ...historyForm, disease: e.target.value })} />
                                     <input type="date" required className="glass-input" value={historyForm.date_treated} onChange={e => setHistoryForm({ ...historyForm, date_treated: e.target.value })} />
-                                    <input type="number" placeholder="Age at Treatment" required className="glass-input" value={historyForm.animal_age_at_treatment} onChange={e => setHistoryForm({ ...historyForm, animal_age_at_treatment: e.target.value })} />
+                                    <input type="number" placeholder="Age at treatment" required className="glass-input" value={historyForm.animal_age_at_treatment} onChange={e => setHistoryForm({ ...historyForm, animal_age_at_treatment: e.target.value })} />
                                 </div>
-                                <div style={{ display: 'flex', gap: '10px', marginTop: '15px' }}>
-                                    <button type="submit" className="glass-button" style={{ background: accentColor, flex: 1 }}>Save</button>
+                                <div style={{ display: 'flex', gap: '10px', marginTop: '14px' }}>
+                                    <button type="submit" className="glass-button" style={{ background: GREEN, color: 'white', flex: 1, fontWeight: 700 }}>Save</button>
                                     <button type="button" className="glass-button" onClick={() => setShowHistoryForm(false)} style={{ flex: 1 }}>Cancel</button>
                                 </div>
                             </form>
                         )}
 
-                        {historyLoading ? <p>Loading records...</p> : (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-                                {medicalHistory.length === 0 ? <p style={{ color: 'var(--color-text-muted)', textAlign: 'center' }}>No medical history found.</p> :
-                                    medicalHistory.map(record => (
-                                        <div key={record.history_id} style={{ background: 'rgba(255,255,255,0.05)', padding: '15px', borderRadius: '10px' }}>
-                                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}>
-                                                <span style={{ fontWeight: 'bold' }}>{new Date(record.date_treated).toLocaleDateString()}</span>
-                                                <span style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>Age: {record.animal_age_at_treatment}</span>
-                                            </div>
-                                            <p style={{ margin: '5px 0', color: 'var(--color-primary)' }}>{record.disease ? `Disease: ${record.disease} ` : ''}</p>
-                                            <p style={{ margin: '5px 0', color: 'orange' }}>{record.injury ? `Injury: ${record.injury} ` : ''}</p>
+                        {historyLoading ? <p style={{ color: GREEN_DARK }}>Loading records...</p> : (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                {medicalHistory.length === 0 ? (
+                                    <p style={{ color: 'var(--color-text-muted)', textAlign: 'center', fontStyle: 'italic' }}>No medical history found.</p>
+                                ) : medicalHistory.map(record => (
+                                    <div key={record.history_id} style={{
+                                        background: 'rgba(255, 245, 231, 0.78)',
+                                        border: '1px solid rgba(121,162,128,0.25)',
+                                        padding: '14px', borderRadius: '10px',
+                                    }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                                            <span style={{ fontWeight: 700, color: GREEN_DARK }}>{new Date(record.date_treated).toLocaleDateString()}</span>
+                                            <span style={{ fontSize: '12px', color: GREEN_DARK, opacity: 0.8 }}>Age: {record.animal_age_at_treatment}</span>
                                         </div>
-                                    ))
+                                        {record.disease && <p style={{ margin: '4px 0', color: 'var(--color-text-dark)' }}><strong style={{ color: GREEN_DARK }}>Disease:</strong> {record.disease}</p>}
+                                        {record.injury && <p style={{ margin: '4px 0', color: 'var(--color-text-dark)' }}><strong style={{ color: '#b45309' }}>Injury:</strong> {record.injury}</p>}
+                                    </div>
+                                ))
                                 }
                             </div>
                         )}

@@ -9,12 +9,15 @@ import logo from '../../../images/logo.png';
 
 // Import React Icons
 import { FaClock, FaTicketAlt, FaMap, FaMapMarkerAlt, FaPhone, FaEnvelope, FaArrowRight, FaUserCircle, FaSignOutAlt } from 'react-icons/fa';
+import { MdOutlinePets } from "react-icons/md";
+
 
 // Import Swiper styles
 import 'swiper/css';
 import 'swiper/css/pagination';
 import 'swiper/css/navigation';
 import 'swiper/css/effect-fade';
+import Navbar from '../../../components/Navbar';
 
 export default function Home() {
   document.title = 'Welcome to Coog Zoo!';
@@ -203,33 +206,7 @@ export default function Home() {
   return (
     <div className="home">
       {/* Navigation Bar */}
-      <nav className="navbar">
-        <div className="navbar-container">
-          <Link to="/" className="navbar-logo-link" aria-label="Go to homepage">
-            <img src={logo} alt="Coog Zoo" />
-          </Link>
-          <div className="navbar-links">
-            <Link to="/tickets" className="navbar-link">Buy Tickets</Link>
-            <Link to="/shop" className="navbar-link">Shop</Link>
-            <Link to="/membership" className="navbar-link">Membership</Link>
-            {user ? (
-              <>
-                <Link to={dashboardPath} className="navbar-link user-dashboard-link">
-                  <FaUserCircle className="user-icon" /> Dashboard
-                </Link>
-                <button onClick={handleLogout} className="navbar-link logout-btn">
-                  <FaSignOutAlt className="user-icon" /> Logout
-                </button>
-              </>
-            ) : (
-              <>
-                <Link to="/account" className="navbar-link">Customer Login</Link>
-                <Link to="/login" className="navbar-link">Staff Portal</Link>
-              </>
-            )}
-          </div>
-        </div>
-      </nav>
+      <Navbar />
       {/* Welcome Section */}
       <section className="welcome-section">
         <div className="container">
@@ -289,12 +266,17 @@ export default function Home() {
             <a href="/tickets" className="info-card">
               <FaTicketAlt className="info-icon" size={50} />
               <p className="info-label">Buy Tickets</p>
-              <p className="info-value">Admission</p>
+              <p className="info-value">Get Yours</p>
             </a>
             <a href="/map" className="info-card">
               <FaMap className="info-icon" size={50} />
               <p className="info-label">Zoo Map</p>
               <p className="info-value">View Map</p>
+            </a>
+            <a href="animals" className="info-card">
+              <MdOutlinePets className="info-icon" size={50} />
+              <p className="info-label">Our Animals</p>
+              <p className="info-value">Meet The Crew</p>
             </a>
           </div>
         </div>

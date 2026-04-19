@@ -50,12 +50,13 @@ export default function Navbar() {
     if (path === '/reset-password') return 'Reset Password';
     if (path.includes('/checkout')) return 'Checkout';
     if (path.includes('/donations')) return 'Donations';
-    if (path === '/calendar') return 'Events Calendar';
+    if (path === '/calendar') return 'Events';
     if (path === '/map') return 'Zoo Map';
-    if (path === '/calendar') return 'Events Calendar';
-    if (path === '/schedule') return 'Schedule of The Day';
+    if (path === '/schedule') return 'Schedule';
     if (path === '/shop/gifts') return 'Gift Shop';
     if (path === '/shop/food') return 'Food & Snacks';
+    if (path === '/animals') return 'Meet The Crew';
+
     return '';
   };
 
@@ -92,7 +93,9 @@ export default function Navbar() {
           {location.pathname !== '/membership' && (
             <Link to="/membership" className="navbar-link">Membership</Link>
           )}
-
+          {location.pathname !== '/map' && (
+            <Link to="/map" className="navbar-link">Zoo Map</Link>
+          )}
           {/*
           and here <--
           and the linw below this

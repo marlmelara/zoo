@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import api from '../../../../lib/api';
 import { useAuth } from '../../../../contexts/AuthContext';
-import { User, Stethoscope, Briefcase, Shield, Trash2, PawPrint, ShoppingBag, Pencil, X } from 'lucide-react';
+import { User, Stethoscope, Briefcase, Shield, Trash2, PawPrint, ShoppingBag, X } from 'lucide-react';
 import { StatusFilter } from '../../../../components/AnimalsPanel';
 
 const GREEN      = 'rgb(123, 144, 79)';
@@ -276,18 +276,27 @@ export default function Staff() {
                         const inactive = person.is_active === 0;
                         const selectable = manageMode && !inactive;
                         const checked = selected.has(person.employee_id);
+                        // Click anywhere on the card to edit (matches Events).
+                        // In manage mode, clicks toggle selection instead.
+                        const canEditCard = canManage && !manageMode && !inactive;
+                        const handleCardClick = () => {
+                            if (selectable) toggleSelect(person.employee_id);
+                            else if (canEditCard) startEdit(person);
+                        };
                         return (
                             <div
                                 key={person.employee_id}
                                 className="glass-panel"
-                                onClick={() => selectable && toggleSelect(person.employee_id)}
+                                onClick={handleCardClick}
                                 style={{
                                     padding: '20px', position: 'relative',
                                     opacity: inactive ? 0.55 : 1,
-                                    cursor: selectable ? 'pointer' : 'default',
+                                    cursor: (selectable || canEditCard) ? 'pointer' : 'default',
                                     outline: checked ? '2px solid #ef4444' : 'none',
-                                    transition: 'outline 120ms',
+                                    transition: 'outline 120ms, transform 150ms',
                                 }}
+                                onMouseEnter={e => { if (canEditCard) e.currentTarget.style.transform = 'translateY(-2px)'; }}
+                                onMouseLeave={e => { e.currentTarget.style.transform = 'none'; }}
                             >
                                 {manageMode && !inactive && (
                                     <input
@@ -340,20 +349,6 @@ export default function Staff() {
                                     )}
                                 </div>
 
-                                {canManage && !manageMode && !inactive && (
-                                    <button onClick={(e) => { e.stopPropagation(); startEdit(person); }}
-                                        title="Edit staff member"
-                                        style={{
-                                            marginTop: '12px', width: '100%',
-                                            padding: '8px 12px', fontSize: '12px', fontWeight: 600,
-                                            background: 'rgba(121,162,128,0.18)', color: GREEN_DARK,
-                                            border: '1px solid rgba(121,162,128,0.35)',
-                                            borderRadius: '8px', cursor: 'pointer',
-                                            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
-                                        }}>
-                                        <Pencil size={12} /> Edit
-                                    </button>
-                                )}
                             </div>
                         );
                     })}

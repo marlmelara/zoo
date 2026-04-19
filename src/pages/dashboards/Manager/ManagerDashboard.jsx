@@ -69,7 +69,7 @@ export default function ManagerDashboard() {
     const [logTo,     setLogTo]     = useState('');
     const [eventFrom, setEventFrom] = useState('');
     const [eventTo,   setEventTo]   = useState('');
-    const [eventWhen, setEventWhen] = useState('all'); // all | upcoming | past
+    const [eventWhen, setEventWhen] = useState('upcoming'); // all | upcoming | past — default to upcoming so the soonest events are front-and-center for assignment
 
     // Staff state
     const [staff, setStaff] = useState([]);

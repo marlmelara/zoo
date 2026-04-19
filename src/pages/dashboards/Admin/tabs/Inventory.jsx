@@ -365,7 +365,7 @@ export default function Inventory() {
                         <button
                             className="glass-button"
                             onClick={() => setShowAddForm(v => !v)}
-                            style={{ background: showAddForm ? 'var(--color-accent)' : 'rgba(255,255,255,0.1)' }}
+                            style={{ background: showAddForm ? 'rgba(239, 68, 68, 0.18)' : 'rgba(255,255,255,0.1)' }}
                         >
                             {showAddForm ? 'Cancel' : '+ Add Item'}
                         </button>

@@ -17,7 +17,17 @@ export default function FoodShop() {
 
   document.title = 'Food - Coog Zoo';
 
-  useEffect(() => { getShopItems(2).then(setItems); }, []);
+  // Pull shop items on mount and then poll every 15s so stock counts stay
+  // roughly live. Server does the authoritative atomic check at checkout.
+  useEffect(() => {
+    let cancelled = false;
+    const load = () => getShopItems(2)
+      .then(data => { if (!cancelled) setItems(data); })
+      .catch(console.error);
+    load();
+    const id = setInterval(load, 15_000);
+    return () => { cancelled = true; clearInterval(id); };
+  }, []);
 
   return (
     <div className="shop-page shop-page--food" style={{ '--silhouette-img': `url(${hotdogImg})` }}>

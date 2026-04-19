@@ -331,7 +331,7 @@ export default function GenEmployeeDashboard() {
                         <button
                             className="glass-button"
                             onClick={() => setShowRequestForm(!showRequestForm)}
-                            style={{ background: showRequestForm ? 'var(--color-accent)' : 'rgba(255,255,255,0.1)' }}
+                            style={{ background: showRequestForm ? 'rgba(239, 68, 68, 0.18)' : 'rgba(255,255,255,0.1)' }}
                         >
                             {showRequestForm ? 'Cancel' : '+ Request Restock'}
                         </button>

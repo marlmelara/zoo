@@ -16,7 +16,19 @@ export default function GiftShop() {
 
   document.title = 'Gift Shop - Coog Zoo';
 
-  useEffect(() => { getShopItems(1).then(setItems); }, []);
+  // Pull shop items on mount and then poll every 15s so stock counts stay
+  // roughly live (matches the Tickets page). The server does the
+  // authoritative atomic check at checkout — this is just to keep the UI
+  // honest for someone camped on the page.
+  useEffect(() => {
+    let cancelled = false;
+    const load = () => getShopItems(1)
+      .then(data => { if (!cancelled) setItems(data); })
+      .catch(console.error);
+    load();
+    const id = setInterval(load, 15_000);
+    return () => { cancelled = true; clearInterval(id); };
+  }, []);
 
   return (
     <div className="shop-page shop-page--gifts" style={{ '--silhouette-img': `url(${hotdogImg})` }}>

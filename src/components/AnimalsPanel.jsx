@@ -198,7 +198,7 @@ export default function AnimalsPanel({ title = 'Animals', accentColor = 'var(--c
                     <button
                         className="glass-button"
                         onClick={() => showForm ? cancelForm() : setShowForm(true)}
-                        style={{ background: showForm ? 'var(--color-accent)' : 'rgba(255,255,255,0.1)' }}
+                        style={{ background: showForm ? 'rgba(239, 68, 68, 0.18)' : 'rgba(255,255,255,0.1)' }}
                     >
                         {showForm ? 'Cancel' : '+ Add Animal'}
                     </button>

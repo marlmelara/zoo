@@ -62,10 +62,22 @@ export default function Tickets() {
   const [upcomingEvents, setUpcomingEvents] = useState([]);
   const [eventsLoading, setEventsLoading] = useState(true);
 
+  // Pull events on mount, then poll every 15s so attendance + sold-out
+  // status stay roughly live while the user is browsing. Server is still
+  // the source of truth at checkout (atomic capacity check), but this keeps
+  // the UI honest for anyone camped on the page.
   useEffect(() => {
-    getUpcomingEvents(20).then(events => {
-      setUpcomingEvents(events.filter(e => e.ticket_price_cents > 0));
-    }).catch(console.error).finally(() => setEventsLoading(false));
+    let cancelled = false;
+    const load = () => getUpcomingEvents(20)
+      .then(events => {
+        if (cancelled) return;
+        setUpcomingEvents(events.filter(e => e.ticket_price_cents > 0));
+      })
+      .catch(console.error)
+      .finally(() => { if (!cancelled) setEventsLoading(false); });
+    load();
+    const id = setInterval(load, 15_000);
+    return () => { cancelled = true; clearInterval(id); };
   }, []);
 
   const [currentYear, setCurrentYear] = useState(dayTime.getFullYear());
@@ -145,6 +157,10 @@ export default function Tickets() {
       venue: event.venue_name || null,
       time: event.start_time ? `${formatTime(event.start_time)}${event.end_time ? ` – ${formatTime(event.end_time)}` : ''}` : null,
       price_cents: event.ticket_price_cents,
+      // Capacity snapshot so the cart's +/- can enforce a local cap.
+      // The server still does the authoritative atomic check at checkout.
+      max_capacity: event.max_capacity,
+      actual_attendance: event.actual_attendance ?? 0,
     });
     setCartOpen(true);
   };
@@ -330,15 +346,36 @@ export default function Tickets() {
                     return `${hr % 12 || 12}:${m} ${hr >= 12 ? 'PM' : 'AM'}`;
                   };
                   const inCart = cartHook.cart.events[event.event_id];
+                  // Live remaining = capacity minus attendance minus what's
+                  // already staged in this user's cart. Server still enforces
+                  // the authoritative cap atomically at checkout.
+                  const cap = event.max_capacity;
+                  const sold = event.actual_attendance ?? 0;
+                  const qtyInCart = inCart?.quantity || 0;
+                  const remaining = cap == null ? Infinity : Math.max(0, cap - sold);
+                  const canAddMore = remaining - qtyInCart > 0;
+                  const soldOut = cap != null && remaining <= 0;
                   return (
                     <div key={event.event_id} style={{
-                      background: inCart ? 'rgba(16,185,129,0.08)' : 'rgba(255,255,255,0.05)',
-                      border: inCart ? '1px solid rgba(16,185,129,0.3)' : '1px solid rgba(255,255,255,0.1)',
+                      background: inCart ? 'rgba(16,185,129,0.08)' : soldOut ? 'rgba(239,68,68,0.05)' : 'rgba(255,255,255,0.05)',
+                      border: inCart ? '1px solid rgba(16,185,129,0.3)' : soldOut ? '1px solid rgba(239,68,68,0.25)' : '1px solid rgba(255,255,255,0.1)',
                       borderRadius: '10px', padding: '14px 16px',
                       display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap',
+                      opacity: soldOut ? 0.75 : 1,
                     }}>
                       <div style={{ flex: 1, minWidth: '180px' }}>
-                        <div style={{ color: 'var(--zoo-muted)', fontWeight: 600, marginBottom: '4px' }}>{event.title || event.event_name}</div>
+                        <div style={{ color: 'var(--zoo-muted)', fontWeight: 600, marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                          <span>{event.title || event.event_name}</span>
+                          {cap != null && !soldOut && remaining <= 10 && (
+                            <span style={{
+                              fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.04em',
+                              padding: '2px 8px', borderRadius: '999px',
+                              background: 'rgba(245,158,11,0.18)', color: '#b45309',
+                            }}>
+                              Only {remaining} left
+                            </span>
+                          )}
+                        </div>
                         <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
                           <span><FaCalendarAlt style={{ marginRight: '4px', verticalAlign: 'middle' }} />
                             {new Date(event.event_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
@@ -357,15 +394,34 @@ export default function Tickets() {
                         <span style={{ fontWeight: 600, color: 'rgb(123, 144, 79)', fontSize: '1rem' }}>
                           ${(event.ticket_price_cents / 100).toFixed(2)}
                         </span>
-                        {inCart ? (
+                        {soldOut ? (
+                          <span style={{
+                            fontWeight: 700, fontSize: '0.85rem',
+                            padding: '8px 14px', borderRadius: '8px',
+                            background: 'rgba(239,68,68,0.15)', color: '#b91c1c',
+                            border: '1px solid rgba(239,68,68,0.3)',
+                            whiteSpace: 'nowrap',
+                          }}>
+                            Sold Out
+                          </span>
+                        ) : inCart ? (
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                             <button className="glass-button" style={{ color: 'var(--color-secondary)', border: 'none', background: 'rgba(123, 144, 79, 0.15)', padding: '6px 10px', fontSize: '0.8rem' }}
                               onClick={() => cartHook.updateEventQty(event.event_id, -1)}>
                               <FaMinus size={10} />
                             </button>
                             <span style={{ color: 'var(--color-secondary)', fontWeight: 700, minWidth: '20px', textAlign: 'center' }}>{inCart.quantity}</span>
-                            <button className="glass-button" style={{ color: 'var(--color-secondary)', border: 'none', background: 'rgba(123, 144, 79, 0.15)', padding: '6px 10px', fontSize: '0.8rem' }}
-                              onClick={() => cartHook.updateEventQty(event.event_id, 1)}>
+                            <button className="glass-button"
+                              disabled={!canAddMore}
+                              title={!canAddMore ? `Only ${remaining} seats available for this event` : ''}
+                              style={{
+                                color: 'var(--color-secondary)', border: 'none',
+                                background: 'rgba(123, 144, 79, 0.15)',
+                                padding: '6px 10px', fontSize: '0.8rem',
+                                opacity: canAddMore ? 1 : 0.4,
+                                cursor: canAddMore ? 'pointer' : 'not-allowed',
+                              }}
+                              onClick={() => { if (canAddMore) cartHook.updateEventQty(event.event_id, 1); }}>
                               <FaPlus size={10} />
                             </button>
                           </div>

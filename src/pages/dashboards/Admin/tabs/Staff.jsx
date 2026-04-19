@@ -197,7 +197,7 @@ export default function Staff() {
                         <button
                             className="glass-button"
                             onClick={() => setShowForm(!showForm)}
-                            style={{ background: showForm ? 'var(--color-accent)' : 'rgba(255,255,255,0.1)' }}
+                            style={{ background: showForm ? 'rgba(239, 68, 68, 0.18)' : 'rgba(255,255,255,0.1)' }}
                         >
                             {showForm ? 'Cancel' : '+ Add Staff'}
                         </button>

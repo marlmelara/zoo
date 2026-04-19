@@ -153,16 +153,49 @@ router.post('/', async (req, res) => {
             receiptId = recResult.insertId;
         }
 
-        // If sale_items provided (POS checkout), insert them and decrement stock
+        // If sale_items provided (shop/POS checkout), atomically check stock +
+        // decrement. Each inventory row is locked FOR UPDATE so two concurrent
+        // checkouts can't both sell the last unit — the second one blocks on
+        // the lock, then reads the post-decrement stock and rolls back with a
+        // clear error. Previous code silently clamped at 0 via GREATEST(),
+        // meaning the customer could be charged for items that weren't in
+        // stock.
         if (Array.isArray(sale_items) && sale_items.length > 0) {
+            // Collapse duplicate item_ids so one row covers the whole order.
+            const byItem = new Map();
             for (const si of sale_items) {
+                const prev = byItem.get(si.item_id);
+                if (prev) prev.quantity += Number(si.quantity);
+                else byItem.set(si.item_id, { ...si, quantity: Number(si.quantity) });
+            }
+
+            for (const si of byItem.values()) {
+                const [rows] = await conn.query(
+                    `SELECT item_name, stock_count FROM inventory WHERE item_id = ? FOR UPDATE`,
+                    [si.item_id]
+                );
+                if (rows.length === 0) {
+                    await conn.rollback();
+                    return res.status(400).json({ error: `Shop item #${si.item_id} no longer exists.` });
+                }
+                const inv = rows[0];
+                if (inv.stock_count < si.quantity) {
+                    await conn.rollback();
+                    return res.status(409).json({
+                        error: inv.stock_count <= 0
+                            ? `"${inv.item_name}" is sold out.`
+                            : `"${inv.item_name}" only has ${inv.stock_count} left, but you tried to buy ${si.quantity}.`,
+                        item_id: si.item_id,
+                        remaining: Math.max(0, inv.stock_count),
+                    });
+                }
                 await conn.query(
                     `INSERT INTO sale_items (transaction_id, item_id, quantity, price_at_sale_cents)
                      VALUES (?, ?, ?, ?)`,
                     [transactionId, si.item_id, si.quantity, si.price_at_sale_cents]
                 );
                 await conn.query(
-                    'UPDATE inventory SET stock_count = GREATEST(0, stock_count - ?) WHERE item_id = ?',
+                    'UPDATE inventory SET stock_count = stock_count - ? WHERE item_id = ?',
                     [si.quantity, si.item_id]
                 );
             }

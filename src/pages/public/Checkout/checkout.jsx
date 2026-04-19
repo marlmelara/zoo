@@ -265,6 +265,70 @@ export default function Checkout() {
     try {
       setSubmitting(true);
 
+      // 0. Capacity / stock pre-check — catches the obvious "this sold out
+      // while I was filling out the form" case BEFORE we take the customer's
+      // money. The server still does the authoritative atomic check
+      // (SELECT ... FOR UPDATE) inside POST /tickets and POST /transactions,
+      // so the tiny race between this pre-check and the insert can't oversell.
+      if (eventTicketList.length > 0) {
+        try {
+          const fresh = await api.get('/events');
+          const byId = new Map(fresh.map(e => [e.event_id, e]));
+          for (const evt of eventTicketList) {
+            const latest = byId.get(evt.event_id);
+            if (!latest) {
+              setSubmitting(false);
+              alert(`"${evt.title}" is no longer available. Please remove it from your cart.`);
+              return;
+            }
+            const cap = latest.max_capacity;
+            const sold = latest.actual_attendance ?? 0;
+            const remaining = cap == null ? Infinity : Math.max(0, cap - sold);
+            const wanted = evt.quantity || 1;
+            if (remaining < wanted) {
+              setSubmitting(false);
+              alert(
+                remaining <= 0
+                  ? `"${evt.title}" just sold out. Please remove it from your cart to continue.`
+                  : `"${evt.title}" only has ${remaining} seat${remaining === 1 ? '' : 's'} left. Reduce your quantity to continue.`
+              );
+              return;
+            }
+          }
+        } catch (probeErr) {
+          // If the pre-check fails (network blip), fall through and let
+          // the server's atomic check be the gate.
+          console.warn('Pre-checkout capacity probe failed, relying on server check:', probeErr);
+        }
+      }
+      if (shopItems.length > 0) {
+        try {
+          const freshInv = await api.get('/inventory');
+          const byId = new Map(freshInv.map(i => [i.item_id, i]));
+          for (const item of shopItems) {
+            const latest = byId.get(item.item_id);
+            if (!latest) {
+              setSubmitting(false);
+              alert(`"${item.item_name}" is no longer available. Please remove it from your cart.`);
+              return;
+            }
+            const remaining = Number(latest.stock_count) || 0;
+            const wanted = item.quantity || 1;
+            if (remaining < wanted) {
+              setSubmitting(false);
+              alert(
+                remaining <= 0
+                  ? `"${latest.item_name}" just sold out. Please remove it from your cart to continue.`
+                  : `"${latest.item_name}" only has ${remaining} left. Reduce your quantity to continue.`
+              );
+              return;
+            }
+          }
+        } catch (probeErr) {
+          console.warn('Pre-checkout inventory probe failed, relying on server check:', probeErr);
+        }
+      }
+
       // 1. Create donation record if donation flow
       let donationId = null;
       if (isDonation) {
@@ -439,7 +503,15 @@ export default function Checkout() {
 
     } catch (err) {
       console.error('Checkout failed:', err);
-      alert('Checkout failed: ' + err.message);
+      // The server's atomic capacity check throws with a clear message for
+      // oversell — pass it through untouched; fall back to generic wording
+      // for everything else.
+      const msg = String(err?.message || '');
+      if (/sold out|seats? left|no longer exists/i.test(msg)) {
+        alert(msg + '\n\nPlease adjust your cart and try again.');
+      } else {
+        alert('Checkout failed: ' + msg);
+      }
     } finally {
       setSubmitting(false);
     }

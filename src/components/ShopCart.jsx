@@ -80,9 +80,17 @@ export function useZooCart() {
   const updateEventQty = (eventId, delta) => {
     const events = { ...cart.events };
     if (!events[eventId]) return;
-    const newQty = events[eventId].quantity + delta;
-    if (newQty <= 0) delete events[eventId];
-    else events[eventId] = { ...events[eventId], quantity: newQty };
+    const ev = events[eventId];
+    const newQty = ev.quantity + delta;
+    if (newQty <= 0) { delete events[eventId]; update({ ...cart, events }); return; }
+    // Respect the capacity snapshot stored when the event was added. Server
+    // still does the authoritative check atomically at checkout — this just
+    // stops the user locally from bumping past what's known-available.
+    if (ev.max_capacity != null) {
+      const remaining = ev.max_capacity - (ev.actual_attendance || 0);
+      if (newQty > remaining) return;
+    }
+    events[eventId] = { ...ev, quantity: newQty };
     update({ ...cart, events });
   };
 
@@ -260,7 +268,11 @@ export default function ShopCartPanel({
                   <h4 style={{ margin: '0 0 8px', fontSize: '13px', textTransform: 'uppercase', color: 'rgb(123, 144, 79)', letterSpacing: '0.5px' }}>
                     <FaCalendarAlt style={{ marginRight: '6px' }} />Event Tickets
                   </h4>
-                  {eventItems.map(event => (
+                  {eventItems.map(event => {
+                    const cap = event.max_capacity;
+                    const remaining = cap == null ? Infinity : Math.max(0, cap - (event.actual_attendance || 0));
+                    const atMax = event.quantity >= remaining;
+                    return (
                     <div key={event.event_id} style={{
                       background: 'rgba(255,255,255,0.3)', border: '1px solid rgba(121, 162, 128, 0.35)',
                       borderRadius: '12px', padding: '12px', marginBottom: '8px',
@@ -280,13 +292,24 @@ export default function ShopCartPanel({
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px'}}>
                         <button onClick={() => updateEventQty(event.event_id, -1)} style={{border: 'none',background: 'rgba(123, 144, 79, 0.15)', color: 'var(--color-secondary)'}}><FaMinus size={10} /></button>
                         <span style={{color: 'var(--color-secondary)', fontWeight: 600, fontSize: '14px', minWidth: '20px', textAlign: 'center' }}>{event.quantity}</span>
-                        <button onClick={() => updateEventQty(event.event_id, 1)} style={{border: 'none',background: 'rgba(123, 144, 79, 0.15)', color: 'var(--color-secondary)'}}><FaPlus size={10} /></button>
+                        <button
+                          onClick={() => updateEventQty(event.event_id, 1)}
+                          disabled={atMax}
+                          title={atMax ? `Only ${remaining} seats available for this event` : ''}
+                          style={{
+                            border: 'none', background: 'rgba(123, 144, 79, 0.15)', color: 'var(--color-secondary)',
+                            opacity: atMax ? 0.4 : 1,
+                            cursor: atMax ? 'not-allowed' : 'pointer',
+                          }}>
+                          <FaPlus size={10} />
+                        </button>
                         <span style={{ marginLeft: 'auto', fontWeight: 600, color: 'rgb(123, 144, 79)' }}>
                           {fmt(event.price_cents * event.quantity)}
                         </span>
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
 

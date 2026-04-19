@@ -78,34 +78,85 @@ router.get('/', requireRole('admin', 'manager', 'retail'), async (req, res) => {
 // Intentionally unauthenticated: guests can buy tickets. Each ticket
 // carries its own customer_id (or null for a guest) + transaction_id
 // so ownership is preserved. Mirrors the auth-less POST /transactions.
+//
+// Race-safe capacity enforcement:
+//   For every event in the batch we lock its row (SELECT ... FOR UPDATE),
+//   compare requested qty against (max_capacity - actual_attendance), and
+//   roll back the whole transaction if ANY event would oversell. Two
+//   simultaneous checkouts for the last seat can't both win because the
+//   second one blocks on the row lock, then sees the bumped attendance.
 router.post('/', async (req, res) => {
-    // tickets: [{ customer_id, type, event_id, price_cents, transaction_id }]
     const { tickets } = req.body;
     if (!Array.isArray(tickets) || tickets.length === 0) {
         return res.status(400).json({ error: 'No tickets provided.' });
     }
+
+    // Group requested ticket counts per event_id (null = admission, skip cap check).
+    const perEvent = new Map();
+    for (const t of tickets) {
+        if (!t.event_id) continue;
+        perEvent.set(t.event_id, (perEvent.get(t.event_id) || 0) + 1);
+    }
+
+    const conn = await db.getConnection();
     try {
+        await conn.beginTransaction();
+
+        // Lock + verify every affected event before inserting anything.
+        for (const [eventId, qty] of perEvent) {
+            const [rows] = await conn.query(
+                `SELECT title, max_capacity, COALESCE(actual_attendance, 0) AS actual_attendance
+                   FROM events
+                  WHERE event_id = ?
+                  FOR UPDATE`,
+                [eventId]
+            );
+            if (rows.length === 0) {
+                await conn.rollback();
+                return res.status(400).json({ error: `Event #${eventId} no longer exists.` });
+            }
+            const ev = rows[0];
+            const remaining = (ev.max_capacity ?? Infinity) - ev.actual_attendance;
+            if (remaining < qty) {
+                await conn.rollback();
+                return res.status(409).json({
+                    error: remaining <= 0
+                        ? `"${ev.title}" is sold out.`
+                        : `"${ev.title}" only has ${remaining} seat${remaining === 1 ? '' : 's'} left, but you tried to buy ${qty}.`,
+                    event_id: eventId,
+                    remaining: Math.max(0, remaining),
+                });
+            }
+        }
+
+        // All events fit — insert the tickets and bump each event's counters
+        // in the same transaction so the locked view stays consistent.
         const values = tickets.map(t =>
             [t.customer_id || null, t.type, t.event_id || null,
              t.price_cents, t.transaction_id || null]
         );
-        await db.query(
+        await conn.query(
             `INSERT INTO tickets (customer_id, type, event_id, price_cents, transaction_id)
              VALUES ?`,
             [values]
         );
-        // Update event tickets_sold counter
-        for (const t of tickets) {
-            if (t.event_id) {
-                await db.query(
-                    'UPDATE events SET tickets_sold = tickets_sold + 1, actual_attendance = COALESCE(actual_attendance,0) + 1 WHERE event_id = ?',
-                    [t.event_id]
-                );
-            }
+        for (const [eventId, qty] of perEvent) {
+            await conn.query(
+                `UPDATE events
+                    SET tickets_sold = tickets_sold + ?,
+                        actual_attendance = COALESCE(actual_attendance, 0) + ?
+                  WHERE event_id = ?`,
+                [qty, qty, eventId]
+            );
         }
+
+        await conn.commit();
         return res.status(201).json({ success: true });
     } catch (err) {
+        try { await conn.rollback(); } catch {}
         return res.status(500).json({ error: err.message });
+    } finally {
+        conn.release();
     }
 });
 

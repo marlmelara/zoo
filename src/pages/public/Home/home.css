@@ -224,7 +224,7 @@
 }
 
 .schedule-card-home {
-  background-color: rgba(255, 255, 255, 0.85);
+  background-color: rgba(255, 255, 255, 0.8);
   backdrop-filter: blur(12px);
   border: 1px solid rgba(121, 162, 128, 0.35);
   border-radius: 12px;
@@ -428,9 +428,9 @@
 .selected-events-card {
   margin-top: 1rem;
   padding: 1rem;
-  background: var(--glass-bg);
+  background: var(--glass-bg-medium);
   backdrop-filter: blur(12px);
-  border: 1px solid var(--glass-border);
+  border: 1px solid rgba(121, 162, 128, 0.35);
   border-radius: 12px;
 }
 
@@ -474,7 +474,7 @@
 
 .selected-event-item {
   padding: 0.75rem;
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--glass-bg-light);
   border-radius: 8px;
   border-left: 3px solid var(--color-primary);
 }
@@ -497,7 +497,7 @@
 
 .selected-event-description {
   font-size: 0.75rem;
-  color: var(--color-text-muted);
+  color: var(--color-secondary);
   margin-bottom: 0.5rem;
   line-height: 1.4;
 }
@@ -507,7 +507,7 @@
   align-items: center;
   gap: 0.4rem;
   font-size: 0.7rem;
-  color: var(--color-text-muted);
+  color: black;
 }
 
 .selected-event-icon {

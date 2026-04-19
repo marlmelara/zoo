@@ -31,7 +31,7 @@ export default function Home() {
     : '/account';
   const handleLogout = async () => { await signOut(); navigate('/'); };
 
-  // Static daily schedule for Today's Schedule section (first 5 events)
+  // Static daily schedule for Today's Schedule section 
   const staticDailySchedule = [
     { id: 1, time: '09:30:00', endTime: '10:00:00', title: 'Birds of the World', venue: 'Birds of the World' },
     { id: 2, time: '10:00:00', endTime: '10:30:00', title: 'African Safari Talk', venue: 'Animals of Africa' },

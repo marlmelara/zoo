@@ -7,6 +7,7 @@ import logo from '../../../images/logo.png';
 import './Membership.css';
 import { useZooCart } from '../../../components/ShopCart';
 import { useAuth } from '../../../contexts/AuthContext';
+import { useToast } from '../../../components/Feedback';
 
 const plans = [
   { type: 'explorer', name: 'Explorer', price_cents: 8999, discount: 0.10, duration_days: 365, featured: false,
@@ -24,6 +25,7 @@ export default function Membership() {
   const navigate = useNavigate();
   const cartHook = useZooCart();
   const { user } = useAuth();
+  const toast = useToast();
 
   const [selected, setSelected] = useState(() => {
     const saved = localStorage.getItem('selectedMembership');
@@ -44,7 +46,7 @@ export default function Membership() {
 
   const handleChoosePlan = (plan) => {
     if (!user) {
-      alert('Please sign in or create an account to purchase a membership.');
+      toast.warn('Please sign in or create an account to purchase a membership.');
       navigate('/account');
       return;
     }

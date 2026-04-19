@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../contexts/AuthContext';
 import api from '../../../lib/api';
+import { useToast } from '../../../components/Feedback';
 import {
     User, Ticket, Heart, Calendar, MapPin, Phone, Mail,
     Star, Gift, ShoppingCart, RefreshCw, Clock, Package, Trash2, AlertTriangle
@@ -12,6 +13,7 @@ const TABS = ['My Profile', 'My Purchases', 'My Tickets', 'My Donations', 'Event
 export default function CustomerDashboard() {
     const { user, customerId, signOut } = useAuth();
     const navigate = useNavigate();
+    const toast = useToast();
     const [activeTab, setActiveTab] = useState('My Profile');
 
     const [profile, setProfile] = useState(null);
@@ -131,7 +133,7 @@ export default function CustomerDashboard() {
             navigate('/');
         } catch (err) {
             console.error('Error deleting account:', err);
-            alert('Failed to delete account: ' + err.message);
+            toast.error('Failed to delete account: ' + err.message);
         } finally {
             setDeleting(false);
         }
@@ -159,21 +161,21 @@ export default function CustomerDashboard() {
         };
         for (const [k, label] of Object.entries(required)) {
             if (!editForm[k] || !String(editForm[k]).trim()) {
-                alert(`${label} is required.`);
+                toast.warn(`${label} is required.`);
                 return;
             }
         }
         if ((editForm.phone || '').replace(/\D/g, '').length !== 10) {
-            alert('Phone number must be exactly 10 digits.');
+            toast.warn('Phone number must be exactly 10 digits.');
             return;
         }
         if (!/^\d{5}$/.test(editForm.zip_code || '')) {
-            alert('Zip code must be exactly 5 digits.');
+            toast.warn('Zip code must be exactly 5 digits.');
             return;
         }
         const dob = new Date(editForm.date_of_birth);
         if (Number.isNaN(dob.getTime()) || dob > today || dob < new Date(minDob)) {
-            alert('Please enter a valid date of birth.');
+            toast.warn('Please enter a valid date of birth.');
             return;
         }
         try {
@@ -191,7 +193,7 @@ export default function CustomerDashboard() {
             fetchProfile();
         } catch (err) {
             console.error('Error updating profile:', err);
-            alert('Failed to update profile: ' + err.message);
+            toast.error('Failed to update profile: ' + err.message);
         }
     }
 

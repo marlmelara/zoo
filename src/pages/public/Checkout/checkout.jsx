@@ -10,6 +10,7 @@ import { useAuth } from '../../../contexts/AuthContext';
 import { createTransaction } from '../../../api/transactions';
 import api from '../../../lib/api';
 import Navbar from '../../../components/Navbar';
+import { useToast } from '../../../components/Feedback';
 import './checkout.css';
 import logo from '../../../images/logo.png';
 
@@ -37,6 +38,7 @@ export default function Checkout() {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, role, customerId, signIn } = useAuth();
+  const toast = useToast();
 
   // ── Load cart from unified localStorage ──
   const initialCart = readZooCart() || { admission: null, events: {}, shop: {}, membership: null };
@@ -241,25 +243,25 @@ export default function Checkout() {
 
     // Membership in cart requires a logged-in customer account.
     if (membershipPlan && !customerId) {
-      alert('You must be signed in to purchase a membership. Please sign in or create an account.');
+      toast.warn('You must be signed in to purchase a membership. Please sign in or create an account.');
       navigate('/account');
       return;
     }
 
     // Validation
     if (!isDonation) {
-      if (!billing.firstName || !billing.lastName) return alert('Please enter your name.');
-      if (!billing.email || billing.email !== billing.confirmEmail) return alert('Emails do not match.');
-      if (!payment.cardNumber || payment.cardNumber.replace(/\s/g, '').length < 16) return alert('Enter a valid card number.');
-      if (!payment.cardName) return alert('Enter the name on card.');
-      if (!payment.expiry || payment.expiry.length < 5) return alert('Enter a valid expiration date.');
-      if (!payment.cvv || payment.cvv.length < 3) return alert('Enter a valid CVV.');
+      if (!billing.firstName || !billing.lastName) { toast.warn('Please enter your name.'); return; }
+      if (!billing.email || billing.email !== billing.confirmEmail) { toast.warn('Emails do not match.'); return; }
+      if (!payment.cardNumber || payment.cardNumber.replace(/\s/g, '').length < 16) { toast.warn('Enter a valid card number.'); return; }
+      if (!payment.cardName) { toast.warn('Enter the name on card.'); return; }
+      if (!payment.expiry || payment.expiry.length < 5) { toast.warn('Enter a valid expiration date.'); return; }
+      if (!payment.cvv || payment.cvv.length < 3) { toast.warn('Enter a valid CVV.'); return; }
     } else {
-      if (!billing.email) return alert('Please enter your email for the donation receipt.');
-      if (!payment.cardNumber || payment.cardNumber.replace(/\s/g, '').length < 16) return alert('Enter a valid card number.');
-      if (!payment.cardName) return alert('Enter the name on card.');
-      if (!payment.expiry || payment.expiry.length < 5) return alert('Enter a valid expiration date.');
-      if (!payment.cvv || payment.cvv.length < 3) return alert('Enter a valid CVV.');
+      if (!billing.email) { toast.warn('Please enter your email for the donation receipt.'); return; }
+      if (!payment.cardNumber || payment.cardNumber.replace(/\s/g, '').length < 16) { toast.warn('Enter a valid card number.'); return; }
+      if (!payment.cardName) { toast.warn('Enter the name on card.'); return; }
+      if (!payment.expiry || payment.expiry.length < 5) { toast.warn('Enter a valid expiration date.'); return; }
+      if (!payment.cvv || payment.cvv.length < 3) { toast.warn('Enter a valid CVV.'); return; }
     }
 
     try {
@@ -278,7 +280,7 @@ export default function Checkout() {
             const latest = byId.get(evt.event_id);
             if (!latest) {
               setSubmitting(false);
-              alert(`"${evt.title}" is no longer available. Please remove it from your cart.`);
+              toast.error(`"${evt.title}" is no longer available. Please remove it from your cart.`);
               return;
             }
             const cap = latest.max_capacity;
@@ -287,7 +289,7 @@ export default function Checkout() {
             const wanted = evt.quantity || 1;
             if (remaining < wanted) {
               setSubmitting(false);
-              alert(
+              toast.error(
                 remaining <= 0
                   ? `"${evt.title}" just sold out. Please remove it from your cart to continue.`
                   : `"${evt.title}" only has ${remaining} seat${remaining === 1 ? '' : 's'} left. Reduce your quantity to continue.`
@@ -309,14 +311,14 @@ export default function Checkout() {
             const latest = byId.get(item.item_id);
             if (!latest) {
               setSubmitting(false);
-              alert(`"${item.item_name}" is no longer available. Please remove it from your cart.`);
+              toast.error(`"${item.item_name}" is no longer available. Please remove it from your cart.`);
               return;
             }
             const remaining = Number(latest.stock_count) || 0;
             const wanted = item.quantity || 1;
             if (remaining < wanted) {
               setSubmitting(false);
-              alert(
+              toast.error(
                 remaining <= 0
                   ? `"${latest.item_name}" just sold out. Please remove it from your cart to continue.`
                   : `"${latest.item_name}" only has ${remaining} left. Reduce your quantity to continue.`
@@ -508,9 +510,9 @@ export default function Checkout() {
       // for everything else.
       const msg = String(err?.message || '');
       if (/sold out|seats? left|no longer exists/i.test(msg)) {
-        alert(msg + '\n\nPlease adjust your cart and try again.');
+        toast.error(msg + '\n\nPlease adjust your cart and try again.');
       } else {
-        alert('Checkout failed: ' + msg);
+        toast.error('Checkout failed: ' + msg);
       }
     } finally {
       setSubmitting(false);

@@ -85,7 +85,17 @@ router.delete('/me', requireAuth, async (req, res) => {
     try {
         const { customerId } = req.user;
         if (!customerId) return res.status(400).json({ error: 'Not a customer account.' });
+        const [rows] = await db.query(
+            'SELECT first_name, last_name FROM customers WHERE customer_id = ?',
+            [customerId]
+        );
         await db.query('UPDATE customers SET is_active = 0 WHERE customer_id = ?', [customerId]);
+        const name = rows[0] ? `${rows[0].first_name} ${rows[0].last_name}` : `customer #${customerId}`;
+        await db.query(
+            `INSERT INTO activity_log (action_type, description, performed_by, target_type, target_id)
+             VALUES ('customer_deactivated', ?, NULL, 'customer', ?)`,
+            [`${name} deactivated their account`, customerId]
+        );
         return res.json({ success: true });
     } catch (err) {
         return res.status(500).json({ error: err.message });
@@ -126,11 +136,46 @@ router.get('/deactivated', requireRole('admin'), async (req, res) => {
     }
 });
 
-// POST /api/customers/:id/reactivate — admin: restore a soft-deleted customer
+// POST /api/customers/:id/reactivate — admin: restore a soft-deleted customer.
+// Logs a 'customer_reactivated' row so the profile's lifecycle modal can
+// show the full activation/deactivation history.
 router.post('/:id/reactivate', requireRole('admin'), async (req, res) => {
     try {
+        const [rows] = await db.query(
+            'SELECT first_name, last_name FROM customers WHERE customer_id = ?',
+            [req.params.id]
+        );
         await db.query('UPDATE customers SET is_active = 1 WHERE customer_id = ?', [req.params.id]);
+        const name = rows[0] ? `${rows[0].first_name} ${rows[0].last_name}` : `customer #${req.params.id}`;
+        await db.query(
+            `INSERT INTO activity_log (action_type, description, performed_by, target_type, target_id)
+             VALUES ('customer_reactivated', ?, ?, 'customer', ?)`,
+            [`Reactivated ${name}`, req.user.employeeId || null, req.params.id]
+        );
         return res.json({ success: true });
+    } catch (err) {
+        return res.status(500).json({ error: err.message });
+    }
+});
+
+// GET /api/customers/:id/lifecycle-log — activation/deactivation history
+// for one customer. Admin-only so we don't leak other users' history.
+router.get('/:id/lifecycle-log', requireRole('admin', 'manager'), async (req, res) => {
+    try {
+        const [rows] = await db.query(
+            `SELECT al.log_id, al.action_type, al.description, al.created_at,
+                    al.performed_by,
+                    e.first_name AS performer_first, e.last_name AS performer_last,
+                    e.role       AS performer_role
+               FROM activity_log al
+               LEFT JOIN employees e ON e.employee_id = al.performed_by
+              WHERE al.target_type = 'customer'
+                AND al.target_id   = ?
+                AND al.action_type IN ('customer_deactivated','customer_reactivated')
+              ORDER BY al.created_at DESC`,
+            [req.params.id]
+        );
+        return res.json(rows);
     } catch (err) {
         return res.status(500).json({ error: err.message });
     }

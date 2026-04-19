@@ -61,11 +61,46 @@ router.get('/deactivated', requireRole('admin'), async (req, res) => {
     }
 });
 
-// POST /api/employees/:id/reactivate — admin: restore a soft-deleted employee
+// POST /api/employees/:id/reactivate — admin: restore a soft-deleted employee.
+// Also stamps an activity_log entry so the profile's Log modal can show
+// the full activation/deactivation history.
 router.post('/:id/reactivate', requireRole('admin'), async (req, res) => {
     try {
+        const [rows] = await db.query(
+            'SELECT first_name, last_name FROM employees WHERE employee_id = ?',
+            [req.params.id]
+        );
         await db.query('UPDATE employees SET is_active = 1 WHERE employee_id = ?', [req.params.id]);
+        const name = rows[0] ? `${rows[0].first_name} ${rows[0].last_name}` : `employee #${req.params.id}`;
+        await db.query(
+            `INSERT INTO activity_log (action_type, description, performed_by, target_type, target_id)
+             VALUES ('employee_reactivated', ?, ?, 'employee', ?)`,
+            [`Reactivated ${name}`, req.user.employeeId || null, req.params.id]
+        );
         return res.json({ success: true });
+    } catch (err) {
+        return res.status(500).json({ error: err.message });
+    }
+});
+
+// GET /api/employees/:id/lifecycle-log — activation/deactivation history
+// for one employee. Returns rows newest-first with the performer's name.
+router.get('/:id/lifecycle-log', requireRole('admin', 'manager'), async (req, res) => {
+    try {
+        const [rows] = await db.query(
+            `SELECT al.log_id, al.action_type, al.description, al.created_at,
+                    al.performed_by,
+                    e.first_name AS performer_first, e.last_name AS performer_last,
+                    e.role       AS performer_role
+               FROM activity_log al
+               LEFT JOIN employees e ON e.employee_id = al.performed_by
+              WHERE al.target_type = 'employee'
+                AND al.target_id   = ?
+                AND al.action_type IN ('employee_created','employee_deactivated','employee_reactivated')
+              ORDER BY al.created_at DESC`,
+            [req.params.id]
+        );
+        return res.json(rows);
     } catch (err) {
         return res.status(500).json({ error: err.message });
     }
@@ -200,6 +235,15 @@ router.post('/', requireRole('admin', 'manager'), async (req, res) => {
         }
 
         await conn.commit();
+        // Stamp the lifecycle log outside the transaction — activity_log is
+        // purely audit data; a failure here must not undo the hire.
+        try {
+            await db.query(
+                `INSERT INTO activity_log (action_type, description, performed_by, target_type, target_id)
+                 VALUES ('employee_created', ?, ?, 'employee', ?)`,
+                [`Created ${first_name} ${last_name}`, req.user?.employeeId || null, empResult.insertId]
+            );
+        } catch { /* logging is best-effort */ }
         return res.status(201).json({ employee_id: empResult.insertId, user_id: userId });
     } catch (err) {
         await conn.rollback();
@@ -228,10 +272,21 @@ router.patch('/:id', requireRole('admin', 'manager'), async (req, res) => {
 });
 
 // DELETE /api/employees/:id — soft-delete (deactivate). Reactivate later via
-// POST /api/employees/:id/reactivate.
+// POST /api/employees/:id/reactivate. Emits an activity_log row so the
+// lifecycle modal on the profile can show who took the action and when.
 router.delete('/:id', requireRole('admin'), async (req, res) => {
     try {
+        const [rows] = await db.query(
+            'SELECT first_name, last_name FROM employees WHERE employee_id = ?',
+            [req.params.id]
+        );
         await db.query('UPDATE employees SET is_active = 0 WHERE employee_id = ?', [req.params.id]);
+        const name = rows[0] ? `${rows[0].first_name} ${rows[0].last_name}` : `employee #${req.params.id}`;
+        await db.query(
+            `INSERT INTO activity_log (action_type, description, performed_by, target_type, target_id)
+             VALUES ('employee_deactivated', ?, ?, 'employee', ?)`,
+            [`Deactivated ${name}`, req.user.employeeId || null, req.params.id]
+        );
         return res.json({ success: true });
     } catch (err) {
         return res.status(500).json({ error: err.message });

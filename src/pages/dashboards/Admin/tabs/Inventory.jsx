@@ -8,10 +8,12 @@ import {
     Pencil, X, ImagePlus,
 } from 'lucide-react';
 import { StatusFilter, DateRangeFilter } from '../../../../components/AnimalsPanel';
+import BulkActionBar from '../../../../components/BulkActionBar';
 import {
     createOperationalSupply, deleteOperationalSupply, deleteInventoryItem,
 } from '../../../../api/supplies';
 import { getRecentActivity } from '../../../../api/activityLog';
+import { useToast, useConfirm, usePrompt } from '../../../../components/Feedback';
 
 const GREEN      = 'rgb(123, 144, 79)';
 const GREEN_DARK = 'rgb(102, 122, 66)';
@@ -32,6 +34,9 @@ const DEPT_ICON = {
 
 export default function Inventory() {
     const { role, deptId, deptName } = useAuth();
+    const toast   = useToast();
+    const confirm = useConfirm();
+    const prompt  = usePrompt();
     const canManage = role === 'admin' || role === 'manager';
 
     // Scope: admin sees everything; each manager sees only their own
@@ -260,8 +265,9 @@ export default function Inventory() {
                          item_name: '', stock_count: '', restock_threshold: 10,
                          price_cents: '', description: '', category: '', image_url: '' });
             fetchAll();
+            toast.success('Item added.');
         } catch (err) {
-            alert('Failed to add item: ' + err.message);
+            toast.error('Failed to add item: ' + err.message);
         }
     }
 
@@ -293,14 +299,22 @@ export default function Inventory() {
             });
             cancelEdit();
             fetchAll();
+            toast.success('Changes saved.');
         } catch (err) {
-            alert('Failed to save: ' + err.message);
+            toast.error('Failed to save: ' + err.message);
         }
     }
 
     async function handleRestock(item) {
-        const amt = window.prompt(`Restock ${item.name}. Enter quantity to add:`, String(item.threshold * 2));
-        if (!amt) return;
+        const amt = await prompt({
+            title: `Restock ${item.name}`,
+            message: 'Enter the quantity to add.',
+            placeholder: 'e.g. 20',
+            inputType: 'number',
+            defaultValue: String(item.threshold * 2),
+            confirmLabel: 'Restock',
+        });
+        if (amt == null) return;
         const qty = parseInt(amt);
         if (!(qty > 0)) return;
         try {
@@ -311,9 +325,10 @@ export default function Inventory() {
                 // to approving a zero-round-trip manager restock via PATCH.
                 await api.patch(`/supplies/${item.id}`, { stock_count_delta: qty });
             }
+            toast.success(`Restocked ${item.name} +${qty}.`);
             fetchAll();
         } catch (err) {
-            alert('Restock failed: ' + err.message);
+            toast.error('Restock failed: ' + err.message);
         }
     }
 
@@ -329,13 +344,23 @@ export default function Inventory() {
 
     async function handleDeleteSelected() {
         if (selected.size === 0) return;
-        if (!window.confirm(`Permanently delete ${selected.size} item${selected.size === 1 ? '' : 's'}?`)) return;
+        const ok = await confirm({
+            title: `Permanently delete ${selected.size} item${selected.size === 1 ? '' : 's'}?`,
+            message: 'This cannot be undone — the items will be removed from inventory entirely.',
+            confirmLabel: 'Delete',
+            tone: 'danger',
+        });
+        if (!ok) return;
         const items = filteredItems.filter(i => selected.has(i.key));
         const results = await Promise.allSettled(items.map(i =>
             i.source === 'retail' ? deleteInventoryItem(i.id) : deleteOperationalSupply(i.id)
         ));
         const failed = results.filter(r => r.status === 'rejected').length;
-        if (failed) alert(`${failed} deletion${failed === 1 ? '' : 's'} failed.`);
+        if (failed) {
+            toast.error(`${failed} deletion${failed === 1 ? '' : 's'} failed.`);
+        } else {
+            toast.success(`Deleted ${items.length} item${items.length === 1 ? '' : 's'}.`);
+        }
         exitManageMode();
         fetchAll();
     }
@@ -604,11 +629,12 @@ export default function Inventory() {
 
             {/* ══ Bulk action bar (items tab only) ══ */}
             {mainTab === 'items' && manageMode && (
-                <BulkBar
+                <BulkActionBar
                     count={selected.size}
                     onSelectAll={selectAllVisible}
-                    onDelete={handleDeleteSelected}
+                    onRemove={handleDeleteSelected}
                     onCancel={exitManageMode}
+                    actionLabel="Delete Selected"
                 />
             )}
         </div>
@@ -787,33 +813,7 @@ function ActivityLog({ loading, items }) {
     );
 }
 
-function BulkBar({ count, onSelectAll, onDelete, onCancel }) {
-    return (
-        <div style={{
-            position: 'fixed', bottom: '24px', left: '50%', transform: 'translateX(-50%)',
-            background: '#1a1f2e', border: '1px solid rgba(239,68,68,0.3)',
-            borderRadius: '14px', padding: '10px 14px',
-            display: 'flex', alignItems: 'center', gap: '14px',
-            boxShadow: '0 10px 30px rgba(0,0,0,0.5)', zIndex: 999,
-        }}>
-            <span style={{ fontSize: '13px', color: 'var(--color-text-muted)' }}>
-                <strong style={{ color: 'white' }}>{count}</strong> selected
-            </span>
-            <button onClick={onSelectAll}
-                style={{ background: 'rgba(255,255,255,0.08)', color: 'white', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '8px', padding: '8px 14px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
-                Select All
-            </button>
-            <button onClick={onDelete} disabled={count === 0}
-                style={{ background: count === 0 ? 'rgba(239,68,68,0.25)' : '#ef4444', color: 'white', border: 'none', borderRadius: '8px', padding: '8px 14px', fontSize: '12px', fontWeight: 700, cursor: count === 0 ? 'not-allowed' : 'pointer' }}>
-                Delete Selected
-            </button>
-            <button onClick={onCancel}
-                style={{ background: 'transparent', color: 'white', border: '1px solid rgba(255,255,255,0.18)', borderRadius: '8px', padding: '8px 14px', fontSize: '12px', cursor: 'pointer' }}>
-                Cancel
-            </button>
-        </div>
-    );
-}
+// BulkBar moved to /components/BulkActionBar.jsx (shared + portaled).
 
 const labelStyle = {
     display: 'block',
@@ -852,24 +852,25 @@ function resizeToDataUrl(file, maxEdge = 600, quality = 0.82) {
 }
 
 function ImagePicker({ value, onChange }) {
+    const toast = useToast();
     const [busy, setBusy] = useState(false);
     const inputId = React.useId();
     async function onFile(e) {
         const file = e.target.files?.[0];
         if (!file) return;
         if (!/^image\//.test(file.type)) {
-            alert('Please choose an image file.');
+            toast.warn('Please choose an image file.');
             return;
         }
         if (file.size > 8 * 1024 * 1024) {
-            alert('Image too large (limit 8 MB).');
+            toast.warn('Image too large (limit 8 MB).');
             return;
         }
         try {
             setBusy(true);
             onChange(await resizeToDataUrl(file));
         } catch (err) {
-            alert('Failed to read image: ' + err.message);
+            toast.error('Failed to read image: ' + err.message);
         } finally {
             setBusy(false);
             e.target.value = '';

@@ -3,6 +3,7 @@ import { useAuth } from '../../../contexts/AuthContext';
 import api from '../../../lib/api';
 import { getSuppliesByDepartment, createSupplyRequest, getMySupplyRequests } from '../../../api/supplies';
 import { logActivity } from '../../../api/activityLog';
+import { useToast } from '../../../components/Feedback';
 import {
     Cat, Package, Calendar, AlertTriangle, Plus,
     ClipboardList, Clock, CheckCircle, XCircle, Send
@@ -12,6 +13,7 @@ const TABS = ['My Animals', 'My Events', 'Supplies'];
 
 export default function CaretakerDashboard() {
     const { user, employeeId, deptId } = useAuth();
+    const toast = useToast();
     const [activeTab, setActiveTab] = useState('My Animals');
 
     // Resolved IDs
@@ -131,7 +133,7 @@ export default function CaretakerDashboard() {
             fetchMyRequests(empId);
         } catch (err) {
             console.error('Error creating supply request:', err);
-            alert('Failed to submit request: ' + err.message);
+            toast.error('Failed to submit request: ' + err.message);
         }
     }
 

@@ -44,15 +44,26 @@ router.get('/deactivated', requireRole('admin'), async (req, res) => {
 });
 
 // POST /api/animals/:id/reactivate — admin: restore a soft-deleted animal.
-// Clears departed_date so the animal reads as currently present.
+// Clears departed_date so the animal reads as currently present and
+// stamps an 'animal_arrived' activity_log row for the lifecycle modal.
 router.post('/:id/reactivate', requireRole('admin'), async (req, res) => {
     try {
+        const [rows] = await db.query(
+            'SELECT name FROM animals WHERE animal_id = ?',
+            [req.params.id]
+        );
         await db.query(
             `UPDATE animals
                 SET is_active = 1, departed_date = NULL,
                     arrived_date = COALESCE(arrived_date, CURDATE())
               WHERE animal_id = ?`,
             [req.params.id]
+        );
+        const name = rows[0]?.name || `animal #${req.params.id}`;
+        await db.query(
+            `INSERT INTO activity_log (action_type, description, performed_by, target_type, target_id)
+             VALUES ('animal_arrived', ?, ?, 'animal', ?)`,
+            [`${name} returned to the zoo`, req.user.employeeId || null, req.params.id]
         );
         return res.json({ success: true });
     } catch (err) {
@@ -61,9 +72,14 @@ router.post('/:id/reactivate', requireRole('admin'), async (req, res) => {
 });
 
 // DELETE /api/animals/:id — soft-delete. Stamps departed_date so the
-// Departed view can show *when* the animal left.
+// Departed view can show *when* the animal left, plus an 'animal_departed'
+// activity_log row for the lifecycle modal.
 router.delete('/:id', requireRole('admin','manager'), async (req, res) => {
     try {
+        const [rows] = await db.query(
+            'SELECT name FROM animals WHERE animal_id = ?',
+            [req.params.id]
+        );
         await db.query(
             `UPDATE animals
                 SET is_active = 0,
@@ -71,7 +87,37 @@ router.delete('/:id', requireRole('admin','manager'), async (req, res) => {
               WHERE animal_id = ?`,
             [req.params.id]
         );
+        const name = rows[0]?.name || `animal #${req.params.id}`;
+        await db.query(
+            `INSERT INTO activity_log (action_type, description, performed_by, target_type, target_id)
+             VALUES ('animal_departed', ?, ?, 'animal', ?)`,
+            [`${name} departed the zoo`, req.user.employeeId || null, req.params.id]
+        );
         return res.json({ success: true });
+    } catch (err) {
+        return res.status(500).json({ error: err.message });
+    }
+});
+
+// GET /api/animals/:id/lifecycle-log — arrival/departure history for one
+// animal. Same shape as the employee + customer variants so the shared
+// LifecycleLogModal can consume all three.
+router.get('/:id/lifecycle-log', requireRole('admin', 'manager'), async (req, res) => {
+    try {
+        const [rows] = await db.query(
+            `SELECT al.log_id, al.action_type, al.description, al.created_at,
+                    al.performed_by,
+                    e.first_name AS performer_first, e.last_name AS performer_last,
+                    e.role       AS performer_role
+               FROM activity_log al
+               LEFT JOIN employees e ON e.employee_id = al.performed_by
+              WHERE al.target_type = 'animal'
+                AND al.target_id   = ?
+                AND al.action_type IN ('animal_added','animal_arrived','animal_departed')
+              ORDER BY al.created_at DESC`,
+            [req.params.id]
+        );
+        return res.json(rows);
     } catch (err) {
         return res.status(500).json({ error: err.message });
     }
@@ -281,6 +327,13 @@ router.post('/', requireRole('admin', 'manager', 'vet', 'caretaker'), async (req
              arrived_date || new Date().toISOString().slice(0, 10)]
         );
         await conn.commit();
+        try {
+            await db.query(
+                `INSERT INTO activity_log (action_type, description, performed_by, target_type, target_id)
+                 VALUES ('animal_added', ?, ?, 'animal', ?)`,
+                [`${name} added to the zoo`, req.user?.employeeId || null, result.insertId]
+            );
+        } catch { /* best-effort audit */ }
         return res.status(201).json({ animal_id: result.insertId });
     } catch (err) {
         await conn.rollback();

@@ -31,8 +31,22 @@ const DEPT_ICON = {
 };
 
 export default function Inventory() {
-    const { role } = useAuth();
+    const { role, deptId, deptName } = useAuth();
     const canManage = role === 'admin' || role === 'manager';
+
+    // Scope: admin sees everything; each manager sees only their own
+    // department's operational supplies. The Retail & Operations manager
+    // additionally sees the retail bucket (shop items) since retail + ops
+    // are their full surface.
+    const allowedBuckets = useMemo(() => {
+        if (role === 'admin') return null;            // null = no restriction
+        const buckets = new Set();
+        if (deptId != null) buckets.add(String(deptId));
+        if ((deptName || '').toLowerCase().includes('retail')) buckets.add('retail');
+        return buckets;
+    }, [role, deptId, deptName]);
+    const canSeeBucket = (bucket) =>
+        allowedBuckets === null || allowedBuckets.has(bucket);
 
     const [mainTab, setMainTab] = useState('items');       // items | activity
     const [deptFilter, setDeptFilter] = useState('all');   // 'all' | 'retail' | dept_id (number as string)
@@ -146,6 +160,8 @@ export default function Inventory() {
     const filteredItems = useMemo(() => {
         const term = searchTerm.toLowerCase();
         const out = allItems.filter(item => {
+            // Hide buckets the current user isn't allowed to see at all.
+            if (!canSeeBucket(item.dept_bucket)) return false;
             const inDept = deptFilter === 'all' || item.dept_bucket === deptFilter;
             if (!inDept) return false;
             if (!term) return true;
@@ -163,13 +179,29 @@ export default function Inventory() {
 
     // Dept tabs for filter pills — Retail bucket + each real department except
     // Administration (no inventory surface — admins don't hold stock).
-    const deptTabs = useMemo(() => ([
-        { key: 'all',    label: 'All' },
-        { key: 'retail', label: 'Retail' },
-        ...departments
-            .filter(d => d.dept_name !== 'Administration')
-            .map(d => ({ key: String(d.dept_id), label: d.dept_name })),
-    ]), [departments]);
+    // For non-admin managers, hide the buckets they aren't allowed to view;
+    // drop the "All" tab when they're left with a single bucket (redundant).
+    const deptTabs = useMemo(() => {
+        const full = [
+            { key: 'all',    label: 'All' },
+            { key: 'retail', label: 'Retail' },
+            ...departments
+                .filter(d => d.dept_name !== 'Administration')
+                .map(d => ({ key: String(d.dept_id), label: d.dept_name })),
+        ];
+        if (allowedBuckets === null) return full; // admin sees all
+        const real = full.filter(t => t.key !== 'all' && allowedBuckets.has(t.key));
+        return allowedBuckets.size > 1 ? [{ key: 'all', label: 'All' }, ...real] : real;
+    }, [departments, allowedBuckets]);
+
+    // Clamp deptFilter to a visible tab when the role-based tab list changes
+    // (e.g. after login, departments load in, etc.).
+    useEffect(() => {
+        if (deptTabs.length === 0) return;
+        if (!deptTabs.find(t => t.key === deptFilter)) {
+            setDeptFilter(deptTabs[0].key);
+        }
+    }, [deptTabs, deptFilter]);
 
     // Activity log derived view — only inventory-related actions, narrowed
     // by dept pill + date range.
@@ -186,12 +218,18 @@ export default function Inventory() {
             const ts = new Date(a.created_at).getTime();
             if (fromTs && ts < fromTs) return false;
             if (toTs   && ts > toTs)   return false;
+            // Classify this activity into a dept bucket so it can be filtered
+            // the same way items are: 'retail' for shop-inventory events,
+            // otherwise the performer's department.
+            const bucket = a.target_type === 'inventory'
+                ? 'retail'
+                : String(a.performer?.dept_id || '');
+            if (!canSeeBucket(bucket)) return false;
             if (deptFilter === 'all') return true;
-            if (deptFilter === 'retail') return a.target_type === 'inventory';
-            return String(a.performer?.dept_id || '') === deptFilter
-                && a.target_type !== 'inventory';
+            if (deptFilter === 'retail') return bucket === 'retail';
+            return bucket === deptFilter;
         });
-    }, [activity, deptFilter, logFrom, logTo]);
+    }, [activity, deptFilter, logFrom, logTo, allowedBuckets]);
 
     // ── Add / Delete handlers ──
     async function handleAddItem(e) {
@@ -357,7 +395,7 @@ export default function Inventory() {
                         <button key={t.key} onClick={() => setMainTab(t.key)}
                             className="glass-button"
                             style={{
-                                background: active ? GREEN : 'rgba(255,255,255,0.55)',
+                                background: active ? GREEN : 'rgba(255, 245, 231, 0.72)',
                                 color:      active ? 'white' : GREEN_DARK,
                                 padding:    '10px 18px',
                                 fontSize:   '14px',
@@ -392,7 +430,7 @@ export default function Inventory() {
                                     onClick={() => setNewItem({ ...newItem, kind: o.k })}
                                     style={{
                                         padding: '8px 16px', fontSize: '13px', fontWeight: 600,
-                                        background: newItem.kind === o.k ? GREEN : 'rgba(255,255,255,0.55)',
+                                        background: newItem.kind === o.k ? GREEN : 'rgba(255, 245, 231, 0.72)',
                                         color:      newItem.kind === o.k ? 'white' : GREEN_DARK,
                                         border: newItem.kind === o.k ? 'none' : '1px solid rgba(121,162,128,0.25)',
                                         borderRadius: '8px', cursor: 'pointer', flex: 1,
@@ -584,7 +622,7 @@ export default function Inventory() {
 function ItemsList({ loading, items, manageMode, selected, toggleSelect, onRestock, onEdit }) {
     if (loading) return <p style={{ color: GREEN_DARK }}>Loading inventory...</p>;
     if (items.length === 0) return (
-        <div className="glass-panel" style={{ padding: '40px', textAlign: 'center', color: GREEN_DARK, background: 'rgba(255,255,255,0.55)' }}>
+        <div className="glass-panel" style={{ padding: '40px', textAlign: 'center', color: GREEN_DARK, background: 'rgba(255, 245, 231, 0.72)' }}>
             <Package size={40} style={{ opacity: 0.3, marginBottom: '10px' }} />
             <p>No items in this view.</p>
         </div>
@@ -599,7 +637,7 @@ function ItemsList({ loading, items, manageMode, selected, toggleSelect, onResto
                         onClick={() => manageMode && toggleSelect(item.key)}
                         style={{
                             display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                            background: 'rgba(255,255,255,0.6)',
+                            background: 'rgba(255, 245, 231, 0.78)',
                             border: item.is_low_stock ? '1px solid rgba(239,68,68,0.45)' : '1px solid rgba(121,162,128,0.25)',
                             borderRadius: '12px', padding: '14px 16px',
                             cursor: manageMode ? 'pointer' : 'default',
@@ -711,7 +749,7 @@ function DeptBadge({ dept_name, shop_name, source }) {
 function ActivityLog({ loading, items }) {
     if (loading) return <p style={{ color: GREEN_DARK }}>Loading activity...</p>;
     if (items.length === 0) return (
-        <div className="glass-panel" style={{ padding: '40px', textAlign: 'center', color: GREEN_DARK, background: 'rgba(255,255,255,0.55)' }}>
+        <div className="glass-panel" style={{ padding: '40px', textAlign: 'center', color: GREEN_DARK, background: 'rgba(255, 245, 231, 0.72)' }}>
             <Activity size={40} style={{ opacity: 0.3, marginBottom: '10px' }} />
             <p>No inventory activity matches this filter.</p>
         </div>
@@ -720,7 +758,7 @@ function ActivityLog({ loading, items }) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             {items.map(a => (
                 <div key={a.log_id} style={{
-                    background: 'rgba(255,255,255,0.6)',
+                    background: 'rgba(255, 245, 231, 0.78)',
                     border: '1px solid rgba(121,162,128,0.25)',
                     borderRadius: '10px', padding: '12px 14px',
                     display: 'flex', justifyContent: 'space-between', alignItems: 'start', gap: '14px',
@@ -842,7 +880,7 @@ function ImagePicker({ value, onChange }) {
             <div style={{
                 width: '72px', height: '72px', flexShrink: 0,
                 borderRadius: '10px', border: '1px dashed rgba(121,162,128,0.5)',
-                background: value ? 'white' : 'rgba(255,255,255,0.6)',
+                background: value ? 'white' : 'rgba(255, 245, 231, 0.78)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
             }}>
                 {value

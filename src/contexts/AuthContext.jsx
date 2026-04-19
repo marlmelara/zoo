@@ -9,6 +9,7 @@ export function AuthProvider({ children }) {
     const [customerId, setCustomerId] = useState(null);
     const [employeeId, setEmployeeId] = useState(null);
     const [deptId, setDeptId]         = useState(null);
+    const [deptName, setDeptName]     = useState(null);
     const [loading, setLoading]       = useState(true);
 
     const applyUser = useCallback((userData) => {
@@ -17,6 +18,7 @@ export function AuthProvider({ children }) {
         setCustomerId(userData.customerId || null);
         setEmployeeId(userData.employeeId || null);
         setDeptId(userData.deptId || null);
+        setDeptName(userData.deptName || null);
     }, []);
 
     const clearAuth = useCallback(() => {
@@ -26,6 +28,7 @@ export function AuthProvider({ children }) {
         setCustomerId(null);
         setEmployeeId(null);
         setDeptId(null);
+        setDeptName(null);
     }, []);
 
     // ── Hydrate from localStorage on mount ──────────────────
@@ -70,7 +73,7 @@ export function AuthProvider({ children }) {
     }, [clearAuth]);
 
     const value = {
-        user, role, customerId, employeeId, deptId, loading,
+        user, role, customerId, employeeId, deptId, deptName, loading,
         signUp, signIn, signOut,
     };
 

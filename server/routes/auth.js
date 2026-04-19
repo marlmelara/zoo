@@ -131,7 +131,11 @@ router.post('/login', async (req, res) => {
 
         // Is this user an employee? (Must be active.)
         const [employees] = await db.query(
-            'SELECT employee_id, first_name, last_name, role, dept_id, is_active FROM employees WHERE user_id = ?',
+            `SELECT e.employee_id, e.first_name, e.last_name, e.role, e.dept_id,
+                    e.is_active, d.dept_name
+               FROM employees e
+               LEFT JOIN departments d ON d.dept_id = e.dept_id
+              WHERE e.user_id = ?`,
             [user.user_id]
         );
 
@@ -159,6 +163,7 @@ router.post('/login', async (req, res) => {
             responseUser = {
                 userId: user.user_id, email: user.email,
                 role: emp.role, employeeId: emp.employee_id,
+                deptId: emp.dept_id, deptName: emp.dept_name || null,
                 firstName: emp.first_name, lastName: emp.last_name,
             };
         } else if (activeCustomer) {

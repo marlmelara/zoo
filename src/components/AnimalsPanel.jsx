@@ -3,6 +3,7 @@
 // roles, and both vet + caretaker are the staff who actually handle
 // animal arrival and departure.
 import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import api from '../lib/api';
 import { Activity, X, Trash2, Pencil } from 'lucide-react';
 
@@ -370,13 +371,13 @@ export default function AnimalsPanel({ title = 'Animals', accentColor = 'var(--c
                 />
             )}
 
-            {selectedAnimal && (
+            {selectedAnimal && createPortal((
                 <div style={{
                     position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
                     background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(5px)',
                     display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
-                }}>
-                    <div className="glass-panel" style={{ width: '600px', maxWidth: '90vw', maxHeight: '80vh', overflowY: 'auto', padding: '30px', background: '#0f172a', border: '1px solid var(--glass-border)' }}>
+                }} onClick={() => setSelectedAnimal(null)}>
+                    <div onClick={e => e.stopPropagation()} className="glass-panel" style={{ width: '600px', maxWidth: '90vw', maxHeight: '80vh', overflowY: 'auto', padding: '30px', background: '#0f172a', border: '1px solid var(--glass-border)' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                                 <Activity color="var(--color-accent)" />
@@ -427,7 +428,7 @@ export default function AnimalsPanel({ title = 'Animals', accentColor = 'var(--c
                         )}
                     </div>
                 </div>
-            )}
+            ), document.body)}
         </div>
     );
 }
@@ -440,7 +441,7 @@ export function StatusFilter({ label = 'Status', tabs, value, onChange }) {
         <div style={{
             display: 'inline-flex',
             gap: '4px',
-            background: 'rgba(255,255,255,0.55)',
+            background: 'rgba(255, 245, 231, 0.72)',
             border: '1px solid rgba(121,162,128,0.25)',
             padding: '4px 6px',
             borderRadius: '12px',
@@ -480,7 +481,7 @@ export function DateRangeFilter({ from, to, onFrom, onTo, label = 'Date range' }
     return (
         <div style={{
             display: 'inline-flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap',
-            background: 'rgba(255,255,255,0.55)',
+            background: 'rgba(255, 245, 231, 0.72)',
             border: '1px solid rgba(121,162,128,0.25)',
             borderRadius: '12px', padding: '6px 12px',
             marginBottom: '16px',

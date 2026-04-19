@@ -173,7 +173,11 @@ export default function VetDashboard() {
         if (!empId && !resolvedEmpId && !employeeId) { setEventsLoading(false); return; }
         try {
             const data = await api.get('/events/assigned');
-            setEvents(data || []);
+            // Show earliest first — this view is about what's next on my plate.
+            const sorted = (data || []).slice().sort(
+                (a, b) => a.event_date.localeCompare(b.event_date)
+            );
+            setEvents(sorted);
         } catch (err) {
             console.error('Error fetching events:', err);
         } finally {

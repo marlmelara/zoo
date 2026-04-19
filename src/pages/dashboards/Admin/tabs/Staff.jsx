@@ -1,8 +1,12 @@
 import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import api from '../../../../lib/api';
 import { useAuth } from '../../../../contexts/AuthContext';
-import { User, Stethoscope, Briefcase, Shield, Trash2, PawPrint, ShoppingBag } from 'lucide-react';
+import { User, Stethoscope, Briefcase, Shield, Trash2, PawPrint, ShoppingBag, Pencil, X } from 'lucide-react';
 import { StatusFilter } from '../../../../components/AnimalsPanel';
+
+const GREEN      = 'rgb(123, 144, 79)';
+const GREEN_DARK = 'rgb(102, 122, 66)';
 
 export default function Staff() {
     const { role } = useAuth();
@@ -14,6 +18,8 @@ export default function Staff() {
     const [statusFilter, setStatusFilter] = useState('active');
     const [manageMode, setManageMode] = useState(false);
     const [selected, setSelected] = useState(() => new Set());
+    const [editing, setEditing] = useState(null);
+    const [editForm, setEditForm] = useState({});
     const [formData, setFormData] = useState({
         first_name: '', last_name: '', contact_info: '', pay_rate_cents: '', shift_timeframe: '', dept_id: '',
         email: '', password: '', role: 'general',
@@ -100,6 +106,37 @@ export default function Staff() {
     function exitManageMode() {
         setManageMode(false);
         setSelected(new Set());
+    }
+
+    function startEdit(person) {
+        setEditing(person);
+        setEditForm({
+            first_name: person.first_name || '',
+            last_name: person.last_name || '',
+            contact_info: person.contact_info || '',
+            shift_timeframe: person.shift_timeframe || '',
+            pay_rate: person.pay_rate_cents != null ? (person.pay_rate_cents / 100).toFixed(2) : '',
+            dept_id: person.dept_id != null ? String(person.dept_id) : '',
+        });
+    }
+    function cancelEdit() { setEditing(null); setEditForm({}); }
+    async function handleEditSave(e) {
+        e.preventDefault();
+        if (!editing) return;
+        try {
+            await api.patch(`/employees/${editing.employee_id}`, {
+                first_name: editForm.first_name,
+                last_name: editForm.last_name,
+                contact_info: editForm.contact_info || null,
+                shift_timeframe: editForm.shift_timeframe || null,
+                pay_rate_cents: editForm.pay_rate === '' ? null : Math.round(parseFloat(editForm.pay_rate) * 100),
+                dept_id: editForm.dept_id === '' ? null : parseInt(editForm.dept_id),
+            });
+            cancelEdit();
+            fetchStaff();
+        } catch (err) {
+            alert('Failed to save: ' + err.message);
+        }
     }
 
     async function handleRemoveSelected() {
@@ -302,11 +339,91 @@ export default function Staff() {
                                         <p>Office: {person.office_location}</p>
                                     )}
                                 </div>
+
+                                {canManage && !manageMode && !inactive && (
+                                    <button onClick={(e) => { e.stopPropagation(); startEdit(person); }}
+                                        title="Edit staff member"
+                                        style={{
+                                            marginTop: '12px', width: '100%',
+                                            padding: '8px 12px', fontSize: '12px', fontWeight: 600,
+                                            background: 'rgba(121,162,128,0.18)', color: GREEN_DARK,
+                                            border: '1px solid rgba(121,162,128,0.35)',
+                                            borderRadius: '8px', cursor: 'pointer',
+                                            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+                                        }}>
+                                        <Pencil size={12} /> Edit
+                                    </button>
+                                )}
                             </div>
                         );
                     })}
                 </div>
             )}
+
+            {/* Portaled edit modal — escapes the parent glass-panel backdrop-filter. */}
+            {editing && createPortal((
+                <div style={{
+                    position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
+                }} onClick={cancelEdit}>
+                    <div onClick={e => e.stopPropagation()} style={{
+                        width: '520px', maxWidth: '92vw', maxHeight: '90vh', overflowY: 'auto',
+                        padding: '28px', background: 'rgba(255,255,255,0.96)',
+                        border: `1px solid ${GREEN}`, borderRadius: '14px',
+                        boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+                    }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                            <h2 style={{ margin: 0, color: GREEN_DARK }}>Edit: {editing.first_name} {editing.last_name}</h2>
+                            <button onClick={cancelEdit} style={{ background: 'none', border: 'none', cursor: 'pointer', color: GREEN_DARK }}>
+                                <X size={20} />
+                            </button>
+                        </div>
+                        <form onSubmit={handleEditSave} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+                            <div>
+                                <label style={staffLabelStyle}>First Name</label>
+                                <input required className="glass-input" value={editForm.first_name}
+                                    onChange={e => setEditForm({ ...editForm, first_name: e.target.value })} />
+                            </div>
+                            <div>
+                                <label style={staffLabelStyle}>Last Name</label>
+                                <input required className="glass-input" value={editForm.last_name}
+                                    onChange={e => setEditForm({ ...editForm, last_name: e.target.value })} />
+                            </div>
+                            <div style={{ gridColumn: '1 / -1' }}>
+                                <label style={staffLabelStyle}>Department</label>
+                                <select required className="glass-input" value={editForm.dept_id}
+                                    onChange={e => setEditForm({ ...editForm, dept_id: e.target.value })}>
+                                    <option value="">Select department...</option>
+                                    {departments.map(d => <option key={d.dept_id} value={d.dept_id}>{d.dept_name}</option>)}
+                                </select>
+                            </div>
+                            <div>
+                                <label style={staffLabelStyle}>Shift</label>
+                                <input className="glass-input" placeholder="e.g. 09:00-17:00" value={editForm.shift_timeframe}
+                                    onChange={e => setEditForm({ ...editForm, shift_timeframe: e.target.value })} />
+                            </div>
+                            <div>
+                                <label style={staffLabelStyle}>Hourly Rate ($)</label>
+                                <input type="number" step="0.01" min="0" className="glass-input" value={editForm.pay_rate}
+                                    onChange={e => setEditForm({ ...editForm, pay_rate: e.target.value })} />
+                            </div>
+                            <div style={{ gridColumn: '1 / -1' }}>
+                                <label style={staffLabelStyle}>Contact Info</label>
+                                <input className="glass-input" value={editForm.contact_info}
+                                    onChange={e => setEditForm({ ...editForm, contact_info: e.target.value })} />
+                            </div>
+                            <div style={{ gridColumn: '1 / -1', display: 'flex', gap: '10px', marginTop: '4px' }}>
+                                <button type="button" onClick={cancelEdit} className="glass-button" style={{ flex: 1 }}>
+                                    Cancel
+                                </button>
+                                <button type="submit" className="glass-button" style={{ flex: 2, background: GREEN, color: 'white', fontWeight: 700 }}>
+                                    Save Changes
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            ), document.body)}
 
             {manageMode && (
                 <BulkActionBar
@@ -348,3 +465,13 @@ function BulkActionBar({ count, onSelectAll, onRemove, onCancel, actionLabel }) 
         </div>
     );
 }
+
+const staffLabelStyle = {
+    display: 'block',
+    fontSize: '11px',
+    color: GREEN_DARK,
+    marginBottom: '4px',
+    fontWeight: 600,
+    textTransform: 'uppercase',
+    letterSpacing: '0.04em',
+};

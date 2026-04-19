@@ -1,6 +1,6 @@
 import api from '../lib/api';
 
-export async function createTransaction({ totalAmountCents, customerId = null, guestEmail = null, isDonation = false, donationId = null, receipt = null }) {
+export async function createTransaction({ totalAmountCents, customerId = null, guestEmail = null, isDonation = false, donationId = null, receipt = null, sale_items = null }) {
     return api.post('/transactions', {
         total_amount_cents: totalAmountCents,
         customer_id: customerId,
@@ -8,6 +8,7 @@ export async function createTransaction({ totalAmountCents, customerId = null, g
         is_donation: isDonation,
         donation_id: donationId,
         receipt,
+        sale_items,
     });
 }
 

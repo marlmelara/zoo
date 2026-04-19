@@ -1,6 +1,7 @@
 import { Router } from '../lib/router.js';
 import db from '../db.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
+import { toIsoUtc } from '../lib/dates.js';
 
 const router = Router();
 
@@ -12,7 +13,7 @@ router.get('/my', requireAuth, async (req, res) => {
             `SELECT * FROM donations WHERE customer_id = ? ORDER BY donation_date DESC`,
             [customerId]
         );
-        return res.json(rows);
+        return res.json(rows.map(r => ({ ...r, donation_date: toIsoUtc(r.donation_date) })));
     } catch (err) {
         return res.status(500).json({ error: err.message });
     }
@@ -27,7 +28,7 @@ router.get('/', requireRole('admin', 'manager'), async (req, res) => {
              LEFT JOIN customers c ON d.customer_id = c.customer_id
              ORDER BY d.donation_date DESC`
         );
-        return res.json(rows);
+        return res.json(rows.map(r => ({ ...r, donation_date: toIsoUtc(r.donation_date) })));
     } catch (err) {
         return res.status(500).json({ error: err.message });
     }

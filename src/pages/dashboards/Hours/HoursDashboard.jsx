@@ -177,7 +177,7 @@ export default function HoursDashboard() {
                         onClick={() => setTab(t.key)}
                         className="glass-button"
                         style={{
-                            background: tab === t.key ? GREEN : 'rgba(255,255,255,0.5)',
+                            background: tab === t.key ? GREEN : 'rgba(255, 245, 231, 0.65)',
                             color: tab === t.key ? 'white' : GREEN_DARK,
                             padding: '10px 18px',
                             fontSize: '14px',
@@ -206,7 +206,7 @@ export default function HoursDashboard() {
                                     gridTemplateColumns: '160px 110px 110px 90px 1fr 40px',
                                     gap: '10px', alignItems: 'end',
                                     padding: '12px', borderRadius: '10px',
-                                    background: 'rgba(255,255,255,0.4)',
+                                    background: 'rgba(255, 245, 231, 0.55)',
                                     border: '1px solid rgba(121,162,128,0.25)',
                                 }}>
                                     <div>
@@ -314,7 +314,7 @@ export default function HoursDashboard() {
                                 className="glass-button"
                                 style={{
                                     padding: '6px 14px', fontSize: '12px',
-                                    background: reviewFilter === f ? GREEN : 'rgba(255,255,255,0.5)',
+                                    background: reviewFilter === f ? GREEN : 'rgba(255, 245, 231, 0.65)',
                                     color: reviewFilter === f ? 'white' : GREEN_DARK,
                                     textTransform: 'capitalize',
                                 }}>{f}</button>
@@ -400,7 +400,7 @@ function RequestList({ items, totalHours, formatDate, statusBadge, mode, onRevie
                                             {req.employee?.first_name} {req.employee?.last_name}
                                         </strong>
                                         <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '10px',
-                                            background: 'rgba(255,255,255,0.5)', color: 'var(--color-text-muted)',
+                                            background: 'rgba(255, 245, 231, 0.65)', color: 'var(--color-text-muted)',
                                             textTransform: 'capitalize' }}>
                                             {req.employee?.role}
                                         </span>
@@ -437,7 +437,7 @@ function RequestList({ items, totalHours, formatDate, statusBadge, mode, onRevie
                             <div key={e.entry_id} style={{
                                 display: 'flex', justifyContent: 'space-between', gap: '12px',
                                 padding: '6px 10px', borderRadius: '6px',
-                                background: 'rgba(255,255,255,0.4)',
+                                background: 'rgba(255, 245, 231, 0.55)',
                                 fontSize: '13px', color: 'var(--color-text-dark)',
                             }}>
                                 <span><Calendar size={12} style={{ verticalAlign: '-2px', marginRight: '4px' }} />{formatDate(e.work_date)}</span>

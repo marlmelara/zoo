@@ -393,6 +393,8 @@ export default function ManagerDashboard() {
         : activityLog;
 
     // Events filter: when (all/upcoming/past) + optional event_date range.
+    // Upcoming reads best chronologically (soonest first); past/all stay
+    // newest-first since they're retrospective.
     const todayStr = new Date().toISOString().slice(0, 10);
     const filteredEvents = (events || []).filter(ev => {
         if (eventWhen === 'upcoming' && !(ev.event_date >= todayStr)) return false;
@@ -400,6 +402,9 @@ export default function ManagerDashboard() {
         if (eventFrom && ev.event_date <  eventFrom) return false;
         if (eventTo   && ev.event_date >  eventTo)   return false;
         return true;
+    }).sort((a, b) => {
+        if (eventWhen === 'upcoming') return a.event_date.localeCompare(b.event_date);
+        return b.event_date.localeCompare(a.event_date);
     });
 
     return (
@@ -431,7 +436,7 @@ export default function ManagerDashboard() {
                             className="glass-button"
                             onClick={() => setActiveTab(tab)}
                             style={{
-                                background: active ? 'var(--color-primary)' : 'rgba(255,255,255,0.5)',
+                                background: active ? 'var(--color-primary)' : 'rgba(255, 245, 231, 0.65)',
                                 color:      active ? 'white' : MGR_GREEN_DARK,
                                 padding: '10px 20px',
                                 fontSize: '14px',
@@ -508,7 +513,7 @@ export default function ManagerDashboard() {
                         ) : allSupplies.filter(s => s.is_low_stock).map(item => (
                             <div key={item.supply_id} style={{
                                 display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                                background: 'rgba(255,255,255,0.6)', padding: '12px 15px', borderRadius: '10px',
+                                background: 'rgba(255, 245, 231, 0.78)', padding: '12px 15px', borderRadius: '10px',
                                 border: '1px solid rgba(239, 68, 68, 0.35)',
                             }}>
                                 <div>
@@ -560,7 +565,7 @@ export default function ManagerDashboard() {
                             {filteredRequests.map(req => (
                                 <div key={req.request_id} className="glass-panel" style={{
                                     padding: '20px',
-                                    background: 'rgba(255,255,255,0.55)',
+                                    background: 'rgba(255, 245, 231, 0.72)',
                                     border: req.status === 'pending' ? '1px solid rgba(245, 158, 11, 0.35)' : '1px solid rgba(121,162,128,0.25)',
                                 }}>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '10px' }}>
@@ -659,7 +664,7 @@ export default function ManagerDashboard() {
                                     : person.role === 'security'  ? { bg: 'rgba(168,85,247,0.18)', fg: '#7e22ce' }
                                     : { bg: 'rgba(121,162,128,0.18)', fg: MGR_GREEN_DARK };
                                 return (
-                                    <div key={person.employee_id} className="glass-panel" style={{ padding: '20px', background: 'rgba(255,255,255,0.6)', border: '1px solid rgba(121,162,128,0.25)' }}>
+                                    <div key={person.employee_id} className="glass-panel" style={{ padding: '20px', background: 'rgba(255, 245, 231, 0.78)', border: '1px solid rgba(121,162,128,0.25)' }}>
                                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '15px' }}>
                                             <div>
                                                 <h3 style={{ margin: '0 0 5px', color: 'var(--color-text-dark)' }}>{person.first_name} {person.last_name}</h3>
@@ -713,7 +718,7 @@ export default function ManagerDashboard() {
                             {filteredActivity.map(log => (
                                 <div key={log.log_id} style={{
                                     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                                    background: 'rgba(255,255,255,0.6)',
+                                    background: 'rgba(255, 245, 231, 0.78)',
                                     border: '1px solid rgba(121,162,128,0.25)',
                                     padding: '14px 18px', borderRadius: '10px',
                                     borderLeft: `3px solid ${
@@ -966,7 +971,7 @@ export default function ManagerDashboard() {
                             {filteredEvents.map(event => {
                                 const assigned = event.assignments || [];
                                 return (
-                                    <div key={event.event_id} className="glass-panel" style={{ padding: '20px', background: 'rgba(255,255,255,0.6)', border: '1px solid rgba(121,162,128,0.25)' }}>
+                                    <div key={event.event_id} className="glass-panel" style={{ padding: '20px', background: 'rgba(255, 245, 231, 0.78)', border: '1px solid rgba(121,162,128,0.25)' }}>
                                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '10px' }}>
                                             <div>
                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '5px' }}>

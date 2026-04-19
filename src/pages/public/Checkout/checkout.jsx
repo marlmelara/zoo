@@ -7,7 +7,7 @@ import {
 } from 'react-icons/fa';
 import { FaPersonCane } from 'react-icons/fa6';
 import { useAuth } from '../../../contexts/AuthContext';
-import { createTransaction, createSaleItems } from '../../../api/transactions';
+import { createTransaction } from '../../../api/transactions';
 import api from '../../../lib/api';
 import Navbar from '../../../components/Navbar';
 import './checkout.css';
@@ -309,13 +309,26 @@ export default function Checkout() {
         receiptItems.push({ description: `Donation — ${donationData.fund}`, quantity: 1, unitPriceCents: donationAmountCents });
       }
 
-      // 3. Create transaction + receipt atomically
+      // 3. Build sale_items up front so the transaction endpoint inserts them
+      // and decrements inventory atomically in a single call. This matters
+      // for guest checkout — the separate POST /sale-items + PATCH /decrement
+      // endpoints are staff-only, so guests previously failed at step 5.
+      const saleItemsPayload = shopItems.map(item => {
+        const price = memberDiscount > 0 ? Math.round(item.price_cents * (1 - memberDiscount)) : item.price_cents;
+        return {
+          item_id: item.item_id,
+          quantity: item.quantity,
+          price_at_sale_cents: price,
+        };
+      });
+
       const transaction = await createTransaction({
         totalAmountCents: totalCents,
         customerId: customerId || null,
         guestEmail: authMode === 'guest' ? billing.email : null,
         isDonation,
         donationId,
+        sale_items: saleItemsPayload,
         receipt: {
           email: billing.email || user?.email || '',
           customer_name: `${billing.firstName} ${billing.lastName}`.trim() || payment.cardName,
@@ -373,27 +386,8 @@ export default function Checkout() {
         await api.post('/tickets', { tickets: eventTicketRows });
       }
 
-      // 5. Process shop + food items, update inventory
-      const allPurchasedItems = [];
-
-      for (const item of shopItems) {
-        const price = memberDiscount > 0 ? Math.round(item.price_cents * (1 - memberDiscount)) : item.price_cents;
-        allPurchasedItems.push({
-          transaction_id: transaction.transaction_id,
-          item_id: item.item_id,
-          quantity: item.quantity,
-          price_at_sale_cents: price,
-        });
-      }
-
-      if (allPurchasedItems.length > 0) {
-        await createSaleItems(allPurchasedItems);
-
-        // Update stock counts
-        for (const si of allPurchasedItems) {
-          await api.post(`/inventory/${si.item_id}/decrement`, { quantity: si.quantity });
-        }
-      }
+      // 5. Shop items + inventory decrement already handled atomically
+      // inside createTransaction() via the sale_items payload above.
 
       // 5b+6: Membership + billing are "nice to have" after the money
       // already moved. If either fails, the user's tickets are already

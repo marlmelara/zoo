@@ -440,7 +440,7 @@ export default function GenEmployeeDashboard() {
                     ) : (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                             {myRequests.map(req => (
-                                <div key={req.request_id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.6)', padding: '12px 15px', borderRadius: '10px', border: '1px solid rgba(121,162,128,0.25)' }}>
+                                <div key={req.request_id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255, 245, 231, 0.78)', padding: '12px 15px', borderRadius: '10px', border: '1px solid rgba(121,162,128,0.25)' }}>
                                     <div>
                                         <span style={{ fontWeight: 700, color: 'var(--color-text-dark)' }}>{req.item_name}</span>
                                         <span style={{ color: 'var(--color-text-dark)', fontSize: '13px', marginLeft: '10px' }}>Qty: <strong>{req.requested_quantity}</strong></span>
@@ -469,7 +469,7 @@ function StockRow({ name, subtitle, stock, threshold, isLow, recommend }) {
     return (
         <div style={{
             display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-            background: 'rgba(255, 255, 255, 0.6)',
+            background: 'rgba(255, 245, 231, 0.78)',
             padding: '14px 16px', borderRadius: '10px',
             border: isLow ? '1px solid rgba(239, 68, 68, 0.45)'
                           : '1px solid rgba(121, 162, 128, 0.25)',

@@ -1,6 +1,7 @@
 import { Router } from '../lib/router.js';
 import db from '../db.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
+import { toIsoUtc } from '../lib/dates.js';
 
 const router = Router();
 
@@ -92,8 +93,12 @@ router.get('/requests', requireAuth, async (req, res) => {
             );
         }
         // Reshape so the frontend can use req.requester / req.reviewer directly.
+        // Emit DATETIMEs as ISO-UTC so the browser localizes them correctly
+        // (mysql2's naive strings are parsed as local time otherwise).
         const shaped = rows.map(r => ({
             ...r,
+            created_at:  toIsoUtc(r.created_at),
+            reviewed_at: toIsoUtc(r.reviewed_at),
             requester: r.requested_by ? {
                 first_name: r.req_first,
                 last_name:  r.req_last,

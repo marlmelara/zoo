@@ -1,7 +1,7 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Bell, AlertCircle, CheckCircle2 } from 'lucide-react';
-import { getNotifications } from '../api/notifications';
+import { Bell, AlertCircle, CheckCircle2, X } from 'lucide-react';
+import { getNotifications, dismissNotification } from '../api/notifications';
 
 const GREEN_DARK = 'rgb(102, 122, 66)';
 
@@ -23,6 +23,18 @@ export default function NotificationsBell() {
             console.error('Notifications load failed:', err);
         } finally {
             setLoading(false);
+        }
+    }
+
+    async function handleDismiss(id) {
+        // Optimistically drop the row; re-load on error to resync.
+        const prev = items;
+        setItems(list => list.filter(n => n.notification_id !== id));
+        try {
+            await dismissNotification(id);
+        } catch (err) {
+            console.error('Dismiss failed:', err);
+            setItems(prev);
         }
     }
 
@@ -185,7 +197,12 @@ export default function NotificationsBell() {
                                 <div>
                                     <SectionLabel>Handled</SectionLabel>
                                     {resolved.map(n => (
-                                        <Row key={n.notification_id} n={n} formatTime={formatTime} />
+                                        <Row
+                                            key={n.notification_id}
+                                            n={n}
+                                            formatTime={formatTime}
+                                            onDismiss={() => handleDismiss(n.notification_id)}
+                                        />
                                     ))}
                                 </div>
                             )}
@@ -213,7 +230,7 @@ function SectionLabel({ children }) {
     );
 }
 
-function Row({ n, urgent, formatTime }) {
+function Row({ n, urgent, formatTime, onDismiss }) {
     return (
         <div style={{
             padding: '12px 14px',
@@ -221,6 +238,7 @@ function Row({ n, urgent, formatTime }) {
             background: urgent ? 'rgba(239, 68, 68, 0.06)' : 'white',
             opacity: urgent ? 1 : 0.75,
             display: 'flex', gap: '10px', alignItems: 'flex-start',
+            position: 'relative',
         }}>
             <div style={{ flexShrink: 0, marginTop: '2px' }}>
                 {urgent
@@ -236,10 +254,30 @@ function Row({ n, urgent, formatTime }) {
                         {formatTime(n.created_at)}
                     </span>
                 </div>
-                <div style={{ fontSize: '13px', color: 'var(--color-text-dark)', marginTop: '2px' }}>
+                <div style={{ fontSize: '13px', color: 'var(--color-text-dark)', marginTop: '2px', paddingRight: onDismiss ? '20px' : 0 }}>
                     {n.message}
                 </div>
             </div>
+            {/* Dismiss X: only on handled rows. Unresolved rows intentionally
+                can't be dismissed — they clear themselves when the underlying
+                work is done (via the resolution triggers). */}
+            {onDismiss && (
+                <button
+                    onClick={onDismiss}
+                    title="Dismiss"
+                    aria-label="Dismiss notification"
+                    style={{
+                        position: 'absolute', right: '8px', bottom: '8px',
+                        background: 'transparent', border: 'none', cursor: 'pointer',
+                        color: 'var(--color-text-muted)', padding: '2px',
+                        borderRadius: '4px', display: 'flex',
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.background = 'rgba(0,0,0,0.06)'; e.currentTarget.style.color = GREEN_DARK; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--color-text-muted)'; }}
+                >
+                    <X size={14} />
+                </button>
+            )}
         </div>
     );
 }

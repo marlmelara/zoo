@@ -51,7 +51,7 @@ export default function AnimalMedicalPanel({ animalId, canFileMedical = false })
     return (
         <div style={{
             marginTop: '16px',
-            background: 'rgba(255,255,255,0.4)',
+            background: 'rgba(255, 245, 231, 0.55)',
             border: '1px solid rgba(121,162,128,0.2)',
             borderRadius: '10px',
             padding: '14px',
@@ -112,7 +112,7 @@ function TabBtn({ active, onClick, children }) {
     return (
         <button onClick={onClick} style={{
             padding: '6px 12px', borderRadius: '8px', border: 'none', cursor: 'pointer',
-            background: active ? GREEN : 'rgba(255,255,255,0.6)',
+            background: active ? GREEN : 'rgba(255, 245, 231, 0.78)',
             color: active ? 'white' : GREEN_DARK,
             fontSize: '12px', fontWeight: 600,
             display: 'flex', alignItems: 'center', gap: '4px',
@@ -126,7 +126,7 @@ function MedicalEntry({ h }) {
     return (
         <div style={{
             padding: '10px 12px', borderRadius: '8px',
-            background: 'rgba(255,255,255,0.6)',
+            background: 'rgba(255, 245, 231, 0.78)',
             border: '1px solid rgba(121,162,128,0.2)',
             marginBottom: '6px', fontSize: '13px',
         }}>
@@ -173,7 +173,7 @@ function CareEntry({ c }) {
     return (
         <div style={{
             padding: '10px 12px', borderRadius: '8px',
-            background: 'rgba(255,255,255,0.6)',
+            background: 'rgba(255, 245, 231, 0.78)',
             border: '1px solid rgba(121,162,128,0.2)',
             marginBottom: '6px', fontSize: '13px',
         }}>

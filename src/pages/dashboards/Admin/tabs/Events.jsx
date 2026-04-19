@@ -1,8 +1,12 @@
 import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { getAdminEvents as fetchEventsApi } from '../../../../api/events';
 import api from '../../../../lib/api';
-import { Calendar, Users, X, Plus, User, Cat, MapPin, Clock, Trash2, AlertTriangle, Archive } from 'lucide-react';
+import { Calendar, Users, X, Plus, User, Cat, MapPin, Clock, Trash2, AlertTriangle, Archive, Pencil } from 'lucide-react';
 import { StatusFilter } from '../../../../components/AnimalsPanel';
+
+const GREEN      = 'rgb(123, 144, 79)';
+const GREEN_DARK = 'rgb(102, 122, 66)';
 
 export default function Events() {
   const [events, setEvents] = useState([]);
@@ -31,6 +35,11 @@ export default function Events() {
 
   // Delete confirm
   const [deleteConfirm, setDeleteConfirm] = useState(null);
+
+  // Edit event modal
+  const [editing, setEditing] = useState(null);
+  const [editForm, setEditForm] = useState({});
+  const [editError, setEditError] = useState('');
 
   useEffect(() => {
     loadEvents();
@@ -191,6 +200,61 @@ export default function Events() {
     }
   }
 
+  // ── Edit event (PATCH) ──
+  function startEditEvent(event) {
+    setEditing(event);
+    setEditError('');
+    setEditForm({
+      title: event.title || '',
+      description: event.description || '',
+      event_date: event.event_date ? event.event_date.slice(0, 10) : '',
+      venue_id: event.venue_id != null ? String(event.venue_id) : '',
+      start_time: event.start_time ? event.start_time.slice(0, 5) : '',
+      end_time:   event.end_time   ? event.end_time.slice(0, 5)   : '',
+      max_capacity: event.max_capacity ?? 100,
+      ticket_price_cents: event.ticket_price_cents != null ? (event.ticket_price_cents / 100).toFixed(2) : '0.00',
+    });
+  }
+  function cancelEditEvent() { setEditing(null); setEditForm({}); setEditError(''); }
+  async function handleEditEventSave(e) {
+    e.preventDefault();
+    setEditError('');
+    const { title, event_date, venue_id, start_time, end_time, max_capacity, ticket_price_cents } = editForm;
+    if (!title || !event_date || !venue_id || !start_time || !end_time) {
+      setEditError('Please fill in all required fields.');
+      return;
+    }
+    if (start_time < '09:00' || end_time > '17:00') {
+      setEditError('Events must be within zoo hours: 9:00 AM – 5:00 PM.');
+      return;
+    }
+    if (end_time <= start_time) {
+      setEditError('End time must be after start time.');
+      return;
+    }
+    const venue = venues.find(v => v.venue_id === parseInt(venue_id));
+    if (venue && max_capacity > venue.capacity) {
+      setEditError(`Max capacity cannot exceed venue capacity of ${venue.capacity}.`);
+      return;
+    }
+    try {
+      await api.patch(`/events/${editing.event_id}`, {
+        title,
+        description: editForm.description || null,
+        event_date,
+        venue_id: parseInt(venue_id),
+        start_time: start_time + ':00',
+        end_time:   end_time   + ':00',
+        max_capacity: parseInt(max_capacity),
+        ticket_price_cents: Math.round(parseFloat(ticket_price_cents) * 100) || 0,
+      });
+      cancelEditEvent();
+      loadEvents();
+    } catch (err) {
+      setEditError('Failed to save: ' + err.message);
+    }
+  }
+
   // ── Archive event (soft-delete). Existing tickets/receipts still resolve.
   async function handleArchiveEvent(eventId) {
     try {
@@ -247,6 +311,12 @@ export default function Events() {
     if (filter === 'upcoming') return ev.event_date >= todayStr;
     if (filter === 'past')     return ev.event_date <  todayStr;
     return true; // 'all'
+  })
+  // Upcoming reads best chronologically (soonest first). Past / all /
+  // archived stay newest-first since they're retrospective views.
+  .sort((a, b) => {
+    if (filter === 'upcoming') return a.event_date.localeCompare(b.event_date);
+    return b.event_date.localeCompare(a.event_date);
   });
 
   return (
@@ -401,140 +471,167 @@ export default function Events() {
       )}
 
       {/* ══ Event Detail Modal ══ */}
-      {selectedEvent && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(5px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
-          <div className="glass-panel" style={{ width: '600px', maxWidth: '90vw', maxHeight: '85vh', overflowY: 'auto', padding: '30px', background: '#0f172a', border: '1px solid var(--glass-border)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <h2 style={{ margin: 0 }}>{selectedEvent.title || 'Event Details'}</h2>
-              <div style={{ display: 'flex', gap: '8px' }}>
+      {/* Styled to match the Edit modal — cream background, green accents,
+          dark text — so the two popups feel like part of the same surface. */}
+      {selectedEvent && createPortal((
+        <div onClick={() => setSelectedEvent(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+          <div onClick={e => e.stopPropagation()} style={{
+            width: '600px', maxWidth: '92vw', maxHeight: '90vh', overflowY: 'auto',
+            padding: '28px', background: 'rgba(255,255,255,0.96)', color: 'var(--color-text-dark)',
+            border: `1px solid ${GREEN}`, borderRadius: '14px',
+            boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px' }}>
+              <h2 style={{ margin: 0, color: GREEN_DARK }}>{selectedEvent.title || 'Event Details'}</h2>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                 {!selectedEvent.is_archived && (
-                  <button onClick={() => setDeleteConfirm(selectedEvent.event_id)} style={{ background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '8px', padding: '6px 10px', color: '#fca5a5', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.8rem' }}>
+                  <button onClick={() => { const ev = selectedEvent; setSelectedEvent(null); startEditEvent(ev); }}
+                    style={{ background: 'rgba(121,162,128,0.18)', border: `1px solid ${GREEN}`, borderRadius: '8px', padding: '6px 12px', color: GREEN_DARK, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', fontWeight: 600 }}>
+                    <Pencil size={14} /> Edit
+                  </button>
+                )}
+                {!selectedEvent.is_archived && (
+                  <button onClick={() => setDeleteConfirm(selectedEvent.event_id)} style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.35)', borderRadius: '8px', padding: '6px 12px', color: '#b91c1c', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', fontWeight: 600 }}>
                     <Archive size={14} /> Archive
                   </button>
                 )}
-                <button onClick={() => setSelectedEvent(null)} style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer' }}>
-                  <X />
+                <button onClick={() => setSelectedEvent(null)} style={{ background: 'none', border: 'none', color: GREEN_DARK, cursor: 'pointer' }}>
+                  <X size={20} />
                 </button>
               </div>
             </div>
 
             {deleteConfirm === selectedEvent.event_id && (
-              <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '8px', padding: '12px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-                <AlertTriangle size={16} color="#fca5a5" />
-                <span style={{ fontSize: '0.85rem', color: '#fca5a5', flex: 1 }}>
+              <div style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.35)', borderRadius: '8px', padding: '12px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                <AlertTriangle size={16} color="#b91c1c" />
+                <span style={{ fontSize: '0.85rem', color: '#b91c1c', flex: 1 }}>
                   Archive this event? Already-purchased tickets stay visible to customers, but the event disappears from public listings. Archives are permanent — create a new event to bring it back.
                 </span>
-                <button onClick={() => handleArchiveEvent(selectedEvent.event_id)} style={{ background: '#ef4444', border: 'none', borderRadius: '6px', padding: '6px 14px', color: 'white', cursor: 'pointer', fontWeight: '600', fontSize: '0.8rem' }}>
+                <button onClick={() => handleArchiveEvent(selectedEvent.event_id)} style={{ background: '#ef4444', border: 'none', borderRadius: '6px', padding: '6px 14px', color: 'white', cursor: 'pointer', fontWeight: 700, fontSize: '0.8rem' }}>
                   Confirm Archive
                 </button>
-                <button onClick={() => setDeleteConfirm(null)} style={{ background: 'transparent', border: '1px solid var(--glass-border)', borderRadius: '6px', padding: '6px 14px', color: 'white', cursor: 'pointer', fontSize: '0.8rem' }}>
+                <button onClick={() => setDeleteConfirm(null)} style={{ background: 'transparent', border: `1px solid ${GREEN}`, borderRadius: '6px', padding: '6px 14px', color: GREEN_DARK, cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600 }}>
                   Cancel
                 </button>
               </div>
             )}
 
-            <div style={{ marginBottom: '24px', paddingBottom: '16px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-              {selectedEvent.description && <p style={{ color: 'var(--color-text-muted)', marginBottom: '12px' }}>{selectedEvent.description}</p>}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '0.9rem' }}>
-                <div><Calendar size={14} style={{ marginRight: '6px' }} />{new Date(selectedEvent.event_date + 'T00:00:00').toDateString()}</div>
-                {selectedEvent.start_time && <div><Clock size={14} style={{ marginRight: '6px' }} />{selectedEvent.start_time?.slice(0, 5)} - {selectedEvent.end_time?.slice(0, 5)}</div>}
-                {selectedEvent.venue_id && <div><MapPin size={14} style={{ marginRight: '6px' }} />{getVenueName(selectedEvent.venue_id)}</div>}
-                <div><Users size={14} style={{ marginRight: '6px' }} />{selectedEvent.actual_attendance || 0} / {selectedEvent.max_capacity}</div>
+            <div style={{ marginBottom: '22px', paddingBottom: '16px', borderBottom: `1px solid ${GREEN}33` }}>
+              {selectedEvent.description && <p style={{ color: 'var(--color-text-dark)', marginBottom: '12px', opacity: 0.85 }}>{selectedEvent.description}</p>}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', fontSize: '0.9rem', color: GREEN_DARK, fontWeight: 600 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><Calendar size={14} color={GREEN} />{new Date(selectedEvent.event_date + 'T00:00:00').toDateString()}</div>
+                {selectedEvent.start_time && <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><Clock size={14} color={GREEN} />{selectedEvent.start_time?.slice(0, 5)} - {selectedEvent.end_time?.slice(0, 5)}</div>}
+                {selectedEvent.venue_id && <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><MapPin size={14} color={GREEN} />{getVenueName(selectedEvent.venue_id)}</div>}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><Users size={14} color={GREEN} />{selectedEvent.actual_attendance || 0} / {selectedEvent.max_capacity}</div>
               </div>
               {selectedEvent.ticket_price_cents > 0 && (
-                <p style={{ marginTop: '8px', color: 'var(--color-primary)', fontWeight: 600 }}>
+                <p style={{ marginTop: '10px', color: GREEN_DARK, fontWeight: 700 }}>
                   Ticket Price: ${(selectedEvent.ticket_price_cents / 100).toFixed(2)}
                 </p>
               )}
             </div>
 
-            <h3>Personnel & Animals</h3>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '24px' }}>
-              <div style={{ background: 'rgba(255,255,255,0.05)', padding: '12px', borderRadius: '10px' }}>
-                <h4 style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: 0, fontSize: '0.9rem' }}><User size={14} /> Personnel</h4>
+            <h3 style={{ color: GREEN_DARK, margin: '0 0 12px' }}>Personnel & Animals</h3>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '20px' }}>
+              <div style={{ background: 'rgba(121,162,128,0.08)', border: `1px solid ${GREEN}33`, padding: '12px', borderRadius: '10px' }}>
+                <h4 style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: 0, marginBottom: '10px', fontSize: '0.88rem', color: GREEN_DARK }}><User size={14} /> Personnel</h4>
                 {assignments.filter(a => a.employee_id).map(a => (
-                  <div key={a.assignment_id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.82rem', marginBottom: '4px' }}>
+                  <div key={a.assignment_id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.82rem', marginBottom: '4px', color: 'var(--color-text-dark)' }}>
                     <span>
                       {a.first_name} {a.last_name}
-                      <span style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', marginLeft: '4px' }}>({a.dept_name})</span>
+                      <span style={{ fontSize: '0.7rem', color: GREEN_DARK, marginLeft: '4px', opacity: 0.8 }}>({a.dept_name})</span>
                     </span>
-                    <button onClick={() => handleRemoveAssignment(a.assignment_id)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '0 4px', fontSize: '14px', lineHeight: 1 }} title="Remove">&times;</button>
+                    <button onClick={() => handleRemoveAssignment(a.assignment_id)} style={{ background: 'none', border: 'none', color: '#b91c1c', cursor: 'pointer', padding: '0 4px', fontSize: '16px', lineHeight: 1, fontWeight: 700 }} title="Remove">&times;</button>
                   </div>
                 ))}
-                {assignments.filter(a => a.employee_id).length === 0 && <p style={{ fontSize: '0.75rem', color: 'gray' }}>None assigned.</p>}
+                {assignments.filter(a => a.employee_id).length === 0 && <p style={{ fontSize: '0.75rem', color: GREEN_DARK, opacity: 0.7, margin: 0, fontStyle: 'italic' }}>None assigned.</p>}
               </div>
-              <div style={{ background: 'rgba(255,255,255,0.05)', padding: '12px', borderRadius: '10px' }}>
-                <h4 style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: 0, fontSize: '0.9rem' }}><Cat size={14} /> Animals</h4>
+              <div style={{ background: 'rgba(121,162,128,0.08)', border: `1px solid ${GREEN}33`, padding: '12px', borderRadius: '10px' }}>
+                <h4 style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: 0, marginBottom: '10px', fontSize: '0.88rem', color: GREEN_DARK }}><Cat size={14} /> Animals</h4>
                 {assignments.filter(a => a.animal_id).map(a => (
-                  <div key={a.assignment_id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.82rem', marginBottom: '4px' }}>
+                  <div key={a.assignment_id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.82rem', marginBottom: '4px', color: 'var(--color-text-dark)' }}>
                     <span>
                       {a.animal_name}
-                      <span style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', marginLeft: '4px' }}>({a.species_common_name})</span>
+                      <span style={{ fontSize: '0.7rem', color: GREEN_DARK, marginLeft: '4px', opacity: 0.8 }}>({a.species_common_name})</span>
                     </span>
-                    <button onClick={() => handleRemoveAssignment(a.assignment_id)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '0 4px', fontSize: '14px', lineHeight: 1 }} title="Remove">&times;</button>
+                    <button onClick={() => handleRemoveAssignment(a.assignment_id)} style={{ background: 'none', border: 'none', color: '#b91c1c', cursor: 'pointer', padding: '0 4px', fontSize: '16px', lineHeight: 1, fontWeight: 700 }} title="Remove">&times;</button>
                   </div>
                 ))}
-                {assignments.filter(a => a.animal_id).length === 0 && <p style={{ fontSize: '0.75rem', color: 'gray' }}>None assigned.</p>}
+                {assignments.filter(a => a.animal_id).length === 0 && <p style={{ fontSize: '0.75rem', color: GREEN_DARK, opacity: 0.7, margin: 0, fontStyle: 'italic' }}>None assigned.</p>}
               </div>
             </div>
 
-            <form onSubmit={handleAssign} style={{ background: 'rgba(255,255,255,0.05)', padding: '16px', borderRadius: '10px' }}>
-              <h4 style={{ marginTop: 0, fontSize: '0.9rem' }}>Assign Personnel / Animal</h4>
+            <form onSubmit={handleAssign} style={{ background: 'rgba(121,162,128,0.08)', border: `1px solid ${GREEN}33`, padding: '16px', borderRadius: '10px' }}>
+              <h4 style={{ marginTop: 0, marginBottom: '10px', fontSize: '0.88rem', color: GREEN_DARK }}>Assign Personnel / Animal</h4>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '8px' }}>
-                <select className="glass-input" value={assignmentForm.employee_id} onChange={(e) => setAssignmentForm({ employee_id: e.target.value, animal_id: '' })}>
+                <select style={modalSelectStyle} value={assignmentForm.employee_id} onChange={(e) => setAssignmentForm({ employee_id: e.target.value, animal_id: '' })}>
                   <option value="">Select Staff...</option>
                   {staff.filter(s => !assignments.some(a => a.employee_id === s.employee_id)).map(s => <option key={s.employee_id} value={s.employee_id}>{s.first_name} {s.last_name}</option>)}
                 </select>
-                <div style={{ textAlign: 'center', fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>OR</div>
-                <select className="glass-input" value={assignmentForm.animal_id} onChange={(e) => setAssignmentForm({ animal_id: e.target.value, employee_id: '' })}>
+                <div style={{ textAlign: 'center', fontSize: '0.75rem', color: GREEN_DARK, fontWeight: 600, letterSpacing: '0.08em' }}>OR</div>
+                <select style={modalSelectStyle} value={assignmentForm.animal_id} onChange={(e) => setAssignmentForm({ animal_id: e.target.value, employee_id: '' })}>
                   <option value="">Select Animal...</option>
                   {animals.filter(a => !assignments.some(asn => asn.animal_id === a.animal_id)).map(a => <option key={a.animal_id} value={a.animal_id}>{a.name} ({a.species_common_name})</option>)}
                 </select>
               </div>
-              <button type="submit" disabled={!assignmentForm.employee_id && !assignmentForm.animal_id} className="glass-button" style={{ width: '100%', marginTop: '12px' }}>
-                <Plus size={16} style={{ marginRight: '4px' }} /> Assign
+              <button type="submit" disabled={!assignmentForm.employee_id && !assignmentForm.animal_id}
+                style={{
+                  width: '100%', marginTop: '12px', padding: '10px',
+                  background: (!assignmentForm.employee_id && !assignmentForm.animal_id) ? 'rgba(121,162,128,0.2)' : GREEN,
+                  color: 'white', border: 'none', borderRadius: '8px', fontWeight: 700,
+                  cursor: (!assignmentForm.employee_id && !assignmentForm.animal_id) ? 'not-allowed' : 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', fontSize: '0.85rem',
+                }}>
+                <Plus size={16} /> Assign
               </button>
             </form>
           </div>
         </div>
-      )}
+      ), document.body)}
 
       {/* ══ Create Event Modal ══ */}
-      {showCreate && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(5px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
-          <div className="glass-panel" style={{ width: '550px', maxWidth: '90vw', maxHeight: '85vh', overflowY: 'auto', padding: '30px', background: '#0f172a', border: '1px solid var(--glass-border)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <h2 style={{ margin: 0 }}>Create Event</h2>
-              <button onClick={() => { setShowCreate(false); setCreateError(''); }} style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer' }}>
-                <X />
+      {/* Themed to match the Edit modal: cream background, green accents,
+          dark text, click-outside-to-close. */}
+      {showCreate && createPortal((
+        <div onClick={() => { setShowCreate(false); setCreateError(''); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+          <div onClick={e => e.stopPropagation()} style={{
+            width: '550px', maxWidth: '92vw', maxHeight: '90vh', overflowY: 'auto',
+            padding: '28px', background: 'rgba(255,255,255,0.96)', color: 'var(--color-text-dark)',
+            border: `1px solid ${GREEN}`, borderRadius: '14px',
+            boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <h2 style={{ margin: 0, color: GREEN_DARK }}>Create Event</h2>
+              <button onClick={() => { setShowCreate(false); setCreateError(''); }} style={{ background: 'none', border: 'none', color: GREEN_DARK, cursor: 'pointer' }}>
+                <X size={20} />
               </button>
             </div>
 
             {createError && (
-              <div style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '8px', padding: '10px 12px', marginBottom: '14px', fontSize: '0.82rem', color: '#fca5a5', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '8px', padding: '10px 12px', marginBottom: '14px', fontSize: '0.82rem', color: '#b91c1c', display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <AlertTriangle size={14} /> {createError}
               </div>
             )}
 
-            <form onSubmit={handleCreateEvent} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            <form onSubmit={handleCreateEvent} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <div>
-                <label style={labelStyle}>Title <span style={{ color: '#ef4444' }}>*</span></label>
-                <input className="glass-input" style={inputStyle} value={createForm.title} onChange={e => setCreateForm(p => ({ ...p, title: e.target.value }))} placeholder="Event title" required />
+                <label style={editLabelStyle}>Title <span style={{ color: '#b91c1c' }}>*</span></label>
+                <input className="glass-input" value={createForm.title} onChange={e => setCreateForm(p => ({ ...p, title: e.target.value }))} placeholder="Event title" required />
               </div>
 
               <div>
-                <label style={labelStyle}>Description</label>
-                <textarea className="glass-input" style={{ ...inputStyle, minHeight: '60px', resize: 'vertical' }} value={createForm.description} onChange={e => setCreateForm(p => ({ ...p, description: e.target.value }))} placeholder="Optional description" />
+                <label style={editLabelStyle}>Description</label>
+                <textarea className="glass-input" style={{ minHeight: '60px', resize: 'vertical' }} value={createForm.description} onChange={e => setCreateForm(p => ({ ...p, description: e.target.value }))} placeholder="Optional description" />
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                 <div>
-                  <label style={labelStyle}>Date <span style={{ color: '#ef4444' }}>*</span></label>
-                  <input type="date" className="glass-input" style={inputStyle} value={createForm.event_date} onChange={e => setCreateForm(p => ({ ...p, event_date: e.target.value }))} required />
+                  <label style={editLabelStyle}>Date <span style={{ color: '#b91c1c' }}>*</span></label>
+                  <input type="date" className="glass-input" value={createForm.event_date} onChange={e => setCreateForm(p => ({ ...p, event_date: e.target.value }))} required />
                 </div>
                 <div>
-                  <label style={labelStyle}>Venue <span style={{ color: '#ef4444' }}>*</span></label>
-                  <select className="glass-input" style={inputStyle} value={createForm.venue_id} onChange={e => setCreateForm(p => ({ ...p, venue_id: e.target.value }))} required>
+                  <label style={editLabelStyle}>Venue <span style={{ color: '#b91c1c' }}>*</span></label>
+                  <select className="glass-input" value={createForm.venue_id} onChange={e => setCreateForm(p => ({ ...p, venue_id: e.target.value }))} required>
                     <option value="">Select venue...</option>
                     {venues.map(v => <option key={v.venue_id} value={v.venue_id}>{v.venue_name} (Cap: {v.capacity})</option>)}
                   </select>
@@ -543,33 +640,105 @@ export default function Events() {
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                 <div>
-                  <label style={labelStyle}>Start Time <span style={{ color: '#ef4444' }}>*</span> <span style={{ color: 'var(--color-text-muted)', fontWeight: 'normal', fontSize: '0.75rem' }}>(9am-5pm)</span></label>
-                  <input type="time" className="glass-input" style={inputStyle} value={createForm.start_time} onChange={e => setCreateForm(p => ({ ...p, start_time: e.target.value }))} min="09:00" max="17:00" required />
+                  <label style={editLabelStyle}>Start Time <span style={{ color: '#b91c1c' }}>*</span> <span style={{ color: GREEN_DARK, opacity: 0.7, fontWeight: 500, textTransform: 'none', letterSpacing: 0, fontSize: '10px' }}>(9am-5pm)</span></label>
+                  <input type="time" className="glass-input" value={createForm.start_time} onChange={e => setCreateForm(p => ({ ...p, start_time: e.target.value }))} min="09:00" max="17:00" required />
                 </div>
                 <div>
-                  <label style={labelStyle}>End Time <span style={{ color: '#ef4444' }}>*</span> <span style={{ color: 'var(--color-text-muted)', fontWeight: 'normal', fontSize: '0.75rem' }}>(min 2hrs)</span></label>
-                  <input type="time" className="glass-input" style={inputStyle} value={createForm.end_time} onChange={e => setCreateForm(p => ({ ...p, end_time: e.target.value }))} min="09:00" max="17:00" required />
+                  <label style={editLabelStyle}>End Time <span style={{ color: '#b91c1c' }}>*</span> <span style={{ color: GREEN_DARK, opacity: 0.7, fontWeight: 500, textTransform: 'none', letterSpacing: 0, fontSize: '10px' }}>(min 2hrs)</span></label>
+                  <input type="time" className="glass-input" value={createForm.end_time} onChange={e => setCreateForm(p => ({ ...p, end_time: e.target.value }))} min="09:00" max="17:00" required />
                 </div>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                 <div>
-                  <label style={labelStyle}>Max Capacity</label>
-                  <input type="number" className="glass-input" style={inputStyle} value={createForm.max_capacity} onChange={e => setCreateForm(p => ({ ...p, max_capacity: e.target.value }))} min={1} />
+                  <label style={editLabelStyle}>Max Capacity</label>
+                  <input type="number" className="glass-input" value={createForm.max_capacity} onChange={e => setCreateForm(p => ({ ...p, max_capacity: e.target.value }))} min={1} />
                 </div>
                 <div>
-                  <label style={labelStyle}>Ticket Price ($)</label>
-                  <input type="number" step="0.01" className="glass-input" style={inputStyle} value={createForm.ticket_price_cents} onChange={e => setCreateForm(p => ({ ...p, ticket_price_cents: e.target.value }))} min={0} placeholder="0.00 = free" />
+                  <label style={editLabelStyle}>Ticket Price ($)</label>
+                  <input type="number" step="0.01" className="glass-input" value={createForm.ticket_price_cents} onChange={e => setCreateForm(p => ({ ...p, ticket_price_cents: e.target.value }))} min={0} placeholder="0.00 = free" />
                 </div>
               </div>
 
-              <button type="submit" className="glass-button" style={{ width: '100%', marginTop: '4px', padding: '12px' }}>
-                Create Event
-              </button>
+              <div style={{ display: 'flex', gap: '10px', marginTop: '6px' }}>
+                <button type="button" onClick={() => { setShowCreate(false); setCreateError(''); }} className="glass-button" style={{ flex: 1 }}>Cancel</button>
+                <button type="submit" className="glass-button" style={{ flex: 2, background: GREEN, color: 'white', fontWeight: 700 }}>Create Event</button>
+              </div>
             </form>
           </div>
         </div>
-      )}
+      ), document.body)}
+
+      {/* ══ Edit Event Modal (portaled) ══ */}
+      {editing && createPortal((
+        <div onClick={cancelEditEvent} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+          <div onClick={e => e.stopPropagation()} style={{
+            width: '550px', maxWidth: '92vw', maxHeight: '90vh', overflowY: 'auto',
+            padding: '28px', background: 'rgba(255,255,255,0.96)', color: 'var(--color-text-dark)',
+            border: `1px solid ${GREEN}`, borderRadius: '14px',
+            boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <h2 style={{ margin: 0, color: GREEN_DARK }}>Edit: {editing.title}</h2>
+              <button onClick={cancelEditEvent} style={{ background: 'none', border: 'none', cursor: 'pointer', color: GREEN_DARK }}>
+                <X size={20} />
+              </button>
+            </div>
+            {editError && (
+              <div style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '8px', padding: '10px 12px', marginBottom: '14px', fontSize: '0.82rem', color: '#b91c1c', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <AlertTriangle size={14} /> {editError}
+              </div>
+            )}
+            <form onSubmit={handleEditEventSave} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div>
+                <label style={editLabelStyle}>Title *</label>
+                <input required className="glass-input" value={editForm.title} onChange={e => setEditForm({ ...editForm, title: e.target.value })} />
+              </div>
+              <div>
+                <label style={editLabelStyle}>Description</label>
+                <textarea className="glass-input" style={{ minHeight: '60px', resize: 'vertical' }} value={editForm.description} onChange={e => setEditForm({ ...editForm, description: e.target.value })} />
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div>
+                  <label style={editLabelStyle}>Date *</label>
+                  <input type="date" required className="glass-input" value={editForm.event_date} onChange={e => setEditForm({ ...editForm, event_date: e.target.value })} />
+                </div>
+                <div>
+                  <label style={editLabelStyle}>Venue *</label>
+                  <select required className="glass-input" value={editForm.venue_id} onChange={e => setEditForm({ ...editForm, venue_id: e.target.value })}>
+                    <option value="">Select venue...</option>
+                    {venues.map(v => <option key={v.venue_id} value={v.venue_id}>{v.venue_name} (Cap: {v.capacity})</option>)}
+                  </select>
+                </div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div>
+                  <label style={editLabelStyle}>Start *</label>
+                  <input type="time" required min="09:00" max="17:00" className="glass-input" value={editForm.start_time} onChange={e => setEditForm({ ...editForm, start_time: e.target.value })} />
+                </div>
+                <div>
+                  <label style={editLabelStyle}>End *</label>
+                  <input type="time" required min="09:00" max="17:00" className="glass-input" value={editForm.end_time} onChange={e => setEditForm({ ...editForm, end_time: e.target.value })} />
+                </div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div>
+                  <label style={editLabelStyle}>Max Capacity</label>
+                  <input type="number" min={1} className="glass-input" value={editForm.max_capacity} onChange={e => setEditForm({ ...editForm, max_capacity: e.target.value })} />
+                </div>
+                <div>
+                  <label style={editLabelStyle}>Ticket Price ($)</label>
+                  <input type="number" step="0.01" min={0} className="glass-input" value={editForm.ticket_price_cents} onChange={e => setEditForm({ ...editForm, ticket_price_cents: e.target.value })} />
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: '10px', marginTop: '6px' }}>
+                <button type="button" onClick={cancelEditEvent} className="glass-button" style={{ flex: 1 }}>Cancel</button>
+                <button type="submit" className="glass-button" style={{ flex: 2, background: GREEN, color: 'white', fontWeight: 700 }}>Save Changes</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ), document.body)}
     </div>
   );
 }
@@ -586,4 +755,27 @@ const inputStyle = {
   width: '100%',
   padding: '10px',
   boxSizing: 'border-box',
+};
+
+const editLabelStyle = {
+  display: 'block',
+  fontSize: '11px',
+  color: GREEN_DARK,
+  marginBottom: '4px',
+  fontWeight: 600,
+  textTransform: 'uppercase',
+  letterSpacing: '0.04em',
+};
+
+// Selects inside the cream-themed event-detail modal — `glass-input` is
+// designed for the dark panels; on white it renders light-on-light.
+const modalSelectStyle = {
+  width: '100%',
+  padding: '8px 10px',
+  background: 'white',
+  color: 'var(--color-text-dark)',
+  border: `1px solid ${GREEN}55`,
+  borderRadius: '8px',
+  fontSize: '0.88rem',
+  fontFamily: 'inherit',
 };

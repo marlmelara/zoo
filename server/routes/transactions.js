@@ -1,6 +1,7 @@
 import { Router } from '../lib/router.js';
 import db from '../db.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
+import { toIsoUtc } from '../lib/dates.js';
 
 const router = Router();
 
@@ -52,20 +53,6 @@ router.get('/my', requireAuth, async (req, res) => {
                 case 'member': return 'Member';
                 default:       return type ? type.charAt(0).toUpperCase() + type.slice(1) : 'General';
             }
-        };
-
-        // mysql2 returns DATETIMEs as naive strings ("YYYY-MM-DD HH:MM:SS") due
-        // to `dateStrings: true` in db.js. We store UTC (timezone: '+00:00'),
-        // but the browser's `new Date(str)` parses the naive form as *local*,
-        // shifting timestamps by the UTC offset. Re-emit as ISO with Z so
-        // clients always see the true UTC instant and can localize themselves.
-        const toIsoUtc = (v) => {
-            if (!v) return v;
-            if (v instanceof Date) return v.toISOString();
-            const s = String(v);
-            // Already ISO? leave it.
-            if (s.includes('T') && (s.endsWith('Z') || /[+-]\d{2}:\d{2}$/.test(s))) return s;
-            return s.replace(' ', 'T') + 'Z';
         };
 
         const shaped = txns.map(t => {
@@ -125,14 +112,7 @@ router.get('/', requireRole('admin', 'manager'), async (req, res) => {
              ORDER BY t.transaction_date DESC`
         );
         // Same UTC normalization as /my so the admin log matches reality.
-        const shaped = rows.map(r => {
-            if (!r.transaction_date) return r;
-            const s = String(r.transaction_date);
-            const iso = (s.includes('T') && (s.endsWith('Z') || /[+-]\d{2}:\d{2}$/.test(s)))
-                ? s
-                : s.replace(' ', 'T') + 'Z';
-            return { ...r, transaction_date: iso };
-        });
+        const shaped = rows.map(r => ({ ...r, transaction_date: toIsoUtc(r.transaction_date) }));
         return res.json(shaped);
     } catch (err) {
         return res.status(500).json({ error: err.message });

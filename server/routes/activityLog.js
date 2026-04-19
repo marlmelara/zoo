@@ -1,6 +1,7 @@
 import { Router } from '../lib/router.js';
 import db from '../db.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
+import { toIsoUtc } from '../lib/dates.js';
 
 const router = Router();
 
@@ -24,8 +25,10 @@ router.get('/', requireRole('admin','manager'), async (req, res) => {
 
         const [rows] = await db.query(query, params);
         // Reshape to include a nested performer for the frontend.
+        // created_at → ISO-UTC so toLocaleTimeString() shows the user's local time.
         const shaped = rows.map(r => ({
             ...r,
+            created_at: toIsoUtc(r.created_at),
             performer: r.performed_by ? {
                 first_name: r.first_name,
                 last_name:  r.last_name,

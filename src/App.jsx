@@ -69,6 +69,23 @@ const RoleRoute = ({ allowed }) => {
   return allowed.includes(role) ? <Outlet /> : <Navigate to="/dashboard" replace />;
 };
 
+// Animals page: admin, or manager whose department actually works with
+// animals (Vet / Caretaker). Other managers (Retail, Security, etc.)
+// shouldn't see the animal roster even if they type the URL directly.
+// Match is case-insensitive + substring so "Vet", "Veterinary Services",
+// "Animal Care", "Animal Health", etc. all qualify — department names
+// vary between seed data and production.
+const isAnimalDept = (deptName) => {
+  const n = (deptName || '').toLowerCase();
+  return n.includes('vet') || n.includes('animal') || n.includes('care');
+};
+const AnimalsRoute = () => {
+  const { role, deptName, loading } = useAuth();
+  if (loading) return <div style={loadingScreenStyle}>Loading...</div>;
+  const ok = role === 'admin' || (role === 'manager' && isAnimalDept(deptName));
+  return ok ? <Outlet /> : <Navigate to="/dashboard" replace />;
+};
+
 function App() {
   return (
     <Router>
@@ -109,17 +126,13 @@ function App() {
               {/* Admin + Manager routes */}
               <Route element={<RoleRoute allowed={['admin', 'manager']} />}>
                 <Route path="/dashboard/manager" element={<ManagerDashboard />} />
-                <Route path="/dashboard/animals" element={<Animals />} />
-              </Route>
-
-              {/* Admin + Manager: Inventory */}
-              <Route element={<RoleRoute allowed={['admin','manager']} />}>
                 <Route path="/dashboard/inventory" element={<Inventory />} />
+                <Route path="/dashboard/events" element={<Events />} />
               </Route>
 
-              {/* Admin-only: Events */}
-              <Route element={<RoleRoute allowed={['admin']} />}>
-                <Route path="/dashboard/events" element={<Events />} />
+              {/* Animals — admin or Vet/Caretaker manager */}
+              <Route element={<AnimalsRoute />}>
+                <Route path="/dashboard/animals" element={<Animals />} />
               </Route>
 
               {/* Role-specific portals */}

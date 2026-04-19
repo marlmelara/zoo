@@ -147,7 +147,7 @@ export default function AdminDashboard() {
                     >
                         + Create User
                     </button>
-                    <div className="glass-panel" style={{ background: 'rgba(255,255,255,0.5)', padding: '10px 20px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <div className="glass-panel" style={{ background: 'rgba(255, 245, 231, 0.65)', padding: '10px 20px', display: 'flex', alignItems: 'center', gap: '10px' }}>
                         <DollarSign color="#6d8243" />
                         <div>
                             <span style={{ display: 'block', fontSize: '12px', color: 'var(--color-text-muted)' }}>Total Revenue</span>
@@ -210,7 +210,7 @@ export default function AdminDashboard() {
                         className="glass-button"
                         onClick={() => setActiveTab(tab)}
                         style={{
-                            background: activeTab === tab ? 'var(--color-primary)' : 'rgba(255,255,255,0.5)',
+                            background: activeTab === tab ? 'var(--color-primary)' : 'rgba(255, 245, 231, 0.65)',
                             color: activeTab === tab ? 'white' : 'rgb(102, 122, 66)',
                             padding: '10px 20px',
                             fontSize: '14px',
@@ -227,28 +227,28 @@ export default function AdminDashboard() {
                 <>
                     {/* Key Metrics Grid */}
                     <div className="grid-cards" style={{ marginBottom: '40px' }}>
-                        <div className="glass-panel" style={{ background: 'rgba(255,255,255,0.5)', padding: '20px' }}>
+                        <div className="glass-panel" style={{ background: 'rgba(255, 245, 231, 0.65)', padding: '20px' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
                                 <h3 style={{ margin: 0 }}>Tickets</h3>
                                 <Ticket size={20} color="var(--color-primary)" />
                             </div>
                             <p style={{ fontSize: '24px', fontWeight: 'bold', margin: 0 }}>${formatDollars(stats.ticketRevenueCents)}</p>
                         </div>
-                        <div className="glass-panel" style={{ background: 'rgba(255,255,255,0.5)',padding: '20px' }}>
+                        <div className="glass-panel" style={{ background: 'rgba(255, 245, 231, 0.65)',padding: '20px' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
                                 <h3 style={{ margin: 0 }}>Retail</h3>
                                 <ShoppingBag size={20} color="var(--color-secondary)" />
                             </div>
                             <p style={{ fontSize: '24px', fontWeight: 'bold', margin: 0 }}>${formatDollars(stats.retailRevenueCents)}</p>
                         </div>
-                        <div className="glass-panel" style={{ background: 'rgba(255,255,255,0.5)', padding: '20px' }}>
+                        <div className="glass-panel" style={{ background: 'rgba(255, 245, 231, 0.65)', padding: '20px' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
                                 <h3 style={{ margin: 0 }}>Staff</h3>
                                 <Users size={20} color="var(--color-accent)" />
                             </div>
                             <p style={{ fontSize: '24px', fontWeight: 'bold', margin: 0 }}>{stats.totalEmployees}</p>
                         </div>
-                        <div className="glass-panel" style={{ background: 'rgba(255,255,255,0.5)',padding: '20px' }}>
+                        <div className="glass-panel" style={{ background: 'rgba(255, 245, 231, 0.65)',padding: '20px' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
                                 <h3 style={{ margin: 0 }}>Animals</h3>
                                 <Database size={20} color="#f59e0b" />
@@ -257,7 +257,7 @@ export default function AdminDashboard() {
                         </div>
                     </div>
 
-                    <div className="glass-panel" style={{ background: 'rgba(255,255,255,0.5)', padding: '20px' }}>
+                    <div className="glass-panel" style={{ background: 'rgba(255, 245, 231, 0.65)', padding: '20px' }}>
                         <h3 style={{ marginTop: 0 }}>System Status</h3>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -275,7 +275,7 @@ export default function AdminDashboard() {
 
             {/* ═══════════ STAFF ANALYTICS TAB ═══════════ */}
             {activeTab === 'Staff Analytics' && (
-                <div className="glass-panel" style={{ background: 'rgba(255,255,255,0.5)',padding: '20px', marginBottom: '40px' }}>
+                <div className="glass-panel" style={{ background: 'rgba(255, 245, 231, 0.65)',padding: '20px', marginBottom: '40px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                         <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
                             <Users size={20} color="var(--color-primary)" />
@@ -323,8 +323,8 @@ export default function AdminDashboard() {
                         <ResponsiveContainer width="100%" height="100%">
                             <BarChart data={staffChartData} margin={{ top: 5, right: 20, bottom: 5, left: -20 }}>
                                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" vertical={false} />
-                                <XAxis dataKey="name" stroke="rgba(255,255,255,0.5)" tick={{fill: 'rgba(255,255,255,0.5)', fontSize: 12}} />
-                                <YAxis stroke="rgba(255,255,255,0.5)" tick={{fill: 'rgba(255,255,255,0.5)', fontSize: 12}} allowDecimals={false} />
+                                <XAxis dataKey="name" stroke="rgba(255, 245, 231, 0.65)" tick={{fill: 'rgba(255, 245, 231, 0.65)', fontSize: 12}} />
+                                <YAxis stroke="rgba(255, 245, 231, 0.65)" tick={{fill: 'rgba(255, 245, 231, 0.65)', fontSize: 12}} allowDecimals={false} />
                                 <Tooltip 
                                     cursor={{fill: 'rgba(255,255,255,0.05)'}}
                                     contentStyle={{ background: 'rgba(15, 23, 42, 0.9)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: 'white' }}
@@ -373,7 +373,7 @@ export default function AdminDashboard() {
 
             {/* ═══════════ ANIMAL ANALYTICS TAB ═══════════ */}
             {activeTab === 'Animal Analytics' && (
-                <div className="glass-panel" style={{ background: 'rgba(255,255,255,0.5)',padding: '20px', marginBottom: '40px' }}>
+                <div className="glass-panel" style={{ background: 'rgba(255, 245, 231, 0.65)',padding: '20px', marginBottom: '40px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                         <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
                             <Database size={20} color="var(--color-secondary)" />
@@ -421,8 +421,8 @@ export default function AdminDashboard() {
                         <ResponsiveContainer width="100%" height="100%">
                             <BarChart data={animalChartData} margin={{ top: 5, right: 20, bottom: 5, left: -20 }}>
                                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" vertical={false} />
-                                <XAxis dataKey="name" stroke="rgba(255,255,255,0.5)" tick={{fill: 'rgba(255,255,255,0.5)', fontSize: 12}} />
-                                <YAxis stroke="rgba(255,255,255,0.5)" tick={{fill: 'rgba(255,255,255,0.5)', fontSize: 12}} allowDecimals={false} />
+                                <XAxis dataKey="name" stroke="rgba(255, 245, 231, 0.65)" tick={{fill: 'rgba(255, 245, 231, 0.65)', fontSize: 12}} />
+                                <YAxis stroke="rgba(255, 245, 231, 0.65)" tick={{fill: 'rgba(255, 245, 231, 0.65)', fontSize: 12}} allowDecimals={false} />
                                 <Tooltip 
                                     cursor={{fill: 'rgba(255,255,255,0.05)'}}
                                     contentStyle={{ background: 'rgba(15, 23, 42, 0.9)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: 'white' }}
@@ -471,7 +471,7 @@ export default function AdminDashboard() {
 
             {/* ═══════════ FINANCIAL REVENUE TAB ═══════════ */}
             {activeTab === 'Financial Revenue' && (
-                <div className="glass-panel" style={{ background: 'rgba(255,255,255,0.5)', padding: '20px', marginBottom: '40px' }}>
+                <div className="glass-panel" style={{ background: 'rgba(255, 245, 231, 0.65)', padding: '20px', marginBottom: '40px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                         <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
                             <DollarSign size={20} color="#10b981" />
@@ -519,8 +519,8 @@ export default function AdminDashboard() {
                         <ResponsiveContainer width="100%" height="100%">
                             <BarChart data={revenueBreakdown} margin={{ top: 5, right: 20, bottom: 5, left: -20 }}>
                                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" vertical={false} />
-                                <XAxis dataKey="name" stroke="rgba(255,255,255,0.5)" tick={{fill: 'rgba(255,255,255,0.5)', fontSize: 12}} />
-                                <YAxis stroke="rgba(255,255,255,0.5)" tick={{fill: 'rgba(255,255,255,0.5)', fontSize: 12}} />
+                                <XAxis dataKey="name" stroke="rgba(255, 245, 231, 0.65)" tick={{fill: 'rgba(255, 245, 231, 0.65)', fontSize: 12}} />
+                                <YAxis stroke="rgba(255, 245, 231, 0.65)" tick={{fill: 'rgba(255, 245, 231, 0.65)', fontSize: 12}} />
                                 <Tooltip 
                                     cursor={{fill: 'rgba(255,255,255,0.05)'}}
                                     contentStyle={{ background: 'rgba(15, 23, 42, 0.9)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: 'white' }}
@@ -656,7 +656,7 @@ function ReactivatePanel() {
                         onClick={() => setTab(t)}
                         style={{
                             padding: '6px 14px', fontSize: '13px',
-                            background: tab === t ? 'rgb(123, 144, 79)' : 'rgba(255,255,255,0.5)',
+                            background: tab === t ? 'rgb(123, 144, 79)' : 'rgba(255, 245, 231, 0.65)',
                             color: tab === t ? 'white' : 'rgb(102, 122, 66)',
                             textTransform: 'capitalize',
                         }}>{t}</button>
@@ -690,7 +690,7 @@ function ReactivatePanel() {
                         <div key={id(r)} style={{
                             display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                             padding: '12px 14px', borderRadius: '10px',
-                            background: 'rgba(255,255,255,0.5)',
+                            background: 'rgba(255, 245, 231, 0.65)',
                             border: '1px solid rgba(121,162,128,0.25)',
                         }}>
                             <span>{label(r)}</span>

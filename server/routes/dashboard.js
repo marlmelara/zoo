@@ -1,6 +1,7 @@
 import { Router } from '../lib/router.js';
 import db from '../db.js';
 import { requireRole } from '../middleware/auth.js';
+import { toIsoUtc } from '../lib/dates.js';
 
 const router = Router();
 
@@ -68,7 +69,7 @@ router.get('/stats', requireRole('admin','manager'), async (req, res) => {
             total_animals, total_employees,
             low_stock_count, pending_requests,
             monthly_revenue: monthlyRevenue,
-            recent_activity: recentActivity,
+            recent_activity: recentActivity.map(r => ({ ...r, created_at: toIsoUtc(r.created_at) })),
         });
     } catch (err) {
         return res.status(500).json({ error: err.message });

@@ -237,7 +237,7 @@ export default function CustomerDashboard() {
                 </div>
                 <div style={{ display: 'flex', gap: '20px' }}>
                     {isMembershipActive && (
-                        <div className="glass-panel" style={{ background: 'rgba(255,255,255,0.5)', padding: '10px 20px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <div className="glass-panel" style={{ background: 'rgba(255, 245, 231, 0.65)', padding: '10px 20px', display: 'flex', alignItems: 'center', gap: '10px' }}>
                             <Star size={16} color={membershipColor(profile.membership_type)} />
                             <div>
                                 <span style={{ display: 'block', fontSize: '12px', color: 'var(--color-text-muted)' }}>Membership</span>
@@ -256,7 +256,7 @@ export default function CustomerDashboard() {
                         className="glass-button"
                         onClick={() => setActiveTab(tab)}
                         style={{
-                            background: activeTab === tab ? '#6d8243' : 'rgba(255,255,255,0.5)',
+                            background: activeTab === tab ? '#6d8243' : 'rgba(255, 245, 231, 0.65)',
                             color: activeTab === tab ? 'white' : 'var(--zoo-muted)',
                             padding: '10px 20px',
                             fontSize: '14px',
@@ -274,7 +274,7 @@ export default function CustomerDashboard() {
                     {profileLoading ? <p>Loading profile...</p> : !profile ? (
                         <p style={{ color: 'var(--color-text-muted)' }}>Could not load profile.</p>
                     ) : editing ? (
-                        <div className="glass-panel" style={{ background: 'rgba(255,255,255,0.5)', padding: '30px' }}>
+                        <div className="glass-panel" style={{ background: 'rgba(255, 245, 231, 0.65)', padding: '30px' }}>
                             <h2 style={{ marginTop: 0 }}>Edit Profile</h2>
                             {profileIncomplete && (
                                 <div style={{ marginBottom: '16px', padding: '12px 16px', background: 'rgba(109,130,67,0.1)', border: '1px solid rgba(109,130,67,0.3)', borderRadius: '10px', display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -331,7 +331,7 @@ export default function CustomerDashboard() {
                     ) : (
                         <div>
                             {/* Profile Card */}
-                            <div className="glass-panel" style={{ background: 'rgba(255,255,255,0.5)', padding: '30px', marginBottom: '20px' }}>
+                            <div className="glass-panel" style={{ background: 'rgba(255, 245, 231, 0.65)', padding: '30px', marginBottom: '20px' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '25px' }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
                                         <div style={{
@@ -414,7 +414,7 @@ export default function CustomerDashboard() {
                             )}
 
                             {/* Membership Card */}
-                            <div className="glass-panel" style={{ background: 'rgba(255,255,255,0.5)', padding: '25px' }}>
+                            <div className="glass-panel" style={{ background: 'rgba(255, 245, 231, 0.65)', padding: '25px' }}>
                                 <h3 style={{ margin: '0 0 15px', display: 'flex', alignItems: 'center', gap: '10px' }}>
                                     <Star size={20} color={membershipColor(profile.membership_type)} /> Membership
                                 </h3>
@@ -545,7 +545,7 @@ export default function CustomerDashboard() {
                         </div>
                     )}
                     {purchasesLoading ? <p>Loading purchases...</p> : purchases.length === 0 ? (
-                        <div className="glass-panel" style={{ background: 'rgba(255,255,255,0.5)', padding: '40px', textAlign: 'center', color: 'var(--color-text-muted)' }}>
+                        <div className="glass-panel" style={{ background: 'rgba(255, 245, 231, 0.65)', padding: '40px', textAlign: 'center', color: 'var(--color-text-muted)' }}>
                             <Package size={48} style={{ marginBottom: '15px', opacity: 0.3 }} />
                             <p>No purchases yet.</p>
                             <p style={{ fontSize: '13px', marginBottom: '15px' }}>Your order history and itemized receipts will appear here.</p>
@@ -563,7 +563,7 @@ export default function CustomerDashboard() {
                             }).map(txn => {
                                 const lineItems = Array.isArray(txn.line_items) ? txn.line_items : (typeof txn.line_items === 'string' ? JSON.parse(txn.line_items || '[]') : []);
                                 return (
-                                    <div key={txn.transaction_id} className="glass-panel" style={{ background: 'rgba(255,255,255,0.5)', padding: '20px' }}>
+                                    <div key={txn.transaction_id} className="glass-panel" style={{ background: 'rgba(255, 245, 231, 0.65)', padding: '20px' }}>
                                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: lineItems.length > 0 ? '12px' : 0 }}>
                                             <div>
                                                 <h3 style={{ margin: '0 0 4px', fontSize: '1rem' }}>
@@ -651,7 +651,7 @@ export default function CustomerDashboard() {
                         </div>
                     )}
                     {ticketsLoading ? <p>Loading tickets...</p> : tickets.length === 0 ? (
-                        <div className="glass-panel" style={{ background: 'rgba(255,255,255,0.5)', padding: '40px', textAlign: 'center', color: 'var(--color-text-muted)' }}>
+                        <div className="glass-panel" style={{ background: 'rgba(255, 245, 231, 0.65)', padding: '40px', textAlign: 'center', color: 'var(--color-text-muted)' }}>
                             <Ticket size={48} style={{ marginBottom: '15px', opacity: 0.3 }} />
                             <p>No tickets purchased yet.</p>
                             <p style={{ fontSize: '13px', marginBottom: '15px' }}>Buy tickets from our website to visit the zoo!</p>
@@ -673,7 +673,7 @@ export default function CustomerDashboard() {
                         const renderAdmission = (ticket) => {
                             const purchaseDate = ticket.transactions?.transaction_date;
                             return (
-                                <div key={ticket.ticket_id} className="glass-panel" style={{ background: 'rgba(255,255,255,0.5)', padding: '20px' }}>
+                                <div key={ticket.ticket_id} className="glass-panel" style={{ background: 'rgba(255, 245, 231, 0.65)', padding: '20px' }}>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
                                         <div style={{ display: 'flex', alignItems: 'start', gap: '15px', flex: 1 }}>
                                             <div style={{
@@ -716,7 +716,7 @@ export default function CustomerDashboard() {
                             const ev = ticket.events;
                             const purchaseDate = ticket.transactions?.transaction_date;
                             return (
-                                <div key={ticket.ticket_id} className="glass-panel" style={{ background: 'rgba(255,255,255,0.5)', padding: '20px' }}>
+                                <div key={ticket.ticket_id} className="glass-panel" style={{ background: 'rgba(255, 245, 231, 0.65)', padding: '20px' }}>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
                                         <div style={{ display: 'flex', alignItems: 'start', gap: '15px', flex: 1 }}>
                                             <div style={{
@@ -831,7 +831,7 @@ export default function CustomerDashboard() {
                         </div>
                     )}
                     {donationsLoading ? <p>Loading donations...</p> : donations.length === 0 ? (
-                        <div className="glass-panel" style={{ background: 'rgba(255,255,255,0.5)', padding: '40px', textAlign: 'center', color: 'var(--color-text-muted)' }}>
+                        <div className="glass-panel" style={{ background: 'rgba(255, 245, 231, 0.65)', padding: '40px', textAlign: 'center', color: 'var(--color-text-muted)' }}>
                             <Heart size={48} style={{ marginBottom: '15px', opacity: 0.3 }} />
                             <p>No donations on record.</p>
                             <p style={{ fontSize: '13px', marginBottom: '15px' }}>Your donations help protect endangered animals and fund conservation programs.</p>
@@ -848,7 +848,7 @@ export default function CustomerDashboard() {
                                 if (donationDateTo && d > new Date(donationDateTo + 'T23:59:59')) return false;
                                 return true;
                             }).map(donation => (
-                                <div key={donation.donation_id} className="glass-panel" style={{ background: 'rgba(255,255,255,0.5)', padding: '20px' }}>
+                                <div key={donation.donation_id} className="glass-panel" style={{ background: 'rgba(255, 245, 231, 0.65)', padding: '20px' }}>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
                                             <div style={{
@@ -902,7 +902,7 @@ export default function CustomerDashboard() {
                             {['upcoming', 'all'].map(f => (
                                 <button key={f} className="glass-button" onClick={() => setEventsFilter(f)} style={{
                                     padding: '6px 16px', fontSize: '13px', borderRadius: 0,
-                                    background: eventsFilter === f ? '#6d8243' : 'rgba(255,255,255,0.5)',
+                                    background: eventsFilter === f ? '#6d8243' : 'rgba(255, 245, 231, 0.65)',
                                     fontWeight: eventsFilter === f ? 700 : 400,
                                     textTransform: 'capitalize',
                                     color: eventsFilter === f ? 'white' : 'var(--zoo-muted)',
@@ -920,7 +920,7 @@ export default function CustomerDashboard() {
                         )}
                     </div>
                     {eventsLoading ? <p>Loading events...</p> : events.length === 0 ? (
-                        <div className="glass-panel" style={{ background: 'rgba(255,255,255,0.5)', padding: '40px', textAlign: 'center', color: 'var(--color-text-muted)' }}>
+                        <div className="glass-panel" style={{ background: 'rgba(255, 245, 231, 0.65)', padding: '40px', textAlign: 'center', color: 'var(--color-text-muted)' }}>
                             <Calendar size={48} style={{ marginBottom: '15px', opacity: 0.3 }} />
                             <p>No events at this time.</p>
                         </div>
@@ -933,12 +933,17 @@ export default function CustomerDashboard() {
                                 if (eventsDateFrom && eventDate < new Date(eventsDateFrom + 'T00:00:00')) return false;
                                 if (eventsDateTo && eventDate > new Date(eventsDateTo + 'T23:59:59')) return false;
                                 return true;
+                            }).sort((a, b) => {
+                                // Upcoming → earliest first; all-events → newest first.
+                                return eventsFilter === 'upcoming'
+                                    ? a.event_date.localeCompare(b.event_date)
+                                    : b.event_date.localeCompare(a.event_date);
                             }).map(event => {
                                 const eventDate = new Date(event.event_date + 'T00:00:00');
                                 const today = new Date(); today.setHours(0, 0, 0, 0);
                                 const isPast = eventDate < today;
                                 return (
-                                    <div key={event.event_id} className="glass-panel" style={{ background: 'rgba(255,255,255,0.5)', padding: '20px', opacity: isPast ? 0.65 : 1 }}>
+                                    <div key={event.event_id} className="glass-panel" style={{ background: 'rgba(255, 245, 231, 0.65)', padding: '20px', opacity: isPast ? 0.65 : 1 }}>
                                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
                                             <div style={{ flex: 1 }}>
                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '5px', flexWrap: 'wrap' }}>

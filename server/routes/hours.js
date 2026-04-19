@@ -1,6 +1,7 @@
 import { Router } from '../lib/router.js';
 import db from '../db.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
+import { toIsoUtc } from '../lib/dates.js';
 
 const router = Router();
 
@@ -33,6 +34,8 @@ async function getRequestWithEntries(conn, requestId) {
     const r = reqRows[0];
     return {
         ...r,
+        created_at:  toIsoUtc(r.created_at),
+        reviewed_at: toIsoUtc(r.reviewed_at),
         entries,
         employee: { first_name: r.emp_first, last_name: r.emp_last,
                     role: r.emp_role, dept_id: r.emp_dept_id, dept_name: r.emp_dept_name },

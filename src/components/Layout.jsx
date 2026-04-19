@@ -16,7 +16,7 @@ const SIDEBAR_GREEN_LIGHT = 'rgba(255, 255, 255, 0.18)';
 export default function Layout() {
     const location = useLocation();
     const navigate = useNavigate();
-    const { user, role, signOut } = useAuth();
+    const { user, role, deptName, signOut } = useAuth();
     const [hoveredPath, setHoveredPath] = React.useState(null);
 
     const handleSignOut = async () => {
@@ -38,9 +38,19 @@ export default function Layout() {
             ];
         }
         if (role === 'manager') {
+            // Animals tab is scoped to managers who actually work with
+            // animals — Vet and Caretaker depts. Retail / Security /
+            // Administration managers don't need it. Case-insensitive
+            // substring match so naming variations ("Vet" vs "Veterinary
+            // Services", "Animal Care" vs "Animal Health") all qualify.
+            const n = (deptName || '').toLowerCase();
+            const canSeeAnimals = n.includes('vet') || n.includes('animal') || n.includes('care');
             return [
                 { name: 'Manager Panel', path: '/dashboard/manager',   icon: <Briefcase size={18} /> },
-                { name: 'Animals',       path: '/dashboard/animals',   icon: <Cat size={18} /> },
+                ...(canSeeAnimals
+                    ? [{ name: 'Animals', path: '/dashboard/animals', icon: <Cat size={18} /> }]
+                    : []),
+                { name: 'Events',        path: '/dashboard/events',    icon: <Calendar size={18} /> },
                 { name: 'Inventory',     path: '/dashboard/inventory', icon: <ShoppingBag size={18} /> },
                 { name: 'Hours',         path: '/dashboard/hours',     icon: <Clock size={18} /> },
             ];
@@ -175,7 +185,7 @@ export default function Layout() {
             </aside>
 
             <main style={{ flex: 1, padding: '20px', overflow: 'visible' }}>
-                <div className="glass-panel" style={{ background: 'rgba(255, 255, 255, 0.5)', minHeight: 'calc(100vh - 40px)', padding: '40px' }}>
+                <div className="glass-panel" style={{ background: 'rgba(255, 245, 231, 0.65)', minHeight: 'calc(100vh - 40px)', padding: '40px' }}>
                     <Outlet />
                 </div>
             </main>

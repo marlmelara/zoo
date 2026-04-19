@@ -1,6 +1,7 @@
 import { Router } from '../lib/router.js';
 import db from '../db.js';
 import { requireAuth } from '../middleware/auth.js';
+import { toIsoUtc } from '../lib/dates.js';
 
 const router = Router();
 
@@ -21,7 +22,10 @@ router.get('/', requireAuth, async (req, res) => {
              LIMIT ?`,
             [employeeId, limit]
         );
-        return res.json(rows);
+        return res.json(rows.map(r => ({
+            ...r,
+            created_at: toIsoUtc(r.created_at),
+        })));
     } catch (err) {
         return res.status(500).json({ error: err.message });
     }
@@ -65,6 +69,28 @@ router.patch('/read-all', requireAuth, async (req, res) => {
             'UPDATE notifications SET is_read = 1 WHERE recipient_id = ?',
             [employeeId]
         );
+        return res.json({ success: true });
+    } catch (err) {
+        return res.status(500).json({ error: err.message });
+    }
+});
+
+// DELETE /api/notifications/:id — dismiss a HANDLED notification.
+// Unresolved ones can't be dismissed — the inbox needs to keep showing
+// the outstanding work until the underlying target is resolved (trigger
+// will flip is_resolved once that happens). The recipient_id match
+// stops someone from dismissing another user's row.
+router.delete('/:id', requireAuth, async (req, res) => {
+    try {
+        const { employeeId } = req.user;
+        const [result] = await db.query(
+            `DELETE FROM notifications
+             WHERE notification_id = ? AND recipient_id = ? AND is_resolved = 1`,
+            [req.params.id, employeeId]
+        );
+        if (result.affectedRows === 0) {
+            return res.status(400).json({ error: 'Notification is not handled yet or does not belong to you.' });
+        }
         return res.json({ success: true });
     } catch (err) {
         return res.status(500).json({ error: err.message });

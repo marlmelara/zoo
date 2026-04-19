@@ -74,8 +74,11 @@ router.get('/', requireRole('admin', 'manager', 'retail'), async (req, res) => {
     }
 });
 
-// POST /api/tickets — insert tickets (called from checkout)
-router.post('/', requireAuth, async (req, res) => {
+// POST /api/tickets — insert tickets (called from checkout).
+// Intentionally unauthenticated: guests can buy tickets. Each ticket
+// carries its own customer_id (or null for a guest) + transaction_id
+// so ownership is preserved. Mirrors the auth-less POST /transactions.
+router.post('/', async (req, res) => {
     // tickets: [{ customer_id, type, event_id, price_cents, transaction_id }]
     const { tickets } = req.body;
     if (!Array.isArray(tickets) || tickets.length === 0) {

@@ -46,11 +46,11 @@ export default function GiftShop() {
           <div style={{ textAlign: 'center', flex: 1, padding: '0 20px' }}>
             <h2 className="page-title" style={{ margin: 0 }}>Gift Shop</h2>
           </div>
-        <div className="home-navbar-links">
-          <Link to="/tickets" className="home-navbar-link">Buy Tickets</Link>
-          <Link to="/membership" className="home-navbar-link">Memberships</Link>
-          <Link to="/account" className="home-navbar-link">Customer Login</Link>
-          <Link to="/login" className="home-navbar-link">Staff Portal</Link>
+        <div className="navbar-links">
+          <Link to="/tickets" className="navbar-link">Buy Tickets</Link>
+          <Link to="/membership" className="navbar-link">Memberships</Link>
+          <Link to="/account" className="navbar-link">Customer Login</Link>
+          <Link to="/login" className="navbar-link">Staff Portal</Link>
           <button
             className={`cart-button ${cartHook.totalItems > 0 ? 'cart-button-active' : ''}`}
             onClick={() => setCartOpen(true)}
@@ -70,7 +70,7 @@ export default function GiftShop() {
                 </div>
               )}
               <div className="item-card-body">
-                <h3 className="item-card-name">{item.item_name}</h3>
+                <h3 className="item-card-name" style ={{color: 'var(--color-text-muted)'}}> {item.item_name}</h3>
                 <p className="item-card-desc">{item.description}</p>
                 <div className="item-card-footer">
                   <span className="item-card-price">${(item.price_cents / 100).toFixed(2)}</span>

@@ -54,7 +54,7 @@ export default function Shop() {
                 <div className="shop-section-icon" style={{ background: `${section.color}33` }}>
                   <Icon size={30} color={section.color} />
                 </div>
-                <h2 className="shop-section-title">{section.title}</h2>
+                <h2 className="shop-section-title" style ={{color: 'white'}}>{section.title}</h2>
                 <p className="shop-section-desc">{section.description}</p>
                 <button className="shop-section-btn" style={{ background: section.color }}>Browse</button>
               </div>

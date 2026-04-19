@@ -68,7 +68,7 @@ export default function FoodShop() {
                 </div>
               )}
               <div className="item-card-body">
-                <h3 className="item-card-name">{item.item_name}</h3>
+                <h3 className="item-card-name" style ={{color: 'var(--color-text-muted)'}}>{item.item_name}</h3>
                 <p className="item-card-desc">{item.description}</p>
                 <div className="item-card-footer">
                   <span className="item-card-price">${(item.price_cents / 100).toFixed(2)}</span>

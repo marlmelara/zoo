@@ -205,7 +205,11 @@ router.patch('/:id/review', requireRole('admin', 'manager'), async (req, res) =>
              (action_type, description, performed_by, target_type, target_id, metadata)
              VALUES (?, ?, ?, 'hours_request', ?, ?)`,
             [
-                status === 'approved' ? 'supply_request_approved' : 'supply_request_denied',
+                // Use hours-specific action types. Previously re-used the
+                // supply_request_* types, which made the Inventory Activity
+                // Log (whitelisted on supply_request_*) mis-classify hours
+                // approvals as supply events.
+                status === 'approved' ? 'hours_request_approved' : 'hours_request_denied',
                 `${status === 'approved' ? 'Approved' : 'Denied'} ${totalHours} hrs submitted by ${submitter}`,
                 req.user.employeeId,
                 req.params.id,

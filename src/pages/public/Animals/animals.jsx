@@ -73,7 +73,7 @@ export default function AnimalGallery() {
   const [selectedAnimal, setSelectedAnimal] = useState(null);
   const [dbAnimals, setDbAnimals] = useState([]);
   useEffect(() => {
-    fetch('http://localhost:3001/api/animals')
+    fetch('/api/animals')
       .then(res => res.json())
       .then(data => setDbAnimals(data))
       .catch(err => console.error(err));

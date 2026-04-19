@@ -90,6 +90,8 @@ export function useZooCart() {
   const addShopItem = (item) => {
     const shop = { ...cart.shop };
     const key = item.item_id;
+    const currentQty = shop[key]?.quantity || 0;
+    if (currentQty >= Number(item.stock_count)) return;
     if (shop[key]) {
       shop[key] = { ...shop[key], quantity: shop[key].quantity + 1 };
     } else {
@@ -107,6 +109,7 @@ export function useZooCart() {
     if (!shop[itemId]) return;
     const newQty = shop[itemId].quantity + delta;
     if (newQty <= 0) delete shop[itemId];
+    else if (newQty > Number(shop[itemId].stock_count)) return;
     else shop[itemId] = { ...shop[itemId], quantity: newQty };
     update({ ...cart, shop });
   };
@@ -290,7 +293,7 @@ export default function ShopCartPanel({
               {/* ── Shop Items ── */}
               {shopItems.length > 0 && (
                 <div>
-                  <h4 style={{ margin: '0 0 8px', fontSize: '13px', textTransform: 'uppercase', color: 'var(--color-text-muted)', letterSpacing: '0.5px' }}>
+                  <h4 style={{ margin: '0 0 8px', fontSize: '13px', textTransform: 'uppercase', color: '#7a5c3a', letterSpacing: '0.5px' }}>
                     <FaShoppingCart style={{ marginRight: '6px' }} />Shop Items
                   </h4>
                   {shopItems.map(item => (
@@ -306,7 +309,7 @@ export default function ShopCartPanel({
                       )}
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
-                          <div style={{ fontWeight: 600, fontSize: '14px' }}>{item.item_name}</div>
+                          <div style={{ fontWeight: 600, fontSize: '14px', color: '#7a5c3a' }}>{item.item_name}</div>
                           <button onClick={() => removeShopItem(item.item_id)} style={{
                             background: 'none', border: 'none', color: '#f87171', cursor: 'pointer', fontSize: '14px', flexShrink: 0,
                           }}><FaTrash size={12} /></button>
@@ -314,7 +317,19 @@ export default function ShopCartPanel({
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px' }}>
                           <button onClick={() => updateShopQty(item.item_id, -1)} style={{border: 'none',background: 'rgba(123, 144, 79, 0.15)', color: 'var(--zoo-muted)'}}><FaMinus size={10} /></button>
                           <span style={{color: 'var(--zoo-muted)', fontWeight: 600, fontSize: '14px', minWidth: '20px', textAlign: 'center' }}>{item.quantity}</span>
-                          <button onClick={() => updateShopQty(item.item_id, 1)} style={{border: 'none',background: 'rgba(123, 144, 79, 0.15)', color: 'var(--zoo-muted)'}}><FaPlus size={10} /></button>
+                          <button
+                            onClick={() => updateShopQty(item.item_id, 1)}
+                            disabled={(item.quantity || 0) >= Number(item.stock_count)}
+                            style={{
+                              border: 'none',
+                              background: 'rgba(123, 144, 79, 0.15)',
+                              color: 'var(--zoo-muted)',
+                              opacity: (item.quantity || 0) >= Number(item.stock_count) ? 0.4 : 1,
+                              cursor: (item.quantity || 0) >= Number(item.stock_count) ? 'not-allowed' : 'pointer',
+                            }}
+                          >
+                            <FaPlus size={10} />
+                          </button>
                           <span style={{ marginLeft: 'auto', fontWeight: 600, color: 'var(--zoo-accent)' }}>
                             {fmt(item.price_cents * item.quantity)}
                           </span>

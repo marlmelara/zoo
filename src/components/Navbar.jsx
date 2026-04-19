@@ -54,6 +54,8 @@ export default function Navbar() {
     if (path === '/map') return 'Zoo Map';
     if (path === '/calendar') return 'Events Calendar';
     if (path === '/schedule') return 'Schedule of The Day';
+    if (path === '/shop/gifts') return 'Gift Shop';
+    if (path === '/shop/food') return 'Food & Snacks';
     return '';
   };
 
@@ -74,9 +76,27 @@ export default function Navbar() {
         )}
         
         <div className="navbar-links">
+          {/*
+          Original navbar button logic for these pages. if we don't like how it looks, revert back to this
           <Link to="/tickets" className="navbar-link">Buy Tickets</Link>
           <Link to="/shop" className="navbar-link">Shop</Link>
           <Link to="/membership" className="navbar-link">Membership</Link>
+          To revert to old navbar thing, keep upper 3 lines and remove all lines between here -->*/}
+
+          {location.pathname !== '/tickets' && (
+            <Link to="/tickets" className="navbar-link">Buy Tickets</Link>
+          )}
+          {location.pathname !== '/shop' && (
+            <Link to="/shop" className="navbar-link">Shop</Link>
+          )}
+          {location.pathname !== '/membership' && (
+            <Link to="/membership" className="navbar-link">Membership</Link>
+          )}
+
+          {/*
+          and here <--
+          and the linw below this
+          */}
           
           {user ? (
             // User is logged in - show dashboard icon

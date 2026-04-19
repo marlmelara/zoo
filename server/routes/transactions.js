@@ -211,9 +211,9 @@ router.post('/sale-items', async (req, res) => {
     for (const item of items) {
       await db.query(
         `INSERT INTO sale_items (transaction_id, item_id, quantity, price_at_sale_cents)
-         VALUES ($1, $2, $3, $4)`,
+        VALUES (?, ?, ?, ?)`,
         [item.transaction_id, item.item_id, item.quantity, item.price_at_sale_cents]
-      );
+        );
     }
     
     res.status(201).json({ success: true, message: `${items.length} sale items created` });
@@ -227,11 +227,11 @@ router.post('/sale-items', async (req, res) => {
 router.get('/:id/sale-items', async (req, res) => {
   try {
     const { id } = req.params;
-    const result = await db.query(
-      `SELECT * FROM sale_items WHERE transaction_id = $1`,
-      [id]
+    const [rows] = await db.query(
+        `SELECT * FROM sale_items WHERE transaction_id = ?`,
+        [id]
     );
-    res.json(result.rows);
+    res.json(rows);
   } catch (error) {
     console.error('Error fetching sale items:', error);
     res.status(500).json({ error: error.message });

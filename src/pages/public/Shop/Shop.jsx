@@ -4,6 +4,7 @@ import ShopCartPanel, { useZooCart } from '../../../components/ShopCart';
 import { FaShoppingCart, FaUtensils, FaCheck, FaStar, FaUsers, FaParking, FaTicketAlt, FaGift, FaClock, FaMap, FaMapMarkerAlt, FaPhone, FaEnvelope, FaArrowRight } from 'react-icons/fa';
 import logo from '../../../images/logo.png';
 import hotdogImg from '../../../images/bgui/background.png';
+import Navbar from '../../../components/Navbar';
 import './Shop.css';
 
 const shopSections = [
@@ -21,7 +22,7 @@ export default function Shop() {
   return (
     <div className="shop-page" style={{ '--silhouette-img': `url(${hotdogImg})` }}>
 
-      <nav className="shop-navbar">
+      <Navbar className="shop-navbar">
         <div className="shop-navbar-left">
           <Link to="/" className="navbar-logo-link" aria-label="Go to homepage">
             <img src={logo} alt="Coog Zoo" />
@@ -29,9 +30,6 @@ export default function Shop() {
         </div>
           <div style={{ textAlign: 'center', flex: 1, padding: '0 20px' }}>
             <h2 className="page-title" style={{ margin: 0 }}>Food & Gift Shop</h2>
-            <p className="page-description">
-              Browse zoo souvenirs, gifts, food, and snacks during your visit.
-            </p>
           </div>
         <div className="home-navbar-links">
           <Link to="/tickets" className="home-navbar-link">Buy Tickets</Link>
@@ -45,7 +43,7 @@ export default function Shop() {
             <FaShoppingCart /> Cart {cartHook.totalItems > 0 && `(${cartHook.totalItems})`}
           </button>
         </div>
-      </nav>
+      </Navbar>
 
       <div className="shop-content-centered">
         <div className="shop-sections-grid">
@@ -73,7 +71,7 @@ export default function Shop() {
                     <div className="footer-section footer-brand">
                       <div className="footer-logo">
                         <div className="logo-placeholder">
-                          <img src={logo} alt="Coog Zoo" className="shop-navbar-logo" style={{ maxWidth: '120px', width: '100%', height: 'auto' }} />
+                          <img src={logo} alt="Coog Zoo" />
                         </div>
                       </div>
                       <p className="footer-description" style={{color:"white"}}>

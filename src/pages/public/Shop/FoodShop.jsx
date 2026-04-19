@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { FaShoppingCart, FaPlus, FaMapMarkerAlt, FaPhone, FaEnvelope } from 'react-icons/fa';
 import { getShopItems } from '../../../api/inventory';
+import Navbar from '../../../components/Navbar';
 import ShopCartPanel, { useZooCart } from '../../../components/ShopCart';
 import logo from '../../../images/logo.png';
 import hotdogImg from '../../../images/bgui/background.png';
@@ -21,7 +22,7 @@ export default function FoodShop() {
   return (
     <div className="shop-page shop-page--food" style={{ '--silhouette-img': `url(${hotdogImg})` }}>
 
-      <nav className="shop-navbar">
+      <Navbar className="shop-navbar">
         <div className="shop-navbar-left">
           <Link to="/" className="navbar-logo-link" aria-label="Go to homepage">
             <img src={logo} alt="Coog Zoo" />
@@ -45,7 +46,7 @@ export default function FoodShop() {
             <FaShoppingCart /> Cart {cartHook.totalItems > 0 && `(${cartHook.totalItems})`}
           </button>
         </div>
-      </nav>
+      </Navbar>
 
       <div className="shop-content">
         <div className="items-grid">
@@ -61,12 +62,30 @@ export default function FoodShop() {
                 <p className="item-card-desc">{item.description}</p>
                 <div className="item-card-footer">
                   <span className="item-card-price">${(item.price_cents / 100).toFixed(2)}</span>
-                  <button
-                    className="add-to-cart-btn"
-                    onClick={() => { cartHook.addShopItem(item); setCartOpen(true); }}
-                  >
-                    <FaPlus size={10} /> Add to Cart
-                  </button>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
+                    {item.stock_count <= item.restock_threshold && (
+                      <span style={{ fontSize: '11px', color: '#e67e22', fontWeight: 600 }}>
+                        Only {item.stock_count} left!
+                      </span>
+                    )}
+                    {item.stock_count === 0 ? (
+                      <button className="add-to-cart-btn" disabled style={{ opacity: 0.5, cursor: 'not-allowed' }}>
+                        Out of Stock
+                      </button>
+                    ) : (
+                      <button
+                        className="add-to-cart-btn"
+                        disabled={(cartHook.cart.shop[item.item_id]?.quantity || 0) >= Number(item.stock_count)}
+                        style={{
+                          opacity: (cartHook.cart.shop[item.item_id]?.quantity || 0) >= Number(item.stock_count) ? 0.5 : 1,
+                          cursor: (cartHook.cart.shop[item.item_id]?.quantity || 0) >= Number(item.stock_count) ? 'not-allowed' : 'pointer',
+                        }}
+                        onClick={() => { cartHook.addShopItem(item); setCartOpen(true); }}
+                      >
+                        <FaPlus size={10} /> Add to Cart
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>

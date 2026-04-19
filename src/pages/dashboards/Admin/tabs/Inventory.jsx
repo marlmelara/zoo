@@ -261,7 +261,7 @@ export default function Inventory() {
     }
 
     async function handleRestock(item) {
-        const amt = window.prompt(`Restock ${item.name}. Enter quantity to add:`, '10');
+        const amt = window.prompt(`Restock ${item.name}. Enter quantity to add:`, String(item.threshold * 2));
         if (!amt) return;
         const qty = parseInt(amt);
         if (!(qty > 0)) return;

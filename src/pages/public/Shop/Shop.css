@@ -27,14 +27,14 @@
 }
 
 .page-title {
-  font-size: 2.5rem;
+  font-size: 1.5rem;
   font-weight: 700;
   margin-bottom: 0.5rem;
   color: white;
 }
 
 .shop-navbar {
-  padding: 0 2rem;
+  padding: 1rem 2rem;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -44,7 +44,6 @@
   background: rgba(123, 144, 79, 0.92);
   backdrop-filter: blur(10px);
   z-index: 100;
-  height: 80px;
 }
 
 .shop-navbar-left {
@@ -70,6 +69,12 @@
   display: flex;
   align-items: center;
   gap: 12px;
+}
+
+.shop-navbar .navbar-logo-link img {
+  max-width: 180px;
+  width: 100%;
+  height: auto;
 }
 
 .shop-navbar-link {
@@ -136,6 +141,7 @@
 .shop-content-centered {
   position: relative;
   z-index: 1;
+  flex: 1;
 }
 
 .shop-hero-title {
@@ -187,7 +193,7 @@
 .shop-section-title {
   margin-top: 0;
   margin-bottom: 10px;
-  color: white;
+  color: var(--color-secondary);
   font-size: 22px;
 }
 
@@ -214,13 +220,15 @@
 }
 
 .items-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
   gap: 20px;
   padding: 2rem 1rem;
 }
 
 .item-card {
+  width: 250px;
   border-radius: 16px;
   overflow: hidden;
   display: flex;
@@ -258,7 +266,7 @@
 .item-card-name {
   margin: 0 0 6px;
   font-size: 16px;
-  color: white;
+  color: var(--color-secondary);
 }
 
 .item-card-desc {

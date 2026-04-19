@@ -111,7 +111,7 @@ export default function AnimalGallery() {
       )}
 
       <div className="animals-page-inner">
-        <h1 className="animals-title">Our Animals</h1>
+        <h1 className="animals-title">Meet The Crew</h1>
 
         <div className="zone-filter">
           <label htmlFor="zone-select">Filter by Zone:</label>

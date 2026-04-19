@@ -55,7 +55,7 @@ export default function Navbar() {
     if (path === '/schedule') return 'Schedule';
     if (path === '/shop/gifts') return 'Gift Shop';
     if (path === '/shop/food') return 'Food & Snacks';
-    if (path === '/animals') return 'Meet The Crew';
+    if (path === '/animals') return 'Our Animals';
 
     return '';
   };

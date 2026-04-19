@@ -38,10 +38,22 @@ export default function AdminDashboard() {
 
     // Create User State
     const [showCreateUser, setShowCreateUser] = useState(false);
-    const [newUser, setNewUser] = useState({
-        email: '', password: '', first_name: '', last_name: '', dept_id: '', role: 'security'
-    });
+    // Role defaults to '' so the dropdown shows the "Select Role..." placeholder
+    // instead of silently pre-selecting Security. The form is fully reset any
+    // time the modal closes via closeCreateUser() so reopening starts clean.
+    const emptyNewUser = {
+        email: '', password: '', first_name: '', last_name: '', dept_id: '', role: ''
+    };
+    const [newUser, setNewUser] = useState(emptyNewUser);
+    // Confirm-password is local-only — never sent to the server.
+    const [confirmPassword, setConfirmPassword] = useState('');
     const [departments, setDepartments] = useState([]);
+
+    const closeCreateUser = () => {
+        setShowCreateUser(false);
+        setNewUser(emptyNewUser);
+        setConfirmPassword('');
+    };
 
     useEffect(() => {
         fetchAdminData();
@@ -87,11 +99,14 @@ export default function AdminDashboard() {
 
     const handleCreateUser = async (e) => {
         e.preventDefault();
+        if (newUser.password !== confirmPassword) {
+            alert('Passwords do not match. Please re-enter.');
+            return;
+        }
         try {
             await createZooUser(newUser);
             alert('User created successfully!');
-            setShowCreateUser(false);
-            setNewUser({ email: '', password: '', first_name: '', last_name: '', dept_id: '', role: 'security' });
+            closeCreateUser();
             fetchAdminData();
         } catch (error) {
             console.error('Error creating user:', error);
@@ -102,8 +117,10 @@ export default function AdminDashboard() {
     const formatDollars = (cents) =>
         (cents / 100).toLocaleString(undefined, { minimumFractionDigits: 2 });
 
-    // Whether dept is auto-set by role (non-manager roles)
-    const isDeptAutoSet = newUser.role !== 'manager';
+    // Dept is auto-set for every role except manager and the empty placeholder.
+    // When no role is picked yet the dept dropdown stays enabled so the
+    // placeholder shows instead of a disabled blank.
+    const isDeptAutoSet = newUser.role !== '' && newUser.role !== 'manager';
 
     // Aggregate data for charts
     const departmentCounts = employees.reduce((acc, emp) => {
@@ -142,7 +159,7 @@ export default function AdminDashboard() {
                 <div style={{ display: 'flex', gap: '20px' }}>
                     <button
                         className="glass-button"
-                        style={{ background: '#6d8243' }}
+                        style={{ background: 'var(--color-primary)', color: 'white' }}
                         onClick={() => setShowCreateUser(true)}
                     >
                         + Create User
@@ -159,14 +176,16 @@ export default function AdminDashboard() {
 
             {/* Create User Modal */}
             {showCreateUser && (
-                <div style={{
-                    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-                    background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000
-                }}>
-                    <div className="glass-panel" style={{ padding: '30px', width: '500px', maxWidth: '90%' }}>
+                <div
+                    onClick={closeCreateUser}
+                    style={{
+                        position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+                        background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000
+                    }}>
+                    <div onClick={e => e.stopPropagation()} className="glass-panel" style={{ padding: '30px', width: '500px', maxWidth: '90%' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
-                            <h2 style={{ margin: 0 }}>Create New User</h2>
-                            <button onClick={() => setShowCreateUser(false)} style={{ background: 'none', border: 'none', color: 'white', fontSize: '20px', cursor: 'pointer' }}>×</button>
+                            <h2 style={{ margin: 0, color: 'rgb(102, 122, 66)' }}>Create New User</h2>
+                            <button onClick={closeCreateUser} style={{ background: 'none', border: 'none', color: 'rgb(102, 122, 66)', fontSize: '20px', cursor: 'pointer' }}>×</button>
                         </div>
                         <form onSubmit={handleCreateUser} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
                             <input required placeholder="First Name" className="glass-input" value={newUser.first_name} onChange={e => setNewUser({ ...newUser, first_name: e.target.value })} />
@@ -174,8 +193,10 @@ export default function AdminDashboard() {
 
                             <input required type="email" placeholder="Email" className="glass-input" style={{ gridColumn: '1/-1' }} value={newUser.email} onChange={e => setNewUser({ ...newUser, email: e.target.value })} />
                             <input required type="password" placeholder="Password" className="glass-input" style={{ gridColumn: '1/-1' }} value={newUser.password} onChange={e => setNewUser({ ...newUser, password: e.target.value })} />
+                            <input required type="password" placeholder="Confirm Password" className="glass-input" style={{ gridColumn: '1/-1' }} value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} />
 
-                            <select className="glass-input" style={{ gridColumn: '1/-1' }} value={newUser.role} onChange={e => handleRoleChange(e.target.value)}>
+                            <select required className="glass-input" style={{ gridColumn: '1/-1' }} value={newUser.role} onChange={e => handleRoleChange(e.target.value)}>
+                                <option value="" disabled>Select Role...</option>
                                 <option value="security">Role: Security</option>
                                 <option value="retail">Role: Retail</option>
                                 <option value="caretaker">Role: Caretaker</option>

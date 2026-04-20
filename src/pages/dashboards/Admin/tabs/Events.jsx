@@ -6,6 +6,7 @@ import { Calendar, Users, X, Plus, User, Cat, MapPin, Clock, Trash2, AlertTriang
 import { StatusFilter } from '../../../../components/AnimalsPanel';
 import BulkActionBar from '../../../../components/BulkActionBar';
 import { useToast, useConfirm } from '../../../../components/Feedback';
+import { formatTime } from '../../../../utils/staff';
 
 const GREEN      = 'rgb(123, 144, 79)';
 const GREEN_DARK = 'rgb(102, 122, 66)';
@@ -170,7 +171,7 @@ export default function Events() {
     const conflict = checkVenueConflict(venue_id, event_date, start_time + ':00', end_time + ':00');
     if (conflict) {
       setCreateError(
-        `Venue conflict: "${conflict.title}" is scheduled ${conflict.start_time?.slice(0, 5)} - ${conflict.end_time?.slice(0, 5)} at this venue on that date.`
+        `Venue conflict: "${conflict.title}" is scheduled ${formatTime(conflict.start_time?.slice(0, 5))} – ${formatTime(conflict.end_time?.slice(0, 5))} at this venue on that date.`
       );
       return;
     }
@@ -432,7 +433,7 @@ export default function Events() {
                 {event.start_time && event.end_time && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px', color: 'var(--color-text-muted)', fontSize: '0.85rem' }}>
                     <Clock size={14} />
-                    <span>{event.start_time?.slice(0, 5)} - {event.end_time?.slice(0, 5)}</span>
+                    <span>{formatTime(event.start_time?.slice(0, 5))} – {formatTime(event.end_time?.slice(0, 5))}</span>
                   </div>
                 )}
 
@@ -517,7 +518,7 @@ export default function Events() {
               {selectedEvent.description && <p style={{ color: 'var(--color-text-dark)', marginBottom: '12px', opacity: 0.85 }}>{selectedEvent.description}</p>}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', fontSize: '0.9rem', color: GREEN_DARK, fontWeight: 600 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><Calendar size={14} color={GREEN} />{new Date(selectedEvent.event_date + 'T00:00:00').toDateString()}</div>
-                {selectedEvent.start_time && <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><Clock size={14} color={GREEN} />{selectedEvent.start_time?.slice(0, 5)} - {selectedEvent.end_time?.slice(0, 5)}</div>}
+                {selectedEvent.start_time && <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><Clock size={14} color={GREEN} />{formatTime(selectedEvent.start_time?.slice(0, 5))} – {formatTime(selectedEvent.end_time?.slice(0, 5))}</div>}
                 {selectedEvent.venue_id && <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><MapPin size={14} color={GREEN} />{getVenueName(selectedEvent.venue_id)}</div>}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><Users size={14} color={GREEN} />{selectedEvent.actual_attendance || 0} / {selectedEvent.max_capacity}</div>
               </div>

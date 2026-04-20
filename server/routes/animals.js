@@ -315,7 +315,7 @@ router.post('/:id/care-log', requireRole('admin','manager','vet','caretaker'), a
 // POST /api/animals
 router.post('/', requireRole('admin', 'manager', 'vet', 'caretaker'), async (req, res) => {
     const { name, species_common_name, species_binomial, age, zone_id,
-            arrived_date, date_of_birth } = req.body;
+            arrived_date, date_of_birth, image_url } = req.body;
 
     // DOB rule: born-at-zoo shares the arrival day; acquired animals were
     // born before they got here. So DOB <= arrived_date always. Reject
@@ -334,11 +334,12 @@ router.post('/', requireRole('admin', 'manager', 'vet', 'caretaker'), async (req
         const [result] = await conn.query(
             `INSERT INTO animals
              (name, species_common_name, species_binomial, age, zone_id,
-              health_record_id, arrived_date, date_of_birth)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+              health_record_id, arrived_date, date_of_birth, image_url)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [name, species_common_name, species_binomial || null,
              age || null, zone_id || null, hrResult.insertId,
-             effectiveArrival, date_of_birth || null]
+             effectiveArrival, date_of_birth || null,
+             image_url && String(image_url).trim() ? String(image_url).trim() : null]
         );
         await conn.commit();
         try {
@@ -428,7 +429,7 @@ router.post('/:id/medical-history', requireRole('admin', 'manager', 'vet'), asyn
 // PATCH /api/animals/:id
 router.patch('/:id', requireRole('admin', 'manager', 'vet', 'caretaker'), async (req, res) => {
     const fields = ['name', 'species_common_name', 'species_binomial', 'age', 'zone_id',
-                    'arrived_date', 'departed_date', 'date_of_birth'];
+                    'arrived_date', 'departed_date', 'date_of_birth', 'image_url'];
     const updates = []; const vals = [];
     for (const f of fields) {
         if (req.body[f] !== undefined) { updates.push(`${f} = ?`); vals.push(req.body[f]); }

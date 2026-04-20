@@ -5,6 +5,7 @@ import {
     getPendingRequestsForManager,
     getAllSupplyRequests,
     reviewSupplyRequest,
+    bulkReviewSupplyRequests,
     restockOperationalSupply,
     getAllOperationalSupplies
 } from '../../../api/supplies';
@@ -13,6 +14,7 @@ import { setHealthStatus } from '../../../api/animals';
 import AnimalMedicalPanel from '../../../components/AnimalMedicalPanel';
 import { StatusFilter, DateRangeFilter } from '../../../components/AnimalsPanel';
 import { useToast } from '../../../components/Feedback';
+import { formatTime } from '../../../utils/staff';
 import ZooPaginator from '../../../components/ZooPaginator';
 import { formatShiftTimeframe } from '../../../utils/staff';
 import {
@@ -66,6 +68,10 @@ export default function ManagerDashboard() {
     const [allRequests, setAllRequests] = useState([]);
     const [requestsLoading, setRequestsLoading] = useState(true);
     const [requestFilter, setRequestFilter] = useState('pending');
+    // Bulk-review state — a Set of request_ids the manager has selected
+    // while on the pending list. Toggled with per-row checkboxes; acted on
+    // by the "Approve Selected" / "Deny Selected" buttons.
+    const [selectedRequests, setSelectedRequests] = useState(() => new Set());
     // Date-range filters — applied to Supply Requests, Activity Log, Events.
     const [reqFrom,   setReqFrom]   = useState('');
     const [reqTo,     setReqTo]     = useState('');
@@ -232,6 +238,59 @@ export default function ManagerDashboard() {
             console.error('Error fetching activity log:', err);
         } finally {
             setActivityLoading(false);
+        }
+    }
+
+    function toggleRequestSelection(id) {
+        setSelectedRequests(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id); else next.add(id);
+            return next;
+        });
+    }
+    function clearRequestSelection() { setSelectedRequests(new Set()); }
+    function selectAllVisibleRequests(ids) { setSelectedRequests(new Set(ids)); }
+
+    // Bulk approve/deny — server processes each id in its own transaction so
+    // a failure on one row (stock gone negative, missing item, etc.) won't
+    // poison the others. Any failures surface via toast.
+    async function handleBulkReview(status) {
+        const ids = Array.from(selectedRequests);
+        if (ids.length === 0) return;
+        const ok = await (async () => {
+            if (status === 'denied') return true; // Denial is always safe to batch.
+            return true;
+        })();
+        if (!ok) return;
+        try {
+            const { results } = await bulkReviewSupplyRequests(ids, status);
+            const failed = (results || []).filter(r => !r.ok);
+            if (failed.length) {
+                toast.error(`${failed.length} of ${ids.length} failed — ${failed[0].error}`);
+            } else {
+                toast.success(`${status === 'approved' ? 'Approved' : 'Denied'} ${ids.length} request${ids.length === 1 ? '' : 's'}.`);
+            }
+            // Log each approval/denial in the activity log so the log tab
+            // reflects the action — bulk endpoint only updates the DB row.
+            for (const id of ids.filter(i => (results || []).find(r => r.id === i && r.ok))) {
+                const r = pendingRequests.find(x => x.request_id === id);
+                if (!r) continue;
+                await logActivity({
+                    action_type: status === 'approved' ? 'supply_request_approved' : 'supply_request_denied',
+                    description: `${status === 'approved' ? 'Approved' : 'Denied'} request for ${r.requested_quantity}x ${r.item_name}${r.action === 'remove' ? ' (removal)' : ''}`,
+                    performed_by: resolvedEmpId || employeeId,
+                    target_type: 'supply_request',
+                    target_id: id,
+                    metadata: { item_name: r.item_name, quantity: r.requested_quantity, action: r.action || 'restock', status, bulk: true },
+                }).catch(() => {});
+            }
+            clearRequestSelection();
+            fetchRequests(resolvedDeptId);
+            fetchOverview(resolvedDeptId);
+            fetchAllSupplies();
+            fetchActivityLog(resolvedDeptId);
+        } catch (err) {
+            toast.error('Bulk review failed: ' + err.message);
         }
     }
 
@@ -656,7 +715,7 @@ export default function ManagerDashboard() {
                                 { key: 'all',      label: 'All'      },
                             ]}
                             value={requestFilter}
-                            onChange={setRequestFilter}
+                            onChange={(v) => { clearRequestSelection(); setRequestFilter(v); }}
                         />
                     </div>
                     <DateRangeFilter
@@ -664,6 +723,62 @@ export default function ManagerDashboard() {
                         from={reqFrom} to={reqTo}
                         onFrom={setReqFrom} onTo={setReqTo}
                     />
+
+                    {/* Bulk-review bar — only appears when rows are selected.
+                        Select All targets the currently-filtered pending list
+                        (no point selecting already-decided requests). */}
+                    {requestFilter === 'pending' && filteredRequests.filter(r => r.status === 'pending').length > 0 && (
+                        <div style={{
+                            display: 'flex', alignItems: 'center', gap: '10px',
+                            marginBottom: '12px', flexWrap: 'wrap',
+                            padding: '10px 14px', borderRadius: '10px',
+                            background: 'rgba(121,162,128,0.12)',
+                            border: '1px solid rgba(121,162,128,0.3)',
+                        }}>
+                            <button type="button" onClick={() => {
+                                const pendingIds = filteredRequests.filter(r => r.status === 'pending').map(r => r.request_id);
+                                if (selectedRequests.size === pendingIds.length) clearRequestSelection();
+                                else selectAllVisibleRequests(pendingIds);
+                            }} className="glass-button" style={{ fontSize: '12px', padding: '6px 12px' }}>
+                                {selectedRequests.size === filteredRequests.filter(r => r.status === 'pending').length && selectedRequests.size > 0 ? 'Clear' : 'Select All'}
+                            </button>
+                            <span style={{ fontSize: '13px', color: MGR_GREEN_DARK, fontWeight: 600 }}>
+                                {selectedRequests.size} selected
+                            </span>
+                            <div style={{ marginLeft: 'auto', display: 'flex', gap: '8px' }}>
+                                <button type="button"
+                                    disabled={selectedRequests.size === 0}
+                                    onClick={() => handleBulkReview('approved')}
+                                    style={{
+                                        background: selectedRequests.size === 0 ? 'rgba(16,185,129,0.08)' : 'rgba(16,185,129,0.18)',
+                                        color: '#047857',
+                                        border: '1px solid rgba(16,185,129,0.35)',
+                                        borderRadius: '8px', padding: '7px 14px',
+                                        fontWeight: 700, fontSize: '13px',
+                                        cursor: selectedRequests.size === 0 ? 'not-allowed' : 'pointer',
+                                        opacity: selectedRequests.size === 0 ? 0.55 : 1,
+                                        display: 'inline-flex', alignItems: 'center', gap: '6px',
+                                    }}>
+                                    <CheckCircle size={14} /> Approve Selected
+                                </button>
+                                <button type="button"
+                                    disabled={selectedRequests.size === 0}
+                                    onClick={() => handleBulkReview('denied')}
+                                    style={{
+                                        background: selectedRequests.size === 0 ? 'rgba(239,68,68,0.06)' : 'rgba(239,68,68,0.15)',
+                                        color: '#b91c1c',
+                                        border: '1px solid rgba(239,68,68,0.35)',
+                                        borderRadius: '8px', padding: '7px 14px',
+                                        fontWeight: 700, fontSize: '13px',
+                                        cursor: selectedRequests.size === 0 ? 'not-allowed' : 'pointer',
+                                        opacity: selectedRequests.size === 0 ? 0.55 : 1,
+                                        display: 'inline-flex', alignItems: 'center', gap: '6px',
+                                    }}>
+                                    <XCircle size={14} /> Deny Selected
+                                </button>
+                            </div>
+                        </div>
+                    )}
 
                     {requestsLoading ? <p>Loading requests...</p> : filteredRequests.length === 0 ? (
                         <div className="glass-panel" style={{ padding: '40px', textAlign: 'center', color: 'var(--color-text-muted)' }}>
@@ -677,21 +792,47 @@ export default function ManagerDashboard() {
                                     padding: '20px',
                                     background: 'rgba(255, 245, 231, 0.72)',
                                     border: req.status === 'pending' ? '1px solid rgba(245, 158, 11, 0.35)' : '1px solid rgba(121,162,128,0.25)',
+                                    borderLeft: req.action === 'remove' ? '4px solid #dc2626' : undefined,
                                 }}>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '10px' }}>
-                                        <div>
-                                            <h3 style={{ margin: '0 0 5px' }}>{req.item_name}</h3>
-                                            <span style={{ fontSize: '13px', color: MGR_GREEN_DARK }}>
-                                                Requested by: <strong>{req.requester?.first_name} {req.requester?.last_name}</strong>
-                                                {req.requester?.departments?.dept_name && (
-                                                    <span style={{
-                                                        marginLeft: '8px', padding: '2px 8px', borderRadius: '10px', fontSize: '11px',
-                                                        background: 'rgba(121,162,128,0.18)', color: MGR_GREEN_DARK, fontWeight: 600,
-                                                    }}>
-                                                        {req.requester.departments.dept_name}
-                                                    </span>
-                                                )}
-                                            </span>
+                                        <div style={{ display: 'flex', alignItems: 'start', gap: '10px', flex: 1 }}>
+                                            {req.status === 'pending' && (
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selectedRequests.has(req.request_id)}
+                                                    onChange={() => toggleRequestSelection(req.request_id)}
+                                                    style={{ marginTop: '4px', width: '16px', height: '16px', cursor: 'pointer', accentColor: 'rgb(123, 144, 79)' }}
+                                                />
+                                            )}
+                                            <div>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '3px', flexWrap: 'wrap' }}>
+                                                    <h3 style={{ margin: 0 }}>{req.item_name}</h3>
+                                                    {req.action === 'remove' ? (
+                                                        <span style={{
+                                                            fontSize: '10px', padding: '3px 8px', borderRadius: '10px',
+                                                            background: 'rgba(239,68,68,0.15)', color: '#dc2626',
+                                                            fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em',
+                                                        }}>Remove</span>
+                                                    ) : (
+                                                        <span style={{
+                                                            fontSize: '10px', padding: '3px 8px', borderRadius: '10px',
+                                                            background: 'rgba(16,185,129,0.15)', color: '#10b981',
+                                                            fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em',
+                                                        }}>Restock</span>
+                                                    )}
+                                                </div>
+                                                <span style={{ fontSize: '13px', color: MGR_GREEN_DARK }}>
+                                                    Requested by: <strong>{req.requester?.first_name} {req.requester?.last_name}</strong>
+                                                    {req.requester?.departments?.dept_name && (
+                                                        <span style={{
+                                                            marginLeft: '8px', padding: '2px 8px', borderRadius: '10px', fontSize: '11px',
+                                                            background: 'rgba(121,162,128,0.18)', color: MGR_GREEN_DARK, fontWeight: 600,
+                                                        }}>
+                                                            {req.requester.departments.dept_name}
+                                                        </span>
+                                                    )}
+                                                </span>
+                                            </div>
                                         </div>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                             {req.status === 'pending' ? <Clock size={16} color="#f59e0b" /> :
@@ -727,7 +868,7 @@ export default function ManagerDashboard() {
                                                     flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
                                                 }}
                                             >
-                                                <CheckCircle size={16} /> Approve & Restock
+                                                <CheckCircle size={16} /> Approve &amp; {req.action === 'remove' ? 'Remove' : 'Restock'}
                                             </button>
                                             <button
                                                 onClick={() => handleReview(req.request_id, 'denied')}
@@ -1184,7 +1325,7 @@ export default function ManagerDashboard() {
                                                 {event.start_time && event.end_time && (
                                                     <p style={{ fontSize: '13px', color: MGR_GREEN_DARK, margin: '4px 0', fontWeight: 500 }}>
                                                         <Clock size={13} style={{ marginRight: '4px', verticalAlign: 'middle' }} />
-                                                        {event.start_time?.slice(0, 5)} – {event.end_time?.slice(0, 5)}
+                                                        {formatTime(event.start_time?.slice(0, 5))} – {formatTime(event.end_time?.slice(0, 5))}
                                                     </p>
                                                 )}
                                                 {event.venue_id && (

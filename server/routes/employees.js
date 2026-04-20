@@ -197,6 +197,23 @@ router.get('/vets', requireRole('admin', 'manager'), async (req, res) => {
     }
 });
 
+// GET /api/employees/admins — active admins. Used by the supervisor
+// dropdown when the role being created is `manager` (managers report to
+// an admin; admins report to nobody).
+router.get('/admins', requireRole('admin', 'manager'), async (req, res) => {
+    try {
+        const [rows] = await db.query(
+            `SELECT employee_id, first_name, last_name
+               FROM employees
+              WHERE role = 'admin' AND is_active = 1
+              ORDER BY last_name ASC, first_name ASC`
+        );
+        return res.json(rows);
+    } catch (err) {
+        return res.status(500).json({ error: err.message });
+    }
+});
+
 // GET /api/employees/managers — active managers, optionally filtered by
 // department. Used by the supervisor dropdown when creating/editing an
 // employee — every non-admin, non-manager must pick one.
@@ -259,17 +276,32 @@ router.post('/', requireRole('admin', 'manager'), async (req, res) => {
         return res.status(400).json({ error: 'Missing required fields.' });
     }
 
-    // Supervisor rule: every non-admin / non-manager must be assigned to
-    // a manager. Admins never have supervisors (their role is unique), and
-    // managers sit at the top of their dept so they don't either. Anyone
-    // else — vet, caretaker, security, retail — needs a manager_id.
-    if (role !== 'admin' && role !== 'manager') {
+    // Supervisor rules:
+    //  - admin  → no supervisor (reports to nobody).
+    //  - manager → supervisor must be an active admin (the top of the chain).
+    //  - everyone else → supervisor must be an active manager in the same dept.
+    if (role === 'admin') {
+        // Admins never have supervisors. Ignore any stray manager_id.
+    } else if (role === 'manager') {
+        if (!manager_id) {
+            return res.status(400).json({
+                error: 'Manager must be assigned to an admin as supervisor.',
+            });
+        }
+        const [sRows] = await db.query(
+            `SELECT employee_id, is_active, role
+               FROM employees WHERE employee_id = ?`, [manager_id]
+        );
+        const sup = sRows[0];
+        if (!sup || sup.is_active !== 1 || sup.role !== 'admin') {
+            return res.status(400).json({ error: 'A manager\'s supervisor must be an active admin.' });
+        }
+    } else {
         if (!manager_id) {
             return res.status(400).json({
                 error: `${role} must be assigned to a supervising manager.`,
             });
         }
-        // Validate the chosen manager is real, active, and in the same dept.
         const [mgrRows] = await db.query(
             `SELECT employee_id, dept_id, is_active, role
                FROM employees WHERE employee_id = ?`, [manager_id]
@@ -281,9 +313,6 @@ router.post('/', requireRole('admin', 'manager'), async (req, res) => {
         if (dept_id && mgr.dept_id !== parseInt(dept_id)) {
             return res.status(400).json({ error: 'Supervisor must be in the same department.' });
         }
-    } else if (manager_id) {
-        // Admins/managers can't have a supervisor — quietly ignore.
-        // (Caller shouldn't send one; this is a safety net.)
     }
 
     const conn = await db.getConnection();
@@ -303,6 +332,7 @@ router.post('/', requireRole('admin', 'manager'), async (req, res) => {
         );
         const userId = userResult.insertId;
 
+        const effectiveManagerId = role === 'admin' ? null : (manager_id || null);
         const [empResult] = await conn.query(
             `INSERT INTO employees
              (first_name, middle_name, last_name, contact_info, pay_rate_cents,
@@ -311,7 +341,7 @@ router.post('/', requireRole('admin', 'manager'), async (req, res) => {
             [first_name, middle_name || null, last_name,
              contact_info || email, pay_rate_cents || 2000,
              shift_timeframe || '09:00-17:00',
-             dept_id || null, userId, manager_id || null, role,
+             dept_id || null, userId, effectiveManagerId, role,
              date_of_birth || null]
         );
 
@@ -373,6 +403,10 @@ router.post('/', requireRole('admin', 'manager'), async (req, res) => {
 });
 
 // PATCH /api/employees/:id
+// Accepts employee-table fields AND the role-specific ones that used to be
+// locked after creation (license_no, specialty, specialization_species,
+// office_location). Role-specific fields are UPSERTed into their respective
+// sub-tables so the admin can fix a typo without rebuilding the account.
 router.patch('/:id', requireRole('admin', 'manager'), async (req, res) => {
     const fields = ['first_name', 'middle_name', 'last_name', 'contact_info',
                     'pay_rate_cents', 'shift_timeframe', 'dept_id', 'manager_id', 'role',
@@ -381,7 +415,6 @@ router.patch('/:id', requireRole('admin', 'manager'), async (req, res) => {
     for (const f of fields) {
         if (req.body[f] !== undefined) { updates.push(`${f} = ?`); vals.push(req.body[f]); }
     }
-    if (updates.length === 0) return res.status(400).json({ error: 'No fields to update.' });
 
     // Keep the supervisor invariant intact across edits. Pull the current
     // role/dept if the caller didn't include them, then validate.
@@ -394,7 +427,27 @@ router.patch('/:id', requireRole('admin', 'manager'), async (req, res) => {
         const nextRole     = req.body.role       !== undefined ? req.body.role       : current.role;
         const nextDeptId   = req.body.dept_id    !== undefined ? req.body.dept_id    : current.dept_id;
         const nextMgrId    = req.body.manager_id !== undefined ? req.body.manager_id : current.manager_id;
-        if (nextRole !== 'admin' && nextRole !== 'manager') {
+        if (nextRole === 'admin') {
+            // Admins don't have supervisors; force-null if caller sent one.
+            if (req.body.manager_id !== undefined && req.body.manager_id !== null) {
+                const idx = updates.findIndex(u => u.startsWith('manager_id'));
+                if (idx >= 0) vals[idx] = null;
+            }
+        } else if (nextRole === 'manager') {
+            if (!nextMgrId) {
+                return res.status(400).json({
+                    error: 'Manager must be assigned to an admin as supervisor.',
+                });
+            }
+            const [sRows] = await db.query(
+                `SELECT employee_id, is_active, role
+                   FROM employees WHERE employee_id = ?`, [nextMgrId]
+            );
+            const sup = sRows[0];
+            if (!sup || sup.is_active !== 1 || sup.role !== 'admin') {
+                return res.status(400).json({ error: 'A manager\'s supervisor must be an active admin.' });
+            }
+        } else {
             if (!nextMgrId) {
                 return res.status(400).json({
                     error: `${nextRole} must be assigned to a supervising manager.`,
@@ -413,8 +466,60 @@ router.patch('/:id', requireRole('admin', 'manager'), async (req, res) => {
             }
         }
 
-        vals.push(req.params.id);
-        await db.query(`UPDATE employees SET ${updates.join(', ')} WHERE employee_id = ?`, vals);
+        if (updates.length > 0) {
+            vals.push(req.params.id);
+            await db.query(`UPDATE employees SET ${updates.join(', ')} WHERE employee_id = ?`, vals);
+        }
+
+        // Role-specific sub-tables: UPSERT if the caller included any of
+        // the relevant fields. Uses INSERT ... ON DUPLICATE KEY UPDATE
+        // against the (employee_id) PK in each sub-table so first-time
+        // edits create the row and subsequent edits update it.
+        const wantsVetUpdate       = req.body.license_no !== undefined || req.body.specialty !== undefined;
+        const wantsCaretakerUpdate = req.body.specialization_species !== undefined;
+        const wantsManagerUpdate   = req.body.office_location !== undefined;
+        if (wantsVetUpdate && (nextRole === 'vet' || nextRole === 'manager')) {
+            // vets.license_no is NOT NULL, so only INSERT a fresh row when
+            // the caller actually supplied a license. Existing rows can
+            // have either field updated in place.
+            const [[existingVet]] = await db.query(
+                'SELECT employee_id FROM vets WHERE employee_id = ?', [req.params.id]
+            );
+            if (existingVet) {
+                const setParts = []; const setVals = [];
+                if (req.body.license_no !== undefined) { setParts.push('license_no = ?'); setVals.push(req.body.license_no); }
+                if (req.body.specialty  !== undefined) { setParts.push('specialty = ?');  setVals.push(req.body.specialty ?? null); }
+                if (setParts.length) {
+                    setVals.push(req.params.id);
+                    await db.query(`UPDATE vets SET ${setParts.join(', ')} WHERE employee_id = ?`, setVals);
+                }
+            } else if (req.body.license_no) {
+                await db.query(
+                    'INSERT INTO vets (employee_id, license_no, specialty) VALUES (?, ?, ?)',
+                    [req.params.id, req.body.license_no, req.body.specialty ?? null]
+                );
+            }
+        }
+        if (wantsCaretakerUpdate && nextRole === 'caretaker') {
+            await db.query(
+                `INSERT INTO animal_caretakers (employee_id, specialization_species)
+                 VALUES (?, ?)
+                 ON DUPLICATE KEY UPDATE specialization_species = VALUES(specialization_species)`,
+                [req.params.id, req.body.specialization_species ?? null]
+            );
+        }
+        if (wantsManagerUpdate && nextRole === 'manager') {
+            await db.query(
+                `INSERT INTO managers (employee_id, office_location)
+                 VALUES (?, ?)
+                 ON DUPLICATE KEY UPDATE office_location = VALUES(office_location)`,
+                [req.params.id, req.body.office_location ?? null]
+            );
+        }
+
+        if (updates.length === 0 && !wantsVetUpdate && !wantsCaretakerUpdate && !wantsManagerUpdate) {
+            return res.status(400).json({ error: 'No fields to update.' });
+        }
         return res.json({ success: true });
     } catch (err) {
         return res.status(500).json({ error: err.message });

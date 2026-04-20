@@ -603,14 +603,17 @@ export default function CustomerDashboard() {
                         </div>
                     ) : (() => {
                         // Compute once: what's visible *after* the date filter.
-                        // The total below sums this exact subset so it reflects
-                        // whatever the user is currently looking at.
-                        const filtered = purchases.filter(txn => {
-                            const d = new Date(txn.transaction_date);
-                            if (purchaseDateFrom && d < new Date(purchaseDateFrom + 'T00:00:00')) return false;
-                            if (purchaseDateTo && d > new Date(purchaseDateTo + 'T23:59:59')) return false;
-                            return true;
-                        });
+                        // Sorted newest-first so Order #N shows at the top,
+                        // which is what "descending order" means here.
+                        const filtered = purchases
+                            .filter(txn => {
+                                const d = new Date(txn.transaction_date);
+                                if (purchaseDateFrom && d < new Date(purchaseDateFrom + 'T00:00:00')) return false;
+                                if (purchaseDateTo && d > new Date(purchaseDateTo + 'T23:59:59')) return false;
+                                return true;
+                            })
+                            .slice()
+                            .sort((a, b) => (purchaseNumberByPK.get(b.transaction_id) || 0) - (purchaseNumberByPK.get(a.transaction_id) || 0));
                         const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
                         const pageItems = filtered.slice(purchasePage * PAGE_SIZE, (purchasePage + 1) * PAGE_SIZE);
                         const filteredTotalCents = filtered.reduce((sum, t) => sum + t.total_amount_cents, 0);
@@ -637,7 +640,7 @@ export default function CustomerDashboard() {
                                                 ${(txn.total_amount_cents / 100).toFixed(2)}
                                             </p>
                                         </div>
-                                        {lineItems.length > 0 && (
+                                        {lineItems.length > 0 ? (
                                             <div style={{ background: 'rgba(0,0,0,0.05)', border: '1px solid rgba(0,0,0,0.08)', borderRadius: '8px', padding: '12px', color: 'var(--color-secondary)' }}>
                                                 {lineItems.map((item, idx) => (
                                                     <div key={idx} style={{ padding: '4px 0', borderBottom: idx < lineItems.length - 1 ? '1px solid rgba(0,0,0,0.06)' : 'none' }}>
@@ -662,6 +665,14 @@ export default function CustomerDashboard() {
                                                         <span>Tax: ${(txn.tax_cents / 100).toFixed(2)}</span>
                                                     </div>
                                                 )}
+                                            </div>
+                                        ) : (
+                                            // Older orders pre-date our receipt line-item saving fix.
+                                            // Surface a neutral placeholder instead of a silent blank
+                                            // so the customer isn't left staring at a total with no
+                                            // context.
+                                            <div style={{ background: 'rgba(0,0,0,0.04)', border: '1px dashed rgba(0,0,0,0.1)', borderRadius: '8px', padding: '10px 12px', fontSize: '12px', color: 'var(--color-text-muted)', fontStyle: 'italic' }}>
+                                                Itemized details weren't recorded for this order. Likely a membership or bundled purchase.
                                             </div>
                                         )}
                                     </div>
@@ -849,17 +860,18 @@ export default function CustomerDashboard() {
                             );
                         };
 
-                        // Merge admission + events into a single stream, newest-first by
-                        // purchase date so the list reads like a chronological history.
-                        // The type pill narrows to one kind when the user picks it.
+                        // Merge admission + events into a single stream and sort
+                        // strictly by ticket number DESC — the type pill acts as
+                        // a filter, not a group divider, so the list reads as
+                        // one clean sequence (Ticket #9, #8, #7…).
                         const visible = (
                             ticketFilter === 'admission' ? admissionTickets
                           : ticketFilter === 'events'    ? eventTickets
                           : [...admissionTickets, ...eventTickets]
                         ).slice().sort((a, b) => {
-                            const ta = a.transactions?.transaction_date ? new Date(a.transactions.transaction_date).getTime() : 0;
-                            const tb = b.transactions?.transaction_date ? new Date(b.transactions.transaction_date).getTime() : 0;
-                            return tb - ta;
+                            const na = ticketNumberByPK.get(a.ticket_id) || 0;
+                            const nb = ticketNumberByPK.get(b.ticket_id) || 0;
+                            return nb - na;
                         });
                         const renderAny = (t) => (t.type === 'event' && t.events) ? renderEvent(t) : renderAdmission(t);
 
@@ -1001,21 +1013,19 @@ export default function CustomerDashboard() {
                             <Ticket size={14} /> Buy Event Tickets
                         </button>
                     </div>
-                    {/* Upcoming / All Toggle + Date Range */}
+                    {/* Upcoming / All Toggle + Date Range — match the pill
+                        filter used on the other tabs so the hover behaviour
+                        is consistent (no more jarring white flash). */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '15px', flexWrap: 'wrap' }}>
-                        <div style={{ display: 'flex', borderRadius: '8px', overflow: 'hidden', border: '1px solid rgba(0,0,0,0.15)' }}>
-                            {['upcoming', 'all'].map(f => (
-                                <button key={f} className="glass-button" onClick={() => setEventsFilter(f)} style={{
-                                    padding: '6px 16px', fontSize: '13px', borderRadius: 0,
-                                    background: eventsFilter === f ? '#6d8243' : 'rgba(255, 245, 231, 0.65)',
-                                    fontWeight: eventsFilter === f ? 700 : 400,
-                                    textTransform: 'capitalize',
-                                    color: eventsFilter === f ? 'white' : 'var(--zoo-muted)',
-                                }}>
-                                    {f === 'upcoming' ? 'Upcoming' : 'All Events'}
-                                </button>
-                            ))}
-                        </div>
+                        <StatusFilter
+                            label="View"
+                            tabs={[
+                                { key: 'upcoming', label: 'Upcoming'  },
+                                { key: 'all',      label: 'All Events' },
+                            ]}
+                            value={eventsFilter}
+                            onChange={setEventsFilter}
+                        />
                         <span style={{ fontSize: '13px', color: 'var(--color-text-muted)', marginLeft: '6px' }}>Date range:</span>
                         <input type="date" className="glass-input" value={eventsDateFrom} onChange={e => setEventsDateFrom(e.target.value)} style={{ padding: '6px 10px', fontSize: '13px', width: 'auto' }} />
                         <span style={{ color: 'var(--color-text-muted)' }}>to</span>

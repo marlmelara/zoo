@@ -9,6 +9,8 @@ export const deleteOperationalSupply = (supplyId) => api.delete(`/supplies/${sup
 export const deleteInventoryItem     = (itemId)   => api.delete(`/inventory/${itemId}`);
 
 export const createSupplyRequest = (body) => api.post('/supplies/requests', body);
+export const bulkReviewSupplyRequests = (ids, status) =>
+    api.post('/supplies/requests/bulk-review', { ids, status });
 export const getAllSupplyRequests = ()     => api.get('/supplies/requests');
 export const getMySupplyRequests  = ()    => api.get('/supplies/requests');
 

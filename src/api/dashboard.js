@@ -9,15 +9,23 @@ export const ROLE_DEPT_MAP = {
     retail:    'Retail & Operations',
 };
 
-export const getAdminDashboardStats     = async () => {
-    const s = await api.get('/dashboard/stats');
+// Optional { from, to } narrows every revenue figure to that window so the
+// Admin panel can slice by YTD / quarter / year. Counts (staff, animals,
+// customers) are returned lifetime regardless.
+export const getAdminDashboardStats     = async ({ from, to } = {}) => {
+    const params = new URLSearchParams();
+    if (from) params.set('from', from);
+    if (to)   params.set('to',   to);
+    const qs = params.toString() ? `?${params.toString()}` : '';
+    const s = await api.get(`/dashboard/stats${qs}`);
     return {
-        totalRevenueCents:  s.total_revenue   || 0,
-        ticketRevenueCents: s.ticket_revenue  || 0,
-        retailRevenueCents: s.retail_revenue  || 0,
-        totalEmployees:     s.total_employees || 0,
-        totalAnimals:       s.total_animals   || 0,
-        totalCustomers:     s.total_customers || 0,
+        totalRevenueCents:   s.total_revenue   || 0,
+        ticketRevenueCents:  s.ticket_revenue  || 0,
+        retailRevenueCents:  s.retail_revenue  || 0,
+        donationRevenueCents: s.total_donations || 0,
+        totalEmployees:      s.total_employees || 0,
+        totalAnimals:        s.total_animals   || 0,
+        totalCustomers:      s.total_customers || 0,
     };
 };
 export const getEmployeesWithDepartments = () => api.get('/employees');
@@ -38,8 +46,12 @@ export async function createZooUser({
     return result.employee_id;
 }
 
-export async function getFinancialRevenueBreakdown() {
-    const s = await api.get('/dashboard/stats');
+export async function getFinancialRevenueBreakdown({ from, to } = {}) {
+    const params = new URLSearchParams();
+    if (from) params.set('from', from);
+    if (to)   params.set('to',   to);
+    const qs = params.toString() ? `?${params.toString()}` : '';
+    const s = await api.get(`/dashboard/stats${qs}`);
     return [
         { name: 'Tickets',   Revenue: (s.ticket_revenue  ?? 0) / 100 },
         { name: 'Retail',    Revenue: (s.retail_revenue  ?? 0) / 100 },

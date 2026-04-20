@@ -136,14 +136,18 @@ router.get('/requests', requireAuth, async (req, res) => {
 });
 
 // POST /api/supplies/requests
+// `action` defaults to 'restock' for backwards compatibility; 'remove'
+// subtracts from stock when approved (e.g., damaged/expired inventory).
 router.post('/requests', requireAuth, async (req, res) => {
-    const { supply_type, item_id, item_name, requested_quantity, reason } = req.body;
+    const { supply_type, item_id, item_name, requested_quantity, reason, action } = req.body;
+    const requestAction = action === 'remove' ? 'remove' : 'restock';
     try {
         const [result] = await db.query(
             `INSERT INTO supply_requests
-             (requested_by, supply_type, item_id, item_name, requested_quantity, reason)
-             VALUES (?, ?, ?, ?, ?, ?)`,
-            [req.user.employeeId, supply_type, item_id, item_name,
+             (requested_by, supply_type, action, item_id, item_name,
+              requested_quantity, reason)
+             VALUES (?, ?, ?, ?, ?, ?, ?)`,
+            [req.user.employeeId, supply_type, requestAction, item_id, item_name,
              requested_quantity, reason || null]
         );
         return res.status(201).json({ request_id: result.insertId });
@@ -166,37 +170,50 @@ router.patch('/requests/:id', requireRole('admin','manager'), async (req, res) =
              WHERE request_id=?`,
             [status, req.user.employeeId, req.params.id]
         );
-        // If approved, restock the item
+        // If approved, apply the requested action.
+        // `action='remove'` subtracts (e.g., damage/expiry write-offs);
+        // default `restock` adds. GREATEST(...,0) guards against negative
+        // stock if the admin approves a removal larger than what's on hand.
         if (status === 'approved') {
             const [reqRows] = await conn.query(
                 'SELECT * FROM supply_requests WHERE request_id = ?', [req.params.id]
             );
             const sr = reqRows[0];
+            const isRemove = sr.action === 'remove';
+            const delta    = isRemove ? -sr.requested_quantity : sr.requested_quantity;
+            const logVerb  = isRemove ? 'Removed' : 'Restocked';
+            const logAction = isRemove ? 'supply_removed' : 'supply_restocked';
+
             if (sr.supply_type === 'retail') {
                 await conn.query(
-                    'UPDATE inventory SET stock_count = stock_count + ? WHERE item_id = ?',
-                    [sr.requested_quantity, sr.item_id]
+                    `UPDATE inventory
+                        SET stock_count = GREATEST(stock_count + ?, 0)
+                      WHERE item_id = ?`,
+                    [delta, sr.item_id]
                 );
-                // Also log this as an `inventory` event so the Retail filter in
-                // the Inventory Activity Log picks it up — Retail should
-                // reflect every shop-item restock, including those triggered
-                // by approving a supply request.
                 await conn.query(
                     `INSERT INTO activity_log
                      (action_type, description, performed_by, target_type, target_id, metadata)
                      VALUES (?, ?, ?, 'inventory', ?, ?)`,
                     [
-                        'supply_restocked',
-                        `Restocked ${sr.requested_quantity}x ${sr.item_name} (via approved request)`,
+                        logAction,
+                        `${logVerb} ${sr.requested_quantity}x ${sr.item_name} (via approved request)`,
                         req.user.employeeId || null,
                         sr.item_id,
-                        JSON.stringify({ source: 'retail', quantity: sr.requested_quantity, via_request: sr.request_id }),
+                        JSON.stringify({
+                            source: 'retail',
+                            quantity: sr.requested_quantity,
+                            action: sr.action,
+                            via_request: sr.request_id,
+                        }),
                     ]
                 );
             } else {
                 await conn.query(
-                    'UPDATE operational_supplies SET stock_count = stock_count + ? WHERE supply_id = ?',
-                    [sr.requested_quantity, sr.item_id]
+                    `UPDATE operational_supplies
+                        SET stock_count = GREATEST(stock_count + ?, 0)
+                      WHERE supply_id = ?`,
+                    [delta, sr.item_id]
                 );
             }
         }
@@ -208,6 +225,77 @@ router.patch('/requests/:id', requireRole('admin','manager'), async (req, res) =
     } finally {
         conn.release();
     }
+});
+
+// POST /api/supplies/requests/bulk-review — approve or deny multiple at once.
+// Body: { ids: [1,2,3], status: 'approved' | 'denied' }. Each row runs through
+// the same single-request transaction so stock stays consistent even when
+// half the batch is retail and half is operational.
+router.post('/requests/bulk-review', requireRole('admin','manager'), async (req, res) => {
+    const { ids, status } = req.body;
+    if (!Array.isArray(ids) || ids.length === 0) {
+        return res.status(400).json({ error: 'ids[] is required.' });
+    }
+    if (!['approved','denied'].includes(status)) {
+        return res.status(400).json({ error: 'Status must be approved or denied.' });
+    }
+    const results = [];
+    for (const rawId of ids) {
+        const id = parseInt(rawId, 10);
+        if (!Number.isFinite(id)) { results.push({ id: rawId, ok: false, error: 'bad id' }); continue; }
+        const conn = await db.getConnection();
+        try {
+            await conn.beginTransaction();
+            await conn.query(
+                `UPDATE supply_requests SET status=?, reviewed_by=?, reviewed_at=NOW()
+                 WHERE request_id=? AND status='pending'`,
+                [status, req.user.employeeId, id]
+            );
+            if (status === 'approved') {
+                const [reqRows] = await conn.query(
+                    `SELECT * FROM supply_requests
+                      WHERE request_id = ? AND reviewed_by = ?`, [id, req.user.employeeId]
+                );
+                const sr = reqRows[0];
+                if (sr) {
+                    const isRemove  = sr.action === 'remove';
+                    const delta     = isRemove ? -sr.requested_quantity : sr.requested_quantity;
+                    const logVerb   = isRemove ? 'Removed' : 'Restocked';
+                    const logAction = isRemove ? 'supply_removed' : 'supply_restocked';
+                    if (sr.supply_type === 'retail') {
+                        await conn.query(
+                            `UPDATE inventory
+                                SET stock_count = GREATEST(stock_count + ?, 0)
+                              WHERE item_id = ?`, [delta, sr.item_id]
+                        );
+                        await conn.query(
+                            `INSERT INTO activity_log
+                             (action_type, description, performed_by, target_type, target_id, metadata)
+                             VALUES (?, ?, ?, 'inventory', ?, ?)`,
+                            [logAction,
+                             `${logVerb} ${sr.requested_quantity}x ${sr.item_name} (via bulk approval)`,
+                             req.user.employeeId || null, sr.item_id,
+                             JSON.stringify({ source: 'retail', quantity: sr.requested_quantity, action: sr.action, via_request: sr.request_id, bulk: true })]
+                        );
+                    } else {
+                        await conn.query(
+                            `UPDATE operational_supplies
+                                SET stock_count = GREATEST(stock_count + ?, 0)
+                              WHERE supply_id = ?`, [delta, sr.item_id]
+                        );
+                    }
+                }
+            }
+            await conn.commit();
+            results.push({ id, ok: true });
+        } catch (err) {
+            await conn.rollback();
+            results.push({ id, ok: false, error: err.message });
+        } finally {
+            conn.release();
+        }
+    }
+    return res.json({ results, processed: results.length });
 });
 
 export default router;

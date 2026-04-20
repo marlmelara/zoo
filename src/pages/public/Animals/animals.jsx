@@ -1,190 +1,213 @@
-import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import { FaClock, FaMapMarkerAlt, FaPhone, FaEnvelope } from 'react-icons/fa';
+// Public "Our Animals" gallery — previously hard-coded to a static list of
+// 29 stock species photos. Now pulls live from /api/animals (active only),
+// grouped/filterable by animal_zones, so whatever's actually on site is
+// what the guest sees. Per-animal image_url is rendered when present;
+// names without a photo get a themed placeholder card.
+import React, { useEffect, useMemo, useState } from 'react';
+import { FaMapMarkerAlt, FaPhone, FaEnvelope } from 'react-icons/fa';
+import { PawPrint } from 'lucide-react';
 import logo from '../../../images/logo.png';
 import './animals.css';
 import Navbar from '../../../components/Navbar';
 
-// Import all animal images
-import stVincentAmazonParrot from '../../../images/animals_amazon_parrot.jpg';
-import greenAnaconda from '../../../images/animals_anaconda.jpg';
-import blackMamba from '../../../images/animals_black_mamba.jpg';
-import blueMacaw from '../../../images/animals_blue_macaw.jpg';
-import easternBongo from '../../../images/animals_bongo.jpg';
-import bonnetheadShark from '../../../images/animals_bonnethead_shark.jpg';
-import chimpanzee from '../../../images/animals_chimp.jpg';
-import cougar from '../../../images/animals_cougar.jpg';
-import whoopingCrane from '../../../images/animals_crane.jpg';
-import asianElephant from '../../../images/animals_elephant.jpg';
-import ChileanFlamingo from '../../../images/animals_flamingo.jpg';
-import masaiGiraffe from '../../../images/animals_giraffe.jpg';
-import domesticatedGoat from '../../../images/animals_goat.jpeg';
-import gorilla from '../../../images/animals_gorilla.jpg';
-import humboldtPenguin from '../../../images/animals_humboldt_penguin.jpg';
-import jaguar from '../../../images/animals_jaguar.jpg';
-import komodoDragon from '../../../images/animals_komodo_dragon.jpg';
-import africanLion from '../../../images/animals_lion.jpg';
-import ocelot from '../../../images/animals_ocelot.jpg';
-import orangutan from '../../../images/animals_orangutan.jpg';
-import ostrich from '../../../images/animals_ostrich.jpg';
-import paintedAfricanDog from '../../../images/animals_painted_dog.jpg';
-import southerWhiteRhinoceros from '../../../images/animals_rhinoceros.jpg';
-import northAmericanRiverOtter from '../../../images/animals_river_otter.jpg';
-import siamang from '../../../images/animals_siamang.jpg';
-import goldenHeadLiontamarin from '../../../images/animals_tamarin.jpg';
-import houstonToad from '../../../images/animals_toad.jpg';
-import africanSpurredTortoise from '../../../images/animals_tortoise.jpg';
-import grantZebra from '../../../images/animals_zebra.jpg';
-
-const animals = [
-  { name: 'St. Vincent Amazon Parrot', src: stVincentAmazonParrot, zone: 'Birds of the World' },
-  { name: 'Green Anaconda', src: greenAnaconda, zone: 'Reptile Lair' },
-  { name: 'Black Mamba', src: blackMamba, zone: 'Reptile Lair' },
-  { name: 'Blue Macaw', src: blueMacaw, zone: 'Birds of the World' },
-  { name: 'Eastern Bongo', src: easternBongo, zone: 'Animals of Africa' },
-  { name: 'Bonnethead Shark', src: bonnetheadShark, zone: 'Galapagos Islands' },
-  { name: 'Chimpanzee', src: chimpanzee, zone: 'World of Primates' },
-  { name: 'Cougar', src: cougar, zone: 'Big Cat Zone' },
-  { name: 'Whooping Crane', src: whoopingCrane, zone: 'Birds of the World' },
-  { name: 'Asian Elephant', src: asianElephant, zone: 'Elephants of Asia' },
-  { name: 'Chilean Flamingo', src: ChileanFlamingo, zone: 'Birds of the World' },
-  { name: 'Masai Giraffe', src: masaiGiraffe, zone: 'Animals of Africa' },
-  { name: 'Domesticated Goat', src: domesticatedGoat, zone: "Children's Zoo" },
-  { name: 'Gorilla', src: gorilla, zone: 'World of Primates' },
-  { name: 'Humboldt Penguin', src: humboldtPenguin, zone: 'Galapagos Islands' },
-  { name: 'Jaguar', src: jaguar, zone: 'Big Cat Zone' },
-  { name: 'Komodo Dragon', src: komodoDragon, zone: 'Reptile Lair' },
-  { name: 'African Lion', src: africanLion, zone: 'Big Cat Zone' },
-  { name: 'Ocelot', src: ocelot, zone: 'Big Cat Zone' },
-  { name: 'Orangutan', src: orangutan, zone: 'World of Primates' },
-  { name: 'Ostrich', src: ostrich, zone: 'Animals of Africa' },
-  { name: 'Painted African Dog', src: paintedAfricanDog, zone: 'Animals of Africa' },
-  { name: 'Southern White Rhinoceros', src: southerWhiteRhinoceros, zone: 'Animals of Africa' },
-  { name: 'North American River Otter', src: northAmericanRiverOtter, zone: "Children's Zoo" },
-  { name: 'Siamang', src: siamang, zone: 'World of Primates' },
-  { name: 'Golden-Head Liontamarin', src: goldenHeadLiontamarin, zone: 'World of Primates' },
-  { name: 'Houston Toad', src: houstonToad, zone: "Children's Zoo" },
-  { name: 'African Spurred Tortoise', src: africanSpurredTortoise, zone: 'Reptile Lair' },
-  { name: 'Grant\'s Zebra', src: grantZebra, zone: 'Animals of Africa' },
-].sort((a, b) => a.name.localeCompare(b.name));
-
 export default function AnimalGallery() {
-  const [selectedZone, setSelectedZone] = useState('All Zones');
-  const [selectedAnimal, setSelectedAnimal] = useState(null);
-  const [dbAnimals, setDbAnimals] = useState([]);
-  useEffect(() => {
-    fetch('/api/animals')
-      .then(res => res.json())
-      .then(data => setDbAnimals(data))
-      .catch(err => console.error(err));
-  }, []);
+    const [animals, setAnimals] = useState([]);
+    const [zones,   setZones]   = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [selectedZone, setSelectedZone] = useState('All Zones');
+    const [selectedAnimal, setSelectedAnimal] = useState(null);
 
-  const zones = ['All Zones', 'World of Primates', 'Elephants of Asia', 'Big Cat Zone', 'Reptile Lair', 'Animals of Africa', "Children's Zoo", 'Birds of the World', 'Galapagos Islands'];
+    useEffect(() => {
+        // Public endpoint — no auth. Defaults to active animals only.
+        Promise.all([
+            fetch('/api/animals').then(r => r.ok ? r.json() : []),
+            fetch('/api/animals/zones/all').then(r => r.ok ? r.json() : []),
+        ])
+            .then(([animalData, zoneData]) => {
+                // Guard against departed animals sneaking in if the default
+                // ever changes on the server — gallery is "who lives here".
+                setAnimals((animalData || []).filter(a => a.is_active !== 0));
+                setZones(zoneData || []);
+            })
+            .catch(err => console.error('Error loading animals page:', err))
+            .finally(() => setLoading(false));
+    }, []);
 
-  const filteredAnimals = selectedZone === 'All Zones'
-    ? animals
-    : animals.filter(animal => animal.zone === selectedZone);
+    // Zone dropdown options: "All Zones" + every zone present in the data,
+    // alphabetized. Sourcing from the zones table (not animals.zone_name)
+    // so empty zones still appear — helps guests who want to see if a
+    // zone they read about is currently occupied or being refurbed.
+    const zoneOptions = useMemo(() => {
+        const names = zones.map(z => z.zone_name).filter(Boolean)
+            .sort((a, b) => a.localeCompare(b));
+        return ['All Zones', ...names];
+    }, [zones]);
 
-  return (
-    <main className="animals-page">
-      <Navbar />
+    const filteredAnimals = useMemo(() => {
+        const q = selectedZone;
+        const rows = q === 'All Zones'
+            ? animals
+            : animals.filter(a => a.zone_name === q);
+        return rows.slice().sort((a, b) =>
+            (a.name || '').localeCompare(b.name || '')
+        );
+    }, [animals, selectedZone]);
 
-      {/* Popup */}
-      {selectedAnimal && (
-        <div className="animal-popup-overlay" onClick={() => setSelectedAnimal(null)}>
-          <div className="animal-popup" onClick={e => e.stopPropagation()}>
-            <button className="animal-popup-close" onClick={() => setSelectedAnimal(null)}>✕</button>
-            <img src={selectedAnimal.src} alt={selectedAnimal.name} />
-            <h2>{selectedAnimal.name}</h2>
-            <div className="animal-popup-names">
-              {(() => {
-                const names = dbAnimals
-                  .filter(a => a.species_common_name === selectedAnimal.name && a.is_active === 1)
-                  .map(a => a.name);
-                return names.length === 0
-                  ? <p>None currently at the zoo</p>
-                  : <p>Meet our {selectedAnimal.name}{names.length > 1 ? 's' : ''}: {names.join(', ')}</p>;
-              })()}
-            </div>
-          </div>
-        </div>
-      )}
+    return (
+        <main className="animals-page">
+            <Navbar />
 
-      <div className="animals-page-inner">
-        <h1 className="animals-title">Meet The Crew</h1>
-
-        <div className="zone-filter">
-          <label htmlFor="zone-select">Filter by Zone:</label>
-          <select
-            id="zone-select"
-            value={selectedZone}
-            onChange={(e) => setSelectedZone(e.target.value)}
-            className="zone-select"
-          >
-            {zones.map(zone => (
-              <option key={zone} value={zone}>{zone}</option>
-            ))}
-          </select>
-        </div>
-
-        <section className="animals-grid">
-          {filteredAnimals.map(animal => (
-            <article
-              key={animal.name}
-              className="animal-card"
-              onClick={() => setSelectedAnimal(animal)}
-              style={{ cursor: 'pointer' }}
-            >
-              <img src={animal.src} alt={animal.name} loading="lazy" />
-              <div className="animal-name">{animal.name}</div>
-            </article>
-          ))}
-        </section>
-      </div>
-      {/* Footer */}
-            <footer className="footer" style={{background: "rgb(123, 144, 79)"}}>
-              <div className="footer-container">
-                <div className="footer-main">
-                  <div className="footer-section footer-brand">
-                    <div className="footer-logo">
-                      <div className="logo-placeholder">
-                        <img src={logo} style={{ maxWidth: '200px', width: '100%', height: 'auto' }} alt="Coog Zoo" />
-                      </div>
-                    </div>
-                    <p className="footer-description" style={{color:"white"}}>
-                      Discover amazing wildlife, attend exciting events, and support animal conservation at Coog Zoo.
-                    </p>
-                  </div>
-      
-                  <div className="footer-section">
-                    <h3 className="footer-title">Contact Us</h3>
-                    <div className="footer-contact-info">
-                      <div className="contact-item">
-                        <FaMapMarkerAlt className="contact-icon" style={{color:"white"}} />
-                        <div>
-                          <p>4302 University Dr</p>
-                          <p>Houston, TX 77004</p>
+            {selectedAnimal && (
+                <div className="animal-popup-overlay" onClick={() => setSelectedAnimal(null)}>
+                    <div className="animal-popup" onClick={e => e.stopPropagation()}>
+                        <button className="animal-popup-close" onClick={() => setSelectedAnimal(null)}>✕</button>
+                        {selectedAnimal.image_url ? (
+                            <img src={selectedAnimal.image_url} alt={selectedAnimal.name} />
+                        ) : (
+                            <div style={{
+                                width: '100%', aspectRatio: '4 / 3', display: 'flex',
+                                alignItems: 'center', justifyContent: 'center',
+                                background: 'rgba(123, 144, 79, 0.12)',
+                                borderRadius: '12px', marginBottom: '16px', color: 'rgb(102, 122, 66)',
+                            }}>
+                                <PawPrint size={48} />
+                            </div>
+                        )}
+                        <h2>{selectedAnimal.name}</h2>
+                        <div className="animal-popup-names">
+                            <p style={{ margin: '8px 0 4px', fontWeight: 600 }}>
+                                {selectedAnimal.species_common_name}
+                            </p>
+                            {selectedAnimal.species_binomial && (
+                                <p style={{ margin: 0, fontStyle: 'italic', color: 'var(--zoo-muted)' }}>
+                                    {selectedAnimal.species_binomial}
+                                </p>
+                            )}
+                            <span className="animal-popup-zone" style={{ marginTop: '10px' }}>
+                                <FaMapMarkerAlt /> {selectedAnimal.zone_name || 'Unassigned'}
+                            </span>
+                            {typeof selectedAnimal.age === 'number' && (
+                                <p style={{ marginTop: '12px', color: 'var(--zoo-muted)' }}>
+                                    Age: <strong>{selectedAnimal.age}</strong> year{selectedAnimal.age === 1 ? '' : 's'}
+                                </p>
+                            )}
                         </div>
-                      </div>
-                      <div className="contact-item">
-                        <FaPhone className="contact-icon" style={{color:"white"}} />
-                        <a href="tel:5555555555">555-555-5555</a>
-                      </div>
-                      <div className="contact-item">
-                        <FaEnvelope className="contact-icon" style={{color:"white"}}/>
-                        <a href="mailto:info@coogzoo.org">info@coogzoo.org</a>
-                      </div>
                     </div>
-                  </div>
                 </div>
-      
-                <div className="footer-bottom">
-                  <div className="footer-bottom-content" style={{color:"white"}}>
-                    <p>&copy; {new Date().getFullYear()} Coog Zoo. All rights reserved.</p>
-                  </div>
+            )}
+
+            <div className="animals-page-inner">
+                <h1 className="animals-title">Our Animals</h1>
+
+                <div className="zone-filter">
+                    <label htmlFor="zone-select">Filter by Zone:</label>
+                    <select
+                        id="zone-select"
+                        value={selectedZone}
+                        onChange={(e) => setSelectedZone(e.target.value)}
+                        className="zone-select"
+                    >
+                        {zoneOptions.map(zone => (
+                            <option key={zone} value={zone}>{zone}</option>
+                        ))}
+                    </select>
                 </div>
-              </div>
+
+                {loading ? (
+                    <p style={{ textAlign: 'center', color: 'var(--zoo-muted)' }}>
+                        Loading the crew…
+                    </p>
+                ) : filteredAnimals.length === 0 ? (
+                    <p style={{ textAlign: 'center', color: 'var(--zoo-muted)', padding: '40px' }}>
+                        No animals to show
+                        {selectedZone !== 'All Zones' ? ` in ${selectedZone}` : ''} right now.
+                    </p>
+                ) : (
+                    <section className="animals-grid">
+                        {filteredAnimals.map(animal => (
+                            <article
+                                key={animal.animal_id}
+                                className="animal-card"
+                                onClick={() => setSelectedAnimal(animal)}
+                                style={{ cursor: 'pointer' }}
+                            >
+                                {animal.image_url ? (
+                                    <img
+                                        src={animal.image_url}
+                                        alt={animal.name}
+                                        loading="lazy"
+                                        onError={(e) => {
+                                            // Swap broken images for the placeholder card.
+                                            e.currentTarget.style.display = 'none';
+                                            const placeholder = e.currentTarget.nextElementSibling;
+                                            if (placeholder) placeholder.style.display = 'flex';
+                                        }}
+                                    />
+                                ) : null}
+                                <div style={{
+                                    width: '100%', aspectRatio: '4 / 3',
+                                    display: animal.image_url ? 'none' : 'flex',
+                                    alignItems: 'center', justifyContent: 'center',
+                                    background: 'linear-gradient(135deg, rgba(123,144,79,0.18) 0%, rgba(255, 245, 231, 0.9) 100%)',
+                                    color: 'rgb(102, 122, 66)',
+                                }}>
+                                    <PawPrint size={48} />
+                                </div>
+                                <div className="animal-name">
+                                    {animal.name}
+                                    <div style={{ fontSize: '12px', fontWeight: 500, color: 'var(--zoo-muted)', marginTop: '4px' }}>
+                                        {animal.species_common_name}
+                                    </div>
+                                </div>
+                            </article>
+                        ))}
+                    </section>
+                )}
+            </div>
+
+            <footer className="footer" style={{ background: 'rgb(123, 144, 79)' }}>
+                <div className="footer-container">
+                    <div className="footer-main">
+                        <div className="footer-section footer-brand">
+                            <div className="footer-logo">
+                                <div className="logo-placeholder">
+                                    <img src={logo} style={{ maxWidth: '200px', width: '100%', height: 'auto' }} alt="Coog Zoo" />
+                                </div>
+                            </div>
+                            <p className="footer-description" style={{ color: 'white' }}>
+                                Discover amazing wildlife, attend exciting events, and support animal conservation at Coog Zoo.
+                            </p>
+                        </div>
+
+                        <div className="footer-section">
+                            <h3 className="footer-title">Contact Us</h3>
+                            <div className="footer-contact-info">
+                                <div className="contact-item">
+                                    <FaMapMarkerAlt className="contact-icon" style={{ color: 'white' }} />
+                                    <div>
+                                        <p>4302 University Dr</p>
+                                        <p>Houston, TX 77004</p>
+                                    </div>
+                                </div>
+                                <div className="contact-item">
+                                    <FaPhone className="contact-icon" style={{ color: 'white' }} />
+                                    <a href="tel:5555555555">555-555-5555</a>
+                                </div>
+                                <div className="contact-item">
+                                    <FaEnvelope className="contact-icon" style={{ color: 'white' }} />
+                                    <a href="mailto:info@coogzoo.org">info@coogzoo.org</a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="footer-bottom">
+                        <div className="footer-bottom-content" style={{ color: 'white' }}>
+                            <p>&copy; {new Date().getFullYear()} Coog Zoo. All rights reserved.</p>
+                        </div>
+                    </div>
+                </div>
             </footer>
-    </main>
-  );
+        </main>
+    );
 }

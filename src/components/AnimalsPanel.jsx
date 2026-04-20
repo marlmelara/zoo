@@ -8,6 +8,7 @@ import api from '../lib/api';
 import { Activity, X, Trash2, Pencil } from 'lucide-react';
 import BulkActionBar from './BulkActionBar';
 import LifecycleLogModal, { LifecycleLogButton } from './LifecycleLogModal';
+import AnimalMedicalPanel from './AnimalMedicalPanel';
 import { useToast, useConfirm } from './Feedback';
 
 const GREEN = 'rgb(123, 144, 79)';
@@ -28,11 +29,11 @@ export default function AnimalsPanel({ title = 'Animals', accentColor = 'var(--c
     // Edit state: holds the animal currently being edited (or null).
     const [editing, setEditing] = useState(null);
 
+    // Medical-records modal now delegates to AnimalMedicalPanel so the
+    // full schema (diagnosis/severity/status/treatment/medications/vitals
+    // /notes/follow-up) is available to admins. Keeping just the "which
+    // animal is selected" state here.
     const [selectedAnimal, setSelectedAnimal] = useState(null);
-    const [medicalHistory, setMedicalHistory] = useState([]);
-    const [historyLoading, setHistoryLoading] = useState(false);
-    const [showHistoryForm, setShowHistoryForm] = useState(false);
-    const [historyForm, setHistoryForm] = useState({ injury: '', disease: '', date_treated: '', animal_age_at_treatment: '' });
 
     const [formData, setFormData] = useState({
         name: '',
@@ -42,6 +43,7 @@ export default function AnimalsPanel({ title = 'Animals', accentColor = 'var(--c
         zone_id: '',
         arrived_date: '',
         date_of_birth: '',
+        image_url: '',
     });
 
     const [searchTerm, setSearchTerm] = useState('');
@@ -70,34 +72,6 @@ export default function AnimalsPanel({ title = 'Animals', accentColor = 'var(--c
         if (data) setZones(data);
     }
 
-    async function fetchMedicalHistory(animal) {
-        if (!animal.animal_id) return;
-        setHistoryLoading(true);
-        try {
-            const data = await api.get(`/animals/${animal.animal_id}/medical-history`);
-            setMedicalHistory(data || []);
-        } catch (error) {
-            console.error('Error fetching history:', error);
-        } finally {
-            setHistoryLoading(false);
-        }
-    }
-
-    async function handleHistorySubmit(e) {
-        e.preventDefault();
-        try {
-            await api.post(`/animals/${selectedAnimal.animal_id}/medical-history`, {
-                ...historyForm,
-                animal_age_at_treatment: parseInt(historyForm.animal_age_at_treatment),
-            });
-            setShowHistoryForm(false);
-            setHistoryForm({ injury: '', disease: '', date_treated: '', animal_age_at_treatment: '' });
-            fetchMedicalHistory(selectedAnimal);
-        } catch (error) {
-            console.error('Error adding medical record', error);
-        }
-    }
-
     async function handleSubmit(e) {
         e.preventDefault();
         // DOB sanity: either no DOB, or DOB is on/before the arrival date.
@@ -118,6 +92,7 @@ export default function AnimalsPanel({ title = 'Animals', accentColor = 'var(--c
                     zone_id: formData.zone_id === '' ? null : parseInt(formData.zone_id),
                     arrived_date: formData.arrived_date || null,
                     date_of_birth: formData.date_of_birth || null,
+                    image_url: formData.image_url?.trim() || null,
                 });
             } else {
                 await api.post('/animals', {
@@ -126,11 +101,12 @@ export default function AnimalsPanel({ title = 'Animals', accentColor = 'var(--c
                     zone_id: parseInt(formData.zone_id),
                     arrived_date: formData.arrived_date || null,
                     date_of_birth: formData.date_of_birth || null,
+                    image_url: formData.image_url?.trim() || null,
                 });
             }
             setShowForm(false);
             setEditing(null);
-            setFormData({ name: '', species_common_name: '', species_binomial: '', age: '', zone_id: '', arrived_date: '', date_of_birth: '' });
+            setFormData({ name: '', species_common_name: '', species_binomial: '', age: '', zone_id: '', arrived_date: '', date_of_birth: '', image_url: '' });
             fetchAnimals();
         } catch (error) {
             console.error('Error saving animal:', error);
@@ -148,15 +124,15 @@ export default function AnimalsPanel({ title = 'Animals', accentColor = 'var(--c
             zone_id: animal.zone_id ?? '',
             arrived_date: animal.arrived_date ? String(animal.arrived_date).slice(0, 10) : '',
             date_of_birth: animal.date_of_birth ? String(animal.date_of_birth).slice(0, 10) : '',
+            image_url: animal.image_url || '',
         });
         setShowForm(true);
-        window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
     function cancelForm() {
         setShowForm(false);
         setEditing(null);
-        setFormData({ name: '', species_common_name: '', species_binomial: '', age: '', zone_id: '', arrived_date: '', date_of_birth: '' });
+        setFormData({ name: '', species_common_name: '', species_binomial: '', age: '', zone_id: '', arrived_date: '', date_of_birth: '', image_url: '' });
     }
 
     function toggleSelect(id) {
@@ -268,69 +244,101 @@ export default function AnimalsPanel({ title = 'Animals', accentColor = 'var(--c
                 />
             </div>
 
-            {showForm && (
-                <div className="glass-panel" style={{ padding: '20px', marginBottom: '30px', border: `1px solid ${accentColor}` }}>
-                    <h3>{editing ? `Edit Animal: ${editing.name}` : 'New Animal Profile'}</h3>
-                    <form onSubmit={handleSubmit} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-                        <div>
-                            <label style={{ display: 'block', marginBottom: '5px' }}>Name</label>
-                            <input required className="glass-input" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} />
-                        </div>
-                        <div>
-                            <label style={{ display: 'block', marginBottom: '5px' }}>Common Species Name</label>
-                            <input required className="glass-input" value={formData.species_common_name} onChange={e => setFormData({ ...formData, species_common_name: e.target.value })} />
-                        </div>
-                        <div>
-                            <label style={{ display: 'block', marginBottom: '5px' }}>Scientific Name</label>
-                            <input className="glass-input" value={formData.species_binomial} onChange={e => setFormData({ ...formData, species_binomial: e.target.value })} />
-                        </div>
-                        <div>
-                            <label style={{ display: 'block', marginBottom: '5px' }}>Age (Years)</label>
-                            <input required type="number" className="glass-input" value={formData.age} onChange={e => setFormData({ ...formData, age: e.target.value })} />
-                        </div>
-                        <div>
-                            <label style={{ display: 'block', marginBottom: '5px' }}>Zone</label>
-                            <select required className="glass-input" value={formData.zone_id} onChange={e => setFormData({ ...formData, zone_id: e.target.value })}>
-                                <option value="">Select Zone...</option>
-                                {zones.map(z => <option key={z.zone_id} value={z.zone_id}>{z.zone_name}</option>)}
-                            </select>
-                        </div>
-                        <div>
-                            <label style={{ display: 'block', marginBottom: '5px' }}>Arrival Date</label>
-                            <input
-                                type="date"
-                                className="glass-input"
-                                value={formData.arrived_date}
-                                onChange={e => setFormData({ ...formData, arrived_date: e.target.value })}
-                                max={new Date().toISOString().slice(0, 10)}
-                                placeholder="Defaults to today"
-                            />
-                        </div>
-                        <div>
-                            <label style={{ display: 'block', marginBottom: '5px' }}>Date of Birth</label>
-                            <input
-                                type="date"
-                                className="glass-input"
-                                value={formData.date_of_birth}
-                                // Can't be born in the future, and can't be born
-                                // after the animal arrived at the zoo. The server
-                                // re-checks both rules.
-                                max={formData.arrived_date || new Date().toISOString().slice(0, 10)}
-                                onChange={e => setFormData({ ...formData, date_of_birth: e.target.value })}
-                                placeholder="Same day as arrival if born here"
-                            />
-                        </div>
-                        <div style={{ gridColumn: '1 / -1', marginTop: '10px', display: 'flex', gap: '10px' }}>
-                            <button type="submit" className="glass-button" style={{ background: accentColor, color: 'white', flex: 1 }}>
-                                {editing ? 'Save Changes' : 'Save Animal'}
+            {showForm && createPortal((
+                <div onClick={cancelForm} style={{
+                    position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
+                }}>
+                    <div onClick={e => e.stopPropagation()} style={{
+                        width: '560px', maxWidth: '92vw', maxHeight: '90vh', overflowY: 'auto',
+                        padding: '28px', background: 'rgba(255,255,255,0.96)', color: 'var(--color-text-dark)',
+                        border: `1px solid ${GREEN}`, borderRadius: '14px',
+                        boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+                    }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px' }}>
+                            <h2 style={{ margin: 0, color: GREEN_DARK }}>{editing ? `Edit Animal: ${editing.name}` : 'New Animal Profile'}</h2>
+                            <button onClick={cancelForm} style={{ background: 'none', border: 'none', color: GREEN_DARK, cursor: 'pointer' }}>
+                                <X size={20} />
                             </button>
-                            {editing && (
-                                <button type="button" onClick={cancelForm} className="glass-button" style={{ flex: 0.3 }}>Cancel</button>
-                            )}
                         </div>
-                    </form>
+                        <form onSubmit={handleSubmit} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+                            <div>
+                                <label style={animalLabelStyle}>Name</label>
+                                <input required className="glass-input" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} />
+                            </div>
+                            <div>
+                                <label style={animalLabelStyle}>Common Species Name</label>
+                                <input required className="glass-input" value={formData.species_common_name} onChange={e => setFormData({ ...formData, species_common_name: e.target.value })} />
+                            </div>
+                            <div>
+                                <label style={animalLabelStyle}>Scientific Name</label>
+                                <input className="glass-input" value={formData.species_binomial} onChange={e => setFormData({ ...formData, species_binomial: e.target.value })} />
+                            </div>
+                            <div>
+                                <label style={animalLabelStyle}>Age (Years)</label>
+                                <input required type="number" className="glass-input" value={formData.age} onChange={e => setFormData({ ...formData, age: e.target.value })} />
+                            </div>
+                            <div>
+                                <label style={animalLabelStyle}>Zone</label>
+                                <select required className="glass-input" value={formData.zone_id} onChange={e => setFormData({ ...formData, zone_id: e.target.value })}>
+                                    <option value="">Select Zone...</option>
+                                    {zones.map(z => <option key={z.zone_id} value={z.zone_id}>{z.zone_name}</option>)}
+                                </select>
+                            </div>
+                            <div>
+                                <label style={animalLabelStyle}>Arrival Date</label>
+                                <input
+                                    type="date"
+                                    className="glass-input"
+                                    value={formData.arrived_date}
+                                    onChange={e => setFormData({ ...formData, arrived_date: e.target.value })}
+                                    max={new Date().toISOString().slice(0, 10)}
+                                    placeholder="Defaults to today"
+                                />
+                            </div>
+                            <div style={{ gridColumn: '1 / -1' }}>
+                                <label style={animalLabelStyle}>Date of Birth</label>
+                                <input
+                                    type="date"
+                                    className="glass-input"
+                                    value={formData.date_of_birth}
+                                    max={formData.arrived_date || new Date().toISOString().slice(0, 10)}
+                                    onChange={e => setFormData({ ...formData, date_of_birth: e.target.value })}
+                                    placeholder="Same day as arrival if born here"
+                                />
+                            </div>
+                            <div style={{ gridColumn: '1 / -1' }}>
+                                <label style={animalLabelStyle}>Photo URL</label>
+                                <input
+                                    type="url"
+                                    className="glass-input"
+                                    value={formData.image_url}
+                                    onChange={e => setFormData({ ...formData, image_url: e.target.value })}
+                                    placeholder="https://… (shown on the public Our Animals page)"
+                                />
+                                {formData.image_url?.trim() && (
+                                    <div style={{ marginTop: '8px', border: `1px solid ${GREEN}33`, borderRadius: '8px', padding: '8px', maxWidth: '220px' }}>
+                                        <img
+                                            src={formData.image_url}
+                                            alt="Preview"
+                                            style={{ width: '100%', borderRadius: '6px', display: 'block' }}
+                                            onError={e => { e.currentTarget.style.display = 'none'; }}
+                                            onLoad={e => { e.currentTarget.style.display = 'block'; }}
+                                        />
+                                        <div style={{ fontSize: '11px', color: GREEN_DARK, marginTop: '4px' }}>Preview</div>
+                                    </div>
+                                )}
+                            </div>
+                            <div style={{ gridColumn: '1 / -1', display: 'flex', gap: '10px', marginTop: '6px' }}>
+                                <button type="button" onClick={cancelForm} className="glass-button" style={{ flex: 1 }}>Cancel</button>
+                                <button type="submit" className="glass-button" style={{ flex: 2, background: GREEN, color: 'white', fontWeight: 700 }}>
+                                    {editing ? 'Save Changes' : 'Save Animal'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
                 </div>
-            )}
+            ), document.body)}
 
             {loading ? (
                 <p>Loading animals...</p>
@@ -373,6 +381,17 @@ export default function AnimalsPanel({ title = 'Animals', accentColor = 'var(--c
                                         background: 'rgba(239,68,68,0.18)', color: '#b91c1c', fontWeight: 700, textTransform: 'uppercase',
                                     }}>Departed</span>
                                 )}
+                                {animal.image_url && (
+                                    <div style={{ marginBottom: '10px', borderRadius: '8px', overflow: 'hidden', aspectRatio: '16/10', background: 'rgba(121,162,128,0.1)' }}>
+                                        <img
+                                            src={animal.image_url}
+                                            alt={animal.name}
+                                            style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                                            loading="lazy"
+                                            onError={e => { e.currentTarget.parentElement.style.display = 'none'; }}
+                                        />
+                                    </div>
+                                )}
                                 <h3 style={{ margin: '0 0 10px', paddingRight: '80px', paddingLeft: manageMode && !departed ? '28px' : 0, transition: 'padding 150ms' }}>{animal.name}</h3>
                                 <p style={{ color: accentColor, fontSize: '14px', marginBottom: '15px' }}>{animal.species_common_name}</p>
                                 <div style={{ fontSize: '14px', color: 'var(--color-text-muted)', marginBottom: '15px' }}>
@@ -399,7 +418,6 @@ export default function AnimalsPanel({ title = 'Animals', accentColor = 'var(--c
                                         onClick={(e) => {
                                             e.stopPropagation();
                                             setSelectedAnimal(animal);
-                                            fetchMedicalHistory(animal);
                                         }}
                                     >
                                         Medical Records
@@ -456,7 +474,7 @@ export default function AnimalsPanel({ title = 'Animals', accentColor = 'var(--c
                     display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
                 }} onClick={() => setSelectedAnimal(null)}>
                     <div onClick={e => e.stopPropagation()} style={{
-                        width: '600px', maxWidth: '90vw', maxHeight: '85vh', overflowY: 'auto',
+                        width: '680px', maxWidth: '92vw', maxHeight: '88vh', overflowY: 'auto',
                         padding: '28px', background: 'rgba(255,255,255,0.98)',
                         border: `1px solid ${GREEN}`, borderRadius: '14px',
                         boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
@@ -465,72 +483,31 @@ export default function AnimalsPanel({ title = 'Animals', accentColor = 'var(--c
                             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                                 <Activity color={GREEN_DARK} size={20} />
                                 <h2 style={{ margin: 0, color: GREEN_DARK, fontSize: '20px' }}>
-                                    Medical History: {selectedAnimal.name}
+                                    Medical Records: {selectedAnimal.name}
                                 </h2>
                             </div>
                             <button onClick={() => setSelectedAnimal(null)} style={{ background: 'none', border: 'none', color: GREEN_DARK, cursor: 'pointer' }}><X size={20} /></button>
                         </div>
-
-                        {!showHistoryForm ? (
-                            <button
-                                className="glass-button"
-                                onClick={() => setShowHistoryForm(true)}
-                                style={{
-                                    width: '100%', marginBottom: '20px',
-                                    background: 'rgba(121,162,128,0.18)', color: GREEN_DARK,
-                                    fontWeight: 600,
-                                }}
-                            >
-                                + Add Medical Entry
-                            </button>
-                        ) : (
-                            <form onSubmit={handleHistorySubmit} style={{
-                                marginBottom: '24px',
-                                background: 'rgba(255, 245, 231, 0.78)',
-                                border: '1px solid rgba(121,162,128,0.25)',
-                                padding: '18px', borderRadius: '10px',
-                            }}>
-                                <h4 style={{ marginTop: 0, color: GREEN_DARK }}>New Entry</h4>
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                                    <input placeholder="Injury (optional)" className="glass-input" value={historyForm.injury} onChange={e => setHistoryForm({ ...historyForm, injury: e.target.value })} />
-                                    <input placeholder="Disease (optional)" className="glass-input" value={historyForm.disease} onChange={e => setHistoryForm({ ...historyForm, disease: e.target.value })} />
-                                    <input type="date" required className="glass-input" value={historyForm.date_treated} onChange={e => setHistoryForm({ ...historyForm, date_treated: e.target.value })} />
-                                    <input type="number" placeholder="Age at treatment" required className="glass-input" value={historyForm.animal_age_at_treatment} onChange={e => setHistoryForm({ ...historyForm, animal_age_at_treatment: e.target.value })} />
-                                </div>
-                                <div style={{ display: 'flex', gap: '10px', marginTop: '14px' }}>
-                                    <button type="submit" className="glass-button" style={{ background: GREEN, color: 'white', flex: 1, fontWeight: 700 }}>Save</button>
-                                    <button type="button" className="glass-button" onClick={() => setShowHistoryForm(false)} style={{ flex: 1 }}>Cancel</button>
-                                </div>
-                            </form>
-                        )}
-
-                        {historyLoading ? <p style={{ color: GREEN_DARK }}>Loading records...</p> : (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                                {medicalHistory.length === 0 ? (
-                                    <p style={{ color: 'var(--color-text-muted)', textAlign: 'center', fontStyle: 'italic' }}>No medical history found.</p>
-                                ) : medicalHistory.map(record => (
-                                    <div key={record.history_id} style={{
-                                        background: 'rgba(255, 245, 231, 0.78)',
-                                        border: '1px solid rgba(121,162,128,0.25)',
-                                        padding: '14px', borderRadius: '10px',
-                                    }}>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
-                                            <span style={{ fontWeight: 700, color: GREEN_DARK }}>{new Date(record.date_treated).toLocaleDateString()}</span>
-                                            <span style={{ fontSize: '12px', color: GREEN_DARK, opacity: 0.8 }}>Age: {record.animal_age_at_treatment}</span>
-                                        </div>
-                                        {record.disease && <p style={{ margin: '4px 0', color: 'var(--color-text-dark)' }}><strong style={{ color: GREEN_DARK }}>Disease:</strong> {record.disease}</p>}
-                                        {record.injury && <p style={{ margin: '4px 0', color: 'var(--color-text-dark)' }}><strong style={{ color: '#b45309' }}>Injury:</strong> {record.injury}</p>}
-                                    </div>
-                                ))
-                                }
-                            </div>
-                        )}
+                        {/* Shared panel — exposes the full schema the server accepts
+                            (diagnosis, severity, status, treatment, medications,
+                             vitals, follow-up, notes) + the care log. */}
+                        <AnimalMedicalPanel animalId={selectedAnimal.animal_id} canFileMedical={true} />
                     </div>
                 </div>
             ), document.body)}
         </div>
     );
 }
+
+const animalLabelStyle = {
+    display: 'block',
+    fontSize: '11px',
+    color: GREEN_DARK,
+    marginBottom: '4px',
+    fontWeight: 600,
+    textTransform: 'uppercase',
+    letterSpacing: '0.04em',
+};
 
 // Shared status/filter pill-group used by AnimalsPanel, Staff, and Events.
 // Kept here (instead of its own file) so every "manage" surface picks up

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../../../contexts/AuthContext';
 import {
     submitHoursRequest, getMyHoursRequests,
@@ -10,6 +10,17 @@ import {
 } from 'lucide-react';
 import { DateRangeFilter } from '../../../components/AnimalsPanel';
 import { useToast, usePrompt } from '../../../components/Feedback';
+import { formatTime } from '../../../utils/staff';
+
+// Older requests stored their time range as raw "HH:MM–HH:MM" inside the
+// description. Rewrite them to 12-hour for display without mutating the DB.
+function prettyDescription(desc) {
+    if (!desc) return '';
+    return String(desc).replace(
+        /(\d{1,2}:\d{2})\s*[-–]\s*(\d{1,2}:\d{2})/g,
+        (_, a, b) => `${formatTime(a)} – ${formatTime(b)}`
+    );
+}
 
 const GREEN = 'rgb(123, 144, 79)';
 const GREEN_DARK = 'rgb(102, 122, 66)';
@@ -39,6 +50,36 @@ export default function HoursDashboard() {
     const [allRequests, setAllRequests]         = useState([]);
     const [reviewedByMe, setReviewedByMe]       = useState([]);
     const [loading, setLoading]                 = useState(true);
+
+    // Per-scope display numbers. Employees see their own chronology (1..N).
+    // Managers see a dept-scoped sequence (backend already narrows the
+    // /getAllHoursRequests payload to their department). Admins keep the
+    // raw request_id because they're looking across the whole system and
+    // a contiguous 1..N would hide gaps from deletions.
+    const mineNumberByPK = useMemo(() => {
+        const sorted = myRequests.slice().sort((a, b) =>
+            new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+            || a.request_id - b.request_id);
+        const map = new Map();
+        sorted.forEach((r, i) => map.set(r.request_id, i + 1));
+        return map;
+    }, [myRequests]);
+    const reviewNumberByPK = React.useMemo(() => {
+        if (role === 'admin') return new Map();
+        const sorted = allRequests.slice().sort((a, b) =>
+            new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+            || a.request_id - b.request_id);
+        const map = new Map();
+        sorted.forEach((r, i) => map.set(r.request_id, i + 1));
+        return map;
+    }, [allRequests, role]);
+    const displayNumberFor = (req, mode) => {
+        if (mode === 'mine') return mineNumberByPK.get(req.request_id) || req.request_id;
+        if (mode === 'review' && role === 'manager') return reviewNumberByPK.get(req.request_id) || req.request_id;
+        // Admin reviewers + the reviewed-by-me log fall back to raw IDs so
+        // nothing contradicts the system-wide numbering shown elsewhere.
+        return req.request_id;
+    };
 
     // Submit form — an array of { work_date, start_time, end_time, description }.
     // Hours auto-calculate from start/end for the employee as they fill it in.
@@ -98,7 +139,7 @@ export default function HoursDashboard() {
                 work_date: e.work_date,
                 hours: hoursBetween(e.start_time, e.end_time),
                 description: [
-                    `${e.start_time}–${e.end_time}`,
+                    `${formatTime(e.start_time)} – ${formatTime(e.end_time)}`,
                     e.description || null,
                 ].filter(Boolean).join(' · '),
             })));
@@ -307,6 +348,7 @@ export default function HoursDashboard() {
                             formatDate={formatDate}
                             statusBadge={statusBadge}
                             mode="mine"
+                            displayNumberFor={displayNumberFor}
                         />
                       )}
                 </div>
@@ -340,6 +382,7 @@ export default function HoursDashboard() {
                             statusBadge={statusBadge}
                             mode="review"
                             onReview={handleReview}
+                            displayNumberFor={displayNumberFor}
                         />
                       )}
                 </div>
@@ -380,6 +423,7 @@ export default function HoursDashboard() {
                                     formatDate={formatDate}
                                     statusBadge={statusBadge}
                                     mode="reviewed"
+                                    displayNumberFor={displayNumberFor}
                                 />
                             );
                         })()}
@@ -389,7 +433,8 @@ export default function HoursDashboard() {
     );
 }
 
-function RequestList({ items, totalHours, formatDate, statusBadge, mode, onReview }) {
+function RequestList({ items, totalHours, formatDate, statusBadge, mode, onReview, displayNumberFor }) {
+    const numFor = (req) => displayNumberFor ? displayNumberFor(req, mode) : req.request_id;
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             {items.map(req => (
@@ -420,12 +465,12 @@ function RequestList({ items, totalHours, formatDate, statusBadge, mode, onRevie
                                     </>
                                 )}
                                 {mode === 'mine' && (
-                                    <strong style={{ color: GREEN_DARK }}>Request #{req.request_id}</strong>
+                                    <strong style={{ color: GREEN_DARK }}>Request #{numFor(req)}</strong>
                                 )}
                                 {statusBadge(req.status)}
                             </div>
                             <div style={{ fontSize: '12px', color: 'var(--color-text-muted)', marginTop: '4px' }}>
-                                {mode !== 'mine' && `Request #${req.request_id} · `}
+                                {mode !== 'mine' && `Request #${numFor(req)} · `}
                                 Submitted {new Date(req.created_at).toLocaleString()}
                             </div>
                         </div>
@@ -449,7 +494,7 @@ function RequestList({ items, totalHours, formatDate, statusBadge, mode, onRevie
                             }}>
                                 <span><Calendar size={12} style={{ verticalAlign: '-2px', marginRight: '4px' }} />{formatDate(e.work_date)}</span>
                                 <span>{Number(e.hours).toFixed(2)} hrs</span>
-                                <span style={{ flex: 1, color: 'var(--color-text-muted)', textAlign: 'right' }}>{e.description || ''}</span>
+                                <span style={{ flex: 1, color: 'var(--color-text-muted)', textAlign: 'right' }}>{prettyDescription(e.description)}</span>
                             </div>
                         ))}
                     </div>

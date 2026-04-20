@@ -491,7 +491,8 @@ export default function AnimalsPanel({ title = 'Animals', accentColor = 'var(--c
                         {/* Shared panel — exposes the full schema the server accepts
                             (diagnosis, severity, status, treatment, medications,
                              vitals, follow-up, notes) + the care log. */}
-                        <AnimalMedicalPanel animalId={selectedAnimal.animal_id} canFileMedical={true} />
+                        {/* Admin can edit both domains. */}
+                        <AnimalMedicalPanel animalId={selectedAnimal.animal_id} canFileMedical={true} canFileCare={true} />
                     </div>
                 </div>
             ), document.body)}

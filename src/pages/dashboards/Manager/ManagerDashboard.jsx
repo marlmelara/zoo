@@ -1277,7 +1277,10 @@ export default function ManagerDashboard() {
                                             {expandedAnimalId === animal.animal_id && (
                                                 <AnimalMedicalPanel
                                                     animalId={animal.animal_id}
-                                                    canFileMedical={isAdmin || role === 'manager' || role === 'vet'}
+                                                    // Vet managers own medical records; admins + vets can too.
+                                                    canFileMedical={isAdmin || (role === 'manager' && isAnimalDept(deptName) && (deptName || '').toLowerCase().includes('vet'))}
+                                                    // Caretaker managers own care logs; admins can too.
+                                                    canFileCare={isAdmin || (role === 'manager' && isAnimalDept(deptName) && !(deptName || '').toLowerCase().includes('vet'))}
                                                 />
                                             )}
                                         </div>

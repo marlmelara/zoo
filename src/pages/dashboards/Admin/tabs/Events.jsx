@@ -79,11 +79,15 @@ export default function Events() {
 
   async function fetchResources() {
     try {
+      // /employees/my-team returns the full roster for admins and just the
+      // reports for managers — same shape either way, so the dropdown
+      // automatically respects "can only assign my staff" without the
+      // frontend having to know the role.
       const [staffData, animalData] = await Promise.all([
-        api.get('/employees'),
+        api.get('/employees/my-team'),
         api.get('/animals'),
       ]);
-      setStaff(staffData || []);
+      setStaff((staffData || []).filter(e => !e.is_self));
       setAnimals(animalData || []);
     } catch (error) {
       console.error('Error fetching resources:', error);

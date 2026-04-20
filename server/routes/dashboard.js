@@ -111,11 +111,18 @@ router.get('/stats', requireRole('admin','manager'), async (req, res) => {
 // ────────────────────────────────────────────────────────────────
 
 // Helper: clamp a (from, to) pair into WHERE fragments against any date column.
+// Uses explicit time suffixes so the range is the full local calendar day
+// (00:00:00 → 23:59:59) — same pattern activity-log filtering uses. This
+// matters when the target column is a DATETIME (e.g. transactions.transaction_date
+// or customers.created_at): comparing against a bare YYYY-MM-DD silently
+// excluded anything later than midnight on the end date. For DATE columns
+// (event_date, membership_start) MySQL widens the date with 00:00:00 and
+// the comparison still works correctly.
 function buildDateWhere(col, from, to) {
     const parts = [];
     const vals  = [];
-    if (from) { parts.push(`${col} >= ?`); vals.push(from); }
-    if (to)   { parts.push(`${col} <  DATE_ADD(?, INTERVAL 1 DAY)`); vals.push(to); }
+    if (from) { parts.push(`${col} >= ?`); vals.push(`${from} 00:00:00`); }
+    if (to)   { parts.push(`${col} <= ?`); vals.push(`${to} 23:59:59`); }
     return {
         sql: parts.length ? ` AND ${parts.join(' AND ')}` : '',
         firstSql: parts.length ? ` WHERE ${parts.join(' AND ')}` : '',
@@ -253,7 +260,11 @@ router.get('/analytics/event-performance/rows', requireRole('admin','manager'), 
               LIMIT 500`,
             w.vals
         );
-        return res.json(rows);
+        // Emit DATETIMEs as ISO-UTC so the browser localises them
+        // correctly (mysql2 would otherwise hand back naive strings that
+        // Date() parses as local time). Same pattern activity log uses.
+        const shaped = rows.map(r => ({ ...r, transaction_date: toIsoUtc(r.transaction_date) }));
+        return res.json(shaped);
     } catch (err) {
         return res.status(500).json({ error: err.message });
     }
@@ -284,7 +295,12 @@ router.get('/analytics/membership-insights/rows', requireRole('admin','manager')
               LIMIT 500`,
             w.vals
         );
-        return res.json(rows);
+        const shaped = rows.map(r => ({
+            ...r,
+            created_at:       toIsoUtc(r.created_at),
+            membership_start: toIsoUtc(r.membership_start),
+        }));
+        return res.json(shaped);
     } catch (err) {
         return res.status(500).json({ error: err.message });
     }
@@ -314,7 +330,8 @@ router.get('/analytics/shop-performance/rows', requireRole('admin','manager'), a
               LIMIT 500`,
             w.vals
         );
-        return res.json(rows);
+        const shaped = rows.map(r => ({ ...r, transaction_date: toIsoUtc(r.transaction_date) }));
+        return res.json(shaped);
     } catch (err) {
         return res.status(500).json({ error: err.message });
     }

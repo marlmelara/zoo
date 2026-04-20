@@ -1,6 +1,7 @@
 import { Router } from '../lib/router.js';
 import db from '../db.js';
 import { requireRole, requireAuth } from '../middleware/auth.js';
+import { isAnimalDeptManager, managerOwnsEmployee } from '../lib/roles.js';
 
 const router = Router();
 
@@ -100,12 +101,25 @@ router.get('/:id/assignments', async (req, res) => {
     }
 });
 
-// POST /api/events/:id/assign — assign an employee OR animal to an event
+// POST /api/events/:id/assign — assign an employee OR animal to an event.
+//
+// Scope rules:
+//   • admin                    — can assign anyone / any animal
+//   • manager (any dept)       — can only assign their own reports
+//                                (employees where manager_id = them)
+//   • Vet / Animal-Care manager exception: animals are free to assign
+//     because they oversee every animal on the grounds.
 router.post('/:id/assign', requireRole('admin', 'manager'), async (req, res) => {
     try {
         const { employee_id, animal_id } = req.body;
         if (!employee_id && !animal_id) {
             return res.status(400).json({ error: 'Must provide employee_id or animal_id.' });
+        }
+        if (employee_id && !(await managerOwnsEmployee(req.user, employee_id))) {
+            return res.status(403).json({ error: 'You can only assign your own staff to events.' });
+        }
+        if (animal_id && !(await isAnimalDeptManager(req.user))) {
+            return res.status(403).json({ error: 'Only admins and Vet/Animal-Care managers can assign animals to events.' });
         }
         const [result] = await db.query(
             'INSERT INTO event_assignments (event_id, employee_id, animal_id) VALUES (?, ?, ?)',
@@ -153,10 +167,13 @@ router.post('/', requireRole('admin', 'manager'), async (req, res) => {
     }
 });
 
-// POST /api/events/:id/assign-employee — admin/manager
+// POST /api/events/:id/assign-employee — admin/manager, scoped to own staff.
 router.post('/:id/assign-employee', requireRole('admin', 'manager'), async (req, res) => {
     try {
         const { employee_id } = req.body;
+        if (!(await managerOwnsEmployee(req.user, employee_id))) {
+            return res.status(403).json({ error: 'You can only assign your own staff to events.' });
+        }
         const [result] = await db.query(
             'INSERT INTO event_assignments (event_id, employee_id) VALUES (?, ?)',
             [req.params.id, employee_id]

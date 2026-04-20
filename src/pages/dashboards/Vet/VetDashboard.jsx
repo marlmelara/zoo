@@ -298,9 +298,15 @@ export default function VetDashboard() {
                                 <Activity color="var(--color-accent)" />
                                 <h2 style={{ margin: 0 }}>Medical Records: {selectedAnimal.name}</h2>
                             </div>
-                            {/* Shared panel — same rich form as manager + admin views.
-                                Vets can always file medical records, so canFileMedical=true. */}
-                            <AnimalMedicalPanel animalId={selectedAnimal.animal_id} canFileMedical={true} />
+                            {/* Vets can modify medical records on their assigned animals
+                                (the VetDashboard only lists assigned animals in the first
+                                place), but care logs are caretakers' domain — they can
+                                view the history but not add entries. */}
+                            <AnimalMedicalPanel
+                                animalId={selectedAnimal.animal_id}
+                                canFileMedical={true}
+                                canFileCare={false}
+                            />
                         </div>
                     )}
                 </div>

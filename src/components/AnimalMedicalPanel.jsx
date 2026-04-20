@@ -24,7 +24,13 @@ const STATUS_COLORS = {
     chronic:    { bg: 'rgba(139,92,246,0.15)', fg: '#7c3aed' },
 };
 
-export default function AnimalMedicalPanel({ animalId, canFileMedical = false }) {
+// `canFileMedical` — show/disable the "Add medical entry" button.
+//   Vets (assigned), vet managers, admins → true.
+// `canFileCare` — show/disable the "Add care note" button.
+//   Caretakers (assigned), caretaker managers, admins → true.
+// Both default to false so the component is safely read-only for
+// anyone we haven't explicitly granted.
+export default function AnimalMedicalPanel({ animalId, canFileMedical = false, canFileCare = false }) {
     const [history, setHistory]     = useState([]);
     const [care, setCare]           = useState([]);
     const [loading, setLoading]     = useState(true);
@@ -91,10 +97,13 @@ export default function AnimalMedicalPanel({ animalId, canFileMedical = false })
                 <>
                     <button className="glass-button"
                         onClick={() => setShowCareForm(v => !v)}
-                        style={{ background: GREEN, color: 'white', fontSize: '12px', padding: '6px 12px', marginBottom: '10px' }}>
+                        disabled={!canFileCare}
+                        title={canFileCare ? '' : 'Only assigned caretakers, caretaker managers, and admins can add care notes.'}
+                        style={{ background: GREEN, color: 'white', fontSize: '12px', padding: '6px 12px', marginBottom: '10px',
+                                 opacity: canFileCare ? 1 : 0.5, cursor: canFileCare ? 'pointer' : 'not-allowed' }}>
                         <Plus size={12} /> {showCareForm ? 'Cancel' : 'Add care note'}
                     </button>
-                    {showCareForm && (
+                    {showCareForm && canFileCare && (
                         <CareForm
                             animalId={animalId}
                             onSaved={async () => { setShowCareForm(false); await load(); }}
@@ -170,7 +179,17 @@ function MedicalEntry({ h }) {
     );
 }
 
+const MOOD_COLORS = {
+    calm:      { bg: 'rgba(16,185,129,0.15)', fg: '#10b981' },
+    alert:     { bg: 'rgba(59,130,246,0.15)', fg: '#3b82f6' },
+    playful:   { bg: 'rgba(168,85,247,0.15)', fg: '#9333ea' },
+    lethargic: { bg: 'rgba(234,179,8,0.15)',  fg: '#ca8a04' },
+    agitated:  { bg: 'rgba(245,158,11,0.2)',  fg: '#d97706' },
+    distressed:{ bg: 'rgba(239,68,68,0.2)',   fg: '#dc2626' },
+};
+
 function CareEntry({ c }) {
+    const mood = c.mood ? (MOOD_COLORS[c.mood] || { bg: 'rgba(121,162,128,0.15)', fg: GREEN_DARK }) : null;
     return (
         <div style={{
             padding: '10px 12px', borderRadius: '8px',
@@ -178,17 +197,30 @@ function CareEntry({ c }) {
             border: '1px solid rgba(121,162,128,0.2)',
             marginBottom: '6px', fontSize: '13px',
         }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px', flexWrap: 'wrap' }}>
-                <span style={{ fontWeight: 600, color: GREEN_DARK, textTransform: 'capitalize' }}>
-                    <Activity size={12} style={{ verticalAlign: '-2px', marginRight: '4px' }} />
-                    {(c.log_type || 'observation').replace(/_/g, ' ')}
-                </span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', marginBottom: '4px', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
+                    <Tag bg="rgba(121,162,128,0.18)" fg={GREEN_DARK}>
+                        <Activity size={10} style={{ verticalAlign: '-1px', marginRight: '3px' }} />
+                        {(c.log_type || 'observation').replace(/_/g, ' ')}
+                    </Tag>
+                    {c.mood && <Tag bg={mood.bg} fg={mood.fg}>Mood: {c.mood}</Tag>}
+                    {c.duration_minutes != null && (
+                        <Tag bg="rgba(121,162,128,0.12)" fg={GREEN_DARK}>
+                            {c.duration_minutes} min
+                        </Tag>
+                    )}
+                </div>
                 <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>
                     {c.first_name ? `${c.first_name} ${c.last_name} (${c.role}) · ` : ''}
                     {new Date(c.logged_at).toLocaleString()}
                 </span>
             </div>
-            <div style={{ color: 'var(--color-text-dark)' }}>{c.notes}</div>
+            {c.notes && <Row label="Notes" value={c.notes} />}
+            {c.followup_needed ? (
+                <div style={{ fontSize: '12px', color: '#d97706', marginTop: '4px', display: 'flex', gap: '4px', alignItems: 'center' }}>
+                    <Activity size={12} /> Follow-up needed{c.followup_note ? `: ${c.followup_note}` : ''}
+                </div>
+            ) : null}
         </div>
     );
 }
@@ -302,19 +334,36 @@ function MedicalForm({ animalId, onSaved }) {
     );
 }
 
+// Structured care note form — matches the medical-record shape with
+// type, duration, observed mood, optional follow-up flag + note, and
+// free-text notes. The extra fields are optional but give caretakers
+// somewhere to put the context they already track in their heads.
 function CareForm({ animalId, onSaved }) {
     const toast = useToast();
-    const [logType, setLogType] = useState('observation');
-    const [notes, setNotes]     = useState('');
-    const [saving, setSaving]   = useState(false);
+    const [form, setForm] = useState({
+        log_type: 'observation',
+        duration_minutes: '',
+        mood: '',
+        followup_needed: false,
+        followup_note: '',
+        notes: '',
+    });
+    const [saving, setSaving] = useState(false);
+    const up = (k) => (e) => setForm(s => ({
+        ...s,
+        [k]: e.target.type === 'checkbox' ? e.target.checked : e.target.value,
+    }));
 
     async function submit(e) {
         e.preventDefault();
-        if (!notes.trim()) { toast.warn('Please write some notes.'); return; }
+        if (!form.notes.trim()) { toast.warn('Please write some notes.'); return; }
         try {
             setSaving(true);
-            await addCareLog(animalId, { log_type: logType, notes });
-            setNotes(''); setLogType('observation');
+            await addCareLog(animalId, {
+                ...form,
+                duration_minutes: form.duration_minutes === '' ? null : Number(form.duration_minutes),
+                followup_note: form.followup_needed ? form.followup_note : null,
+            });
             onSaved();
         } catch (err) {
             toast.error('Failed: ' + err.message);
@@ -327,10 +376,10 @@ function CareForm({ animalId, onSaved }) {
         <form onSubmit={submit} style={{
             padding: '12px', background: 'rgba(255,255,255,0.7)',
             border: '1px solid rgba(121,162,128,0.25)', borderRadius: '10px', marginBottom: '10px',
-            display: 'grid', gap: '8px',
+            display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px',
         }}>
             <FormField label="Type">
-                <select className="glass-input" value={logType} onChange={e => setLogType(e.target.value)}>
+                <select className="glass-input" value={form.log_type} onChange={up('log_type')}>
                     <option value="observation">Observation</option>
                     <option value="feeding">Feeding</option>
                     <option value="cleaning">Cleaning</option>
@@ -341,11 +390,40 @@ function CareForm({ animalId, onSaved }) {
                     <option value="other">Other</option>
                 </select>
             </FormField>
-            <FormField label="Notes">
-                <textarea className="glass-input" rows={3} value={notes} onChange={e => setNotes(e.target.value)}
-                    placeholder="e.g. Ate well at 9am, appetite normal." maxLength={1000} required />
+            <FormField label="Duration (min)">
+                <input type="number" min="0" className="glass-input"
+                    value={form.duration_minutes} onChange={up('duration_minutes')}
+                    placeholder="e.g. 20" />
             </FormField>
-            <div style={{ textAlign: 'right' }}>
+            <FormField label="Observed mood" style={{ gridColumn: '1 / -1' }}>
+                <select className="glass-input" value={form.mood} onChange={up('mood')}>
+                    <option value="">—</option>
+                    <option value="calm">Calm</option>
+                    <option value="alert">Alert</option>
+                    <option value="playful">Playful</option>
+                    <option value="lethargic">Lethargic</option>
+                    <option value="agitated">Agitated</option>
+                    <option value="distressed">Distressed</option>
+                </select>
+            </FormField>
+            <FormField label="Notes" style={{ gridColumn: '1 / -1' }}>
+                <textarea className="glass-input" rows={3} value={form.notes} onChange={up('notes')}
+                    placeholder="e.g. Ate full portion at 9am. Drank water. Active and responsive." maxLength={2000} required />
+            </FormField>
+            <FormField label="Follow-up needed?" style={{ gridColumn: '1 / -1' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: GREEN_DARK, fontWeight: 600 }}>
+                    <input type="checkbox" checked={form.followup_needed} onChange={up('followup_needed')}
+                        style={{ accentColor: GREEN }} />
+                    Flag for follow-up (vet or next caretaker)
+                </label>
+            </FormField>
+            {form.followup_needed && (
+                <FormField label="Follow-up note" style={{ gridColumn: '1 / -1' }}>
+                    <input className="glass-input" value={form.followup_note} onChange={up('followup_note')}
+                        placeholder="What should the next shift check on?" maxLength={500} />
+                </FormField>
+            )}
+            <div style={{ gridColumn: '1 / -1', textAlign: 'right' }}>
                 <button type="submit" className="glass-button" disabled={saving}
                     style={{ background: GREEN, color: 'white' }}>
                     {saving ? 'Saving...' : 'Save care note'}

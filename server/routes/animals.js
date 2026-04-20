@@ -2,6 +2,10 @@ import { Router } from '../lib/router.js';
 import db from '../db.js';
 import { requireRole, requireAuth } from '../middleware/auth.js';
 import { toIsoUtc } from '../lib/dates.js';
+import {
+    isAnimalDeptManager, isVetDeptManager, isCaretakerDeptManager,
+    isVetAssignedToAnimal, isCaretakerAssignedToAnimal, managerOwnsEmployee,
+} from '../lib/roles.js';
 
 const router = Router();
 
@@ -257,8 +261,14 @@ router.get('/:id/medical-history', requireAuth, async (req, res) => {
 
 // PATCH /api/animals/:id/health-status — set/update the quick-look flag.
 // This is the UPDATE that fires trg_animal_sick_notify (or the healthy
-// resolver). Only animal-care roles may flag status — customers and
-// retail/security staff cannot trigger clinical alerts.
+// resolver).
+//
+// Who can flag status:
+//   • admin                                — always
+//   • managers in Vet / Animal Care depts  — always (oversee every animal)
+//   • vets / caretakers                    — only for animals they're
+//                                            assigned to
+// Other managers (Retail, Security) and non-animal employees get 403.
 router.patch('/:id/health-status', requireRole('admin','manager','vet','caretaker'), async (req, res) => {
     const { health_status } = req.body;
     const allowed = ['healthy','under_observation','sick','critical','recovering'];
@@ -266,11 +276,21 @@ router.patch('/:id/health-status', requireRole('admin','manager','vet','caretake
         return res.status(400).json({ error: 'Invalid health_status value.' });
     }
     try {
+        const animalId = Number(req.params.id);
+        const { role, employeeId } = req.user;
+        if (role !== 'admin' && !(await isAnimalDeptManager(req.user))) {
+            // vet/caretaker employees (or other managers) — need an assignment
+            const okVet   = role === 'vet'       && await isVetAssignedToAnimal(employeeId, animalId);
+            const okCare  = role === 'caretaker' && await isCaretakerAssignedToAnimal(employeeId, animalId);
+            if (!okVet && !okCare) {
+                return res.status(403).json({ error: 'You can only change the health status of animals assigned to you.' });
+            }
+        }
         await db.query(
             `UPDATE animals
                 SET health_status = ?, last_health_update = NOW()
               WHERE animal_id = ?`,
-            [health_status, req.params.id]
+            [health_status, animalId]
         );
         return res.json({ success: true, health_status });
     } catch (err) {
@@ -297,15 +317,38 @@ router.get('/:id/care-log', requireAuth, async (req, res) => {
     }
 });
 
-// POST /api/animals/:id/care-log — anyone on staff can log an update.
-router.post('/:id/care-log', requireRole('admin','manager','vet','caretaker'), async (req, res) => {
-    const { log_type, notes } = req.body;
+// POST /api/animals/:id/care-log — caretakers add structured care notes.
+//
+// Access:
+//   • admin                        — always
+//   • Caretaker-dept manager       — always (oversees all animals)
+//   • caretaker (employee)         — only for animals assigned to them
+//   • vet / vet-manager            — 403 (care log is caretakers' domain;
+//                                    medical history is vets' domain)
+router.post('/:id/care-log', requireRole('admin','manager','caretaker'), async (req, res) => {
+    const { log_type, duration_minutes, mood, followup_needed, followup_note, notes } = req.body;
     if (!notes || !notes.trim()) return res.status(400).json({ error: 'Notes are required.' });
     try {
+        const animalId = Number(req.params.id);
+        const { role, employeeId } = req.user;
+        if (role !== 'admin' && !(await isCaretakerDeptManager(req.user))) {
+            if (role !== 'caretaker' || !(await isCaretakerAssignedToAnimal(employeeId, animalId))) {
+                return res.status(403).json({ error: 'Only caretakers assigned to this animal (or their manager) can add care log entries.' });
+            }
+        }
         const [result] = await db.query(
-            `INSERT INTO animal_care_log (animal_id, employee_id, log_type, notes)
-             VALUES (?, ?, ?, ?)`,
-            [req.params.id, req.user.employeeId, log_type || 'observation', notes]
+            `INSERT INTO animal_care_log
+               (animal_id, employee_id, log_type, duration_minutes, mood,
+                followup_needed, followup_note, notes)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+                animalId, employeeId, log_type || 'observation',
+                duration_minutes != null && duration_minutes !== '' ? Number(duration_minutes) : null,
+                mood || null,
+                followup_needed ? 1 : 0,
+                followup_note || null,
+                notes,
+            ]
         );
         return res.status(201).json({ log_id: result.insertId });
     } catch (err) {
@@ -359,9 +402,14 @@ router.post('/', requireRole('admin', 'manager', 'vet', 'caretaker'), async (req
     }
 });
 
-// POST /api/animals/:id/vet-assign
-router.post('/:id/vet-assign', requireRole('admin', 'manager', 'vet'), async (req, res) => {
+// POST /api/animals/:id/vet-assign — admin or Vet-dept manager only.
+// Non-animal managers (Retail, Security) and employees can't pin
+// vets to animals.
+router.post('/:id/vet-assign', requireRole('admin', 'manager'), async (req, res) => {
     try {
+        if (!(await isVetDeptManager(req.user))) {
+            return res.status(403).json({ error: 'Only admins and Vet-department managers can assign vets.' });
+        }
         const { vet_id } = req.body;
         await db.query(
             'INSERT INTO vet_animal_assignments (vet_id, animal_id) VALUES (?, ?)',
@@ -373,9 +421,12 @@ router.post('/:id/vet-assign', requireRole('admin', 'manager', 'vet'), async (re
     }
 });
 
-// POST /api/animals/:id/caretaker-assign
-router.post('/:id/caretaker-assign', requireRole('admin', 'manager', 'caretaker'), async (req, res) => {
+// POST /api/animals/:id/caretaker-assign — admin or Animal-Care manager.
+router.post('/:id/caretaker-assign', requireRole('admin', 'manager'), async (req, res) => {
     try {
+        if (!(await isCaretakerDeptManager(req.user))) {
+            return res.status(403).json({ error: 'Only admins and Animal Care managers can assign caretakers.' });
+        }
         const { caretaker_id } = req.body;
         await db.query(
             'INSERT INTO caretaker_animal_assignments (caretaker_id, animal_id) VALUES (?, ?)',
@@ -388,6 +439,12 @@ router.post('/:id/caretaker-assign', requireRole('admin', 'manager', 'caretaker'
 });
 
 // POST /api/animals/:id/medical-history — full medical record entry.
+//
+// Access:
+//   • admin              — always
+//   • Vet-dept manager   — always (oversees all animals)
+//   • vet (employee)     — only for animals assigned to them
+//   • caretaker / caretaker manager — 403 (care log is their domain)
 router.post('/:id/medical-history', requireRole('admin', 'manager', 'vet'), async (req, res) => {
     const {
         injury, disease, diagnosis, treatment, medications,
@@ -395,8 +452,15 @@ router.post('/:id/medical-history', requireRole('admin', 'manager', 'vet'), asyn
         notes, next_followup_date, date_treated, animal_age_at_treatment,
     } = req.body;
     try {
+        const animalId = Number(req.params.id);
+        const { role, employeeId } = req.user;
+        if (role !== 'admin' && !(await isVetDeptManager(req.user))) {
+            if (role !== 'vet' || !(await isVetAssignedToAnimal(employeeId, animalId))) {
+                return res.status(403).json({ error: 'Only vets assigned to this animal (or their manager) can add medical records.' });
+            }
+        }
         const [animals] = await db.query(
-            'SELECT health_record_id FROM animals WHERE animal_id = ?', [req.params.id]
+            'SELECT health_record_id FROM animals WHERE animal_id = ?', [animalId]
         );
         if (animals.length === 0 || !animals[0].health_record_id) {
             return res.status(404).json({ error: 'No health record for this animal.' });
@@ -461,9 +525,12 @@ router.patch('/:id', requireRole('admin', 'manager', 'vet', 'caretaker'), async 
     }
 });
 
-// DELETE /api/animals/:id/vet-assign/:vetId
+// DELETE /api/animals/:id/vet-assign/:vetId — same gate as assign.
 router.delete('/:id/vet-assign/:vetId', requireRole('admin', 'manager'), async (req, res) => {
     try {
+        if (!(await isVetDeptManager(req.user))) {
+            return res.status(403).json({ error: 'Only admins and Vet-department managers can unassign vets.' });
+        }
         await db.query(
             'DELETE FROM vet_animal_assignments WHERE vet_id = ? AND animal_id = ?',
             [req.params.vetId, req.params.id]
@@ -474,9 +541,12 @@ router.delete('/:id/vet-assign/:vetId', requireRole('admin', 'manager'), async (
     }
 });
 
-// DELETE /api/animals/:id/caretaker-assign/:caretakerId
+// DELETE /api/animals/:id/caretaker-assign/:caretakerId — same gate as assign.
 router.delete('/:id/caretaker-assign/:caretakerId', requireRole('admin', 'manager'), async (req, res) => {
     try {
+        if (!(await isCaretakerDeptManager(req.user))) {
+            return res.status(403).json({ error: 'Only admins and Animal Care managers can unassign caretakers.' });
+        }
         await db.query(
             'DELETE FROM caretaker_animal_assignments WHERE caretaker_id = ? AND animal_id = ?',
             [req.params.caretakerId, req.params.id]

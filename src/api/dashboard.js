@@ -25,11 +25,15 @@ export const getDepartments             = () => api.get('/employees/departments/
 export const getAnimalsWithZones        = () => api.get('/animals');
 export const getRecentTransactions      = () => api.get('/transactions');
 
-export async function createZooUser({ email, password, first_name, last_name, dept_id, role,
-                                       license_no, specialty, specialization_species, office_location }) {
+export async function createZooUser({
+    email, password, first_name, last_name, dept_id, role,
+    license_no, specialty, specialization_species, office_location,
+    shift_timeframe, pay_rate_cents, contact_info, manager_id,
+}) {
     const result = await api.post('/employees', {
         email, password, first_name, last_name, dept_id, role,
         license_no, specialty, specialization_species, office_location,
+        shift_timeframe, pay_rate_cents, contact_info, manager_id,
     });
     return result.employee_id;
 }

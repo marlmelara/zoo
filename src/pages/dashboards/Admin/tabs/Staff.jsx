@@ -7,6 +7,7 @@ import { StatusFilter } from '../../../../components/AnimalsPanel';
 import BulkActionBar from '../../../../components/BulkActionBar';
 import LifecycleLogModal, { LifecycleLogButton } from '../../../../components/LifecycleLogModal';
 import { useToast, useConfirm } from '../../../../components/Feedback';
+import { formatShiftTimeframe, defaultOfficeFor } from '../../../../utils/staff';
 
 const GREEN      = 'rgb(123, 144, 79)';
 const GREEN_DARK = 'rgb(102, 122, 66)';
@@ -30,17 +31,40 @@ export default function Staff() {
     // one staff member at a time.
     const [logTarget, setLogTarget] = useState(null);
     const [formData, setFormData] = useState({
-        first_name: '', last_name: '', contact_info: '', pay_rate_cents: '', shift_timeframe: '', dept_id: '',
+        first_name: '', last_name: '', contact_info: '', pay_rate_cents: '',
+        shift_start: '09:00', shift_end: '17:00',
+        date_of_birth: '',
+        dept_id: '',
         email: '', password: '', role: 'general',
         license_no: '', specialty: '',
         specialization_species: '',
-        office_location: ''
+        office_location: '',
+        manager_id: '',
     });
+    // Managers in the selected department — populates the supervisor picker
+    // for non-manager roles. Reloads whenever dept_id or role changes.
+    const [deptManagers, setDeptManagers] = useState([]);
 
     useEffect(() => {
         fetchStaff();
         fetchDepartments();
     }, [statusFilter]);
+
+    // Load the manager dropdown whenever dept/role change — covers both
+    // the Add form and the Edit modal. They share `deptManagers` since
+    // only one is open at a time.
+    useEffect(() => {
+        const addActive  = showForm && formData.dept_id
+            && formData.role !== 'admin' && formData.role !== 'manager';
+        const editActive = !!editing && editForm.dept_id
+            && editForm.role !== 'admin' && editForm.role !== 'manager';
+        const deptId = addActive ? formData.dept_id : editActive ? editForm.dept_id : '';
+        if (!deptId) { setDeptManagers([]); return; }
+        api.get(`/employees/managers?dept_id=${deptId}`)
+            .then(setDeptManagers)
+            .catch(() => setDeptManagers([]));
+    }, [showForm, formData.dept_id, formData.role,
+        editing, editForm.dept_id, editForm.role]);
 
     async function fetchStaff() {
         setLoading(true);
@@ -61,37 +85,52 @@ export default function Staff() {
 
     async function handleSubmit(e) {
         e.preventDefault();
+        // Compose the shift string from the two pickers so we never end up
+        // with free-text garbage like "8-4" going into shift_timeframe.
+        if (formData.shift_start && formData.shift_end
+            && formData.shift_start >= formData.shift_end) {
+            toast.warn('Shift end time must be after the start time.');
+            return;
+        }
+        const role = formData.role;
+        if (role !== 'admin' && role !== 'manager' && !formData.manager_id) {
+            toast.warn('Pick a supervising manager for this employee.');
+            return;
+        }
         try {
-            let derivedRole = formData.role;
-            const selectedDept = departments.find(d => d.dept_id == formData.dept_id);
-            if (selectedDept) {
-                const deptName = selectedDept.dept_name.toLowerCase();
-                if (deptName.includes('vet')) derivedRole = 'vet';
-                else if (deptName.includes('admin') || deptName.includes('manager')) derivedRole = 'manager';
-                else if (deptName.includes('care') || deptName.includes('animal')) derivedRole = 'caretaker';
-            }
-
             await api.post('/employees', {
                 first_name: formData.first_name,
                 last_name: formData.last_name,
-                contact_info: formData.contact_info,
-                pay_rate_cents: parseInt(formData.pay_rate_cents) * 100,
-                shift_timeframe: formData.shift_timeframe,
+                contact_info: formData.contact_info || formData.email,
+                date_of_birth: formData.date_of_birth || null,
+                pay_rate_cents: formData.pay_rate_cents
+                    ? Math.round(parseFloat(formData.pay_rate_cents) * 100)
+                    : 2000,
+                shift_timeframe: formData.shift_start && formData.shift_end
+                    ? `${formData.shift_start}-${formData.shift_end}`
+                    : null,
                 dept_id: formData.dept_id,
                 email: formData.email,
                 password: formData.password,
-                role: derivedRole,
-                license_no: formData.license_no,
-                specialty: formData.specialty,
-                specialization_species: formData.specialization_species,
-                office_location: formData.office_location,
+                role,
+                license_no: formData.license_no || null,
+                specialty: formData.specialty || null,
+                specialization_species: formData.specialization_species || null,
+                office_location: formData.office_location || null,
+                manager_id: (role === 'admin' || role === 'manager')
+                    ? null
+                    : parseInt(formData.manager_id),
             });
 
             setShowForm(false);
             setFormData({
-                first_name: '', last_name: '', contact_info: '', pay_rate_cents: '', shift_timeframe: '', dept_id: '',
+                first_name: '', last_name: '', contact_info: '', pay_rate_cents: '',
+                shift_start: '09:00', shift_end: '17:00',
+                date_of_birth: '',
+                dept_id: '',
                 email: '', password: '', role: 'general',
-                license_no: '', specialty: '', specialization_species: '', office_location: ''
+                license_no: '', specialty: '', specialization_species: '', office_location: '',
+                manager_id: '',
             });
             fetchStaff();
         } catch (error) {
@@ -118,28 +157,64 @@ export default function Staff() {
     }
 
     function startEdit(person) {
+        // Split an existing "HH:MM-HH:MM" into two time inputs. If the
+        // stored value is malformed (older free-text rows), fall back to
+        // reasonable defaults and let the user correct.
+        const [startRaw, endRaw] = (person.shift_timeframe || '').split('-');
+        const toHHMM = (s) => {
+            if (!s) return '';
+            const m = s.trim().match(/^(\d{1,2}):?(\d{2})?/);
+            if (!m) return '';
+            const hh = m[1].padStart(2, '0');
+            const mm = (m[2] || '00').padStart(2, '0');
+            return `${hh}:${mm}`;
+        };
         setEditing(person);
         setEditForm({
             first_name: person.first_name || '',
             last_name: person.last_name || '',
             contact_info: person.contact_info || '',
-            shift_timeframe: person.shift_timeframe || '',
+            shift_start: toHHMM(startRaw) || '09:00',
+            shift_end:   toHHMM(endRaw)   || '17:00',
+            date_of_birth: person.date_of_birth ? String(person.date_of_birth).slice(0, 10) : '',
             pay_rate: person.pay_rate_cents != null ? (person.pay_rate_cents / 100).toFixed(2) : '',
             dept_id: person.dept_id != null ? String(person.dept_id) : '',
+            role:    person.role || '',
+            manager_id: person.manager_id != null ? String(person.manager_id) : '',
+            license_no:              person.license_no || '',
+            specialty:               person.specialty || '',
+            specialization_species:  person.specialization_species || '',
+            office_location:         person.office_location || '',
         });
     }
     function cancelEdit() { setEditing(null); setEditForm({}); }
     async function handleEditSave(e) {
         e.preventDefault();
         if (!editing) return;
+        if (editForm.shift_start && editForm.shift_end
+            && editForm.shift_start >= editForm.shift_end) {
+            toast.warn('Shift end time must be after the start time.');
+            return;
+        }
+        const role = editForm.role;
+        if (role && role !== 'admin' && role !== 'manager' && !editForm.manager_id) {
+            toast.warn('Pick a supervising manager for this employee.');
+            return;
+        }
         try {
             await api.patch(`/employees/${editing.employee_id}`, {
                 first_name: editForm.first_name,
                 last_name: editForm.last_name,
                 contact_info: editForm.contact_info || null,
-                shift_timeframe: editForm.shift_timeframe || null,
+                date_of_birth: editForm.date_of_birth || null,
+                shift_timeframe: editForm.shift_start && editForm.shift_end
+                    ? `${editForm.shift_start}-${editForm.shift_end}`
+                    : null,
                 pay_rate_cents: editForm.pay_rate === '' ? null : Math.round(parseFloat(editForm.pay_rate) * 100),
                 dept_id: editForm.dept_id === '' ? null : parseInt(editForm.dept_id),
+                manager_id: (role === 'admin' || role === 'manager' || !editForm.manager_id)
+                    ? null
+                    : parseInt(editForm.manager_id),
             });
             cancelEdit();
             fetchStaff();
@@ -194,6 +269,15 @@ export default function Staff() {
             return matchesSearch && matchesDept;
         })
         .sort((a, b) => {
+            // Priority by role so the people in charge float to the top of
+            // each department: admin → manager → everyone else. Alphabetical
+            // (last name then first) inside each tier.
+            const priority = (p) =>
+                p.role === 'admin'   ? 0
+              : p.role === 'manager' ? 1
+              :                        2;
+            const pa = priority(a), pb = priority(b);
+            if (pa !== pb) return pa - pb;
             const lastCmp = (a.last_name || '').localeCompare(b.last_name || '');
             return lastCmp !== 0 ? lastCmp : (a.first_name || '').localeCompare(b.first_name || '');
         });
@@ -263,42 +347,124 @@ export default function Staff() {
                 />
             </div>
 
-            {showForm && (
+            {showForm && (() => {
+                const role = formData.role;
+                const isVet       = role === 'vet';
+                const isCaretaker = role === 'caretaker';
+                const isManager   = role === 'manager';
+                const selectedDeptName = (departments.find(d => String(d.dept_id) === String(formData.dept_id)) || {}).dept_name || '';
+                const isVetManager = isManager && /veterinary/i.test(selectedDeptName);
+                const needsSupervisor = role && role !== 'admin' && role !== 'manager' && role !== 'general';
+                const pickRole = (nextRole) => setFormData({
+                    ...formData,
+                    role: nextRole,
+                    manager_id: '',
+                    license_no:             '',
+                    specialty:              '',
+                    specialization_species: '',
+                    office_location: defaultOfficeFor(nextRole, selectedDeptName),
+                });
+                const pickDept = (nextDeptId) => {
+                    const nextName = (departments.find(d => String(d.dept_id) === String(nextDeptId)) || {}).dept_name || '';
+                    setFormData({
+                        ...formData,
+                        dept_id: nextDeptId,
+                        manager_id: '',
+                        office_location: defaultOfficeFor(role, nextName),
+                    });
+                };
+                return (
                 <div className="glass-panel" style={{ padding: '20px', marginBottom: '30px', border: '1px solid var(--color-secondary)' }}>
                     <h3>New Staff Member</h3>
-                    <form onSubmit={handleSubmit} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                    <form onSubmit={handleSubmit} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
                         <input placeholder="First Name" required className="glass-input" value={formData.first_name} onChange={e => setFormData({ ...formData, first_name: e.target.value })} />
                         <input placeholder="Last Name" required className="glass-input" value={formData.last_name} onChange={e => setFormData({ ...formData, last_name: e.target.value })} />
                         <input placeholder="Email" type="email" required className="glass-input" value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })} />
                         <input placeholder="Password" type="password" required className="glass-input" value={formData.password} onChange={e => setFormData({ ...formData, password: e.target.value })} />
-                        <input placeholder="Contact Info" className="glass-input" value={formData.contact_info} onChange={e => setFormData({ ...formData, contact_info: e.target.value })} />
-                        <input placeholder="Hourly Rate ($)" type="number" required className="glass-input" value={formData.pay_rate_cents} onChange={e => setFormData({ ...formData, pay_rate_cents: e.target.value })} />
-                        <input placeholder="Shift (e.g. 9-5)" className="glass-input" value={formData.shift_timeframe} onChange={e => setFormData({ ...formData, shift_timeframe: e.target.value })} />
+                        <input placeholder="Contact (phone / ext. — defaults to email)" className="glass-input" value={formData.contact_info} onChange={e => setFormData({ ...formData, contact_info: e.target.value })} />
+                        <input placeholder="Hourly Rate ($)" type="number" step="0.01" min="0" required className="glass-input" value={formData.pay_rate_cents} onChange={e => setFormData({ ...formData, pay_rate_cents: e.target.value })} />
 
-                        <select required className="glass-input" value={formData.dept_id} onChange={e => setFormData({ ...formData, dept_id: e.target.value })}>
+                        <div style={{ gridColumn: '1 / -1' }}>
+                            <label style={staffLabelStyle}>Date of Birth</label>
+                            <input required type="date" className="glass-input"
+                                max={new Date().toISOString().slice(0, 10)}
+                                value={formData.date_of_birth}
+                                onChange={e => setFormData({ ...formData, date_of_birth: e.target.value })} />
+                        </div>
+
+                        {/* Structured shift pickers — no more free-text garbage. */}
+                        <div>
+                            <label style={staffLabelStyle}>Shift Start</label>
+                            <input type="time" required className="glass-input"
+                                value={formData.shift_start}
+                                onChange={e => setFormData({ ...formData, shift_start: e.target.value })} />
+                        </div>
+                        <div>
+                            <label style={staffLabelStyle}>Shift End</label>
+                            <input type="time" required className="glass-input"
+                                value={formData.shift_end}
+                                onChange={e => setFormData({ ...formData, shift_end: e.target.value })} />
+                        </div>
+
+                        <select required className="glass-input" value={formData.role} onChange={e => pickRole(e.target.value)}>
+                            <option value="" disabled>Select Role...</option>
+                            <option value="security">Security</option>
+                            <option value="retail">Retail</option>
+                            <option value="caretaker">Caretaker</option>
+                            <option value="vet">Vet</option>
+                            <option value="manager">Manager</option>
+                            <option value="admin">Admin</option>
+                        </select>
+                        <select required className="glass-input" value={formData.dept_id} onChange={e => pickDept(e.target.value)}>
                             <option value="">Select Department...</option>
                             {departments.map(d => <option key={d.dept_id} value={d.dept_id}>{d.dept_name}</option>)}
                         </select>
 
-                        {departments.find(d => d.dept_id == formData.dept_id)?.dept_name.toLowerCase().includes('vet') && (
-                            <>
-                                <input placeholder="License Number" required className="glass-input" value={formData.license_no} onChange={e => setFormData({ ...formData, license_no: e.target.value })} />
-                                <input placeholder="Specialty" className="glass-input" value={formData.specialty} onChange={e => setFormData({ ...formData, specialty: e.target.value })} />
-                            </>
+                        {(isVet || isVetManager) && (<>
+                            <input placeholder="License Number" required className="glass-input" value={formData.license_no} onChange={e => setFormData({ ...formData, license_no: e.target.value })} />
+                            <input placeholder="Specialty (e.g. Large mammals)" className="glass-input" value={formData.specialty} onChange={e => setFormData({ ...formData, specialty: e.target.value })} />
+                        </>)}
+                        {isCaretaker && (
+                            <input placeholder="Specialization (species)" required className="glass-input" style={{ gridColumn: '1 / -1' }} value={formData.specialization_species} onChange={e => setFormData({ ...formData, specialization_species: e.target.value })} />
                         )}
-                        {departments.find(d => d.dept_id == formData.dept_id)?.dept_name.toLowerCase().includes('admin') && (
-                            <input placeholder="Office Location" required className="glass-input" value={formData.office_location} onChange={e => setFormData({ ...formData, office_location: e.target.value })} />
+                        {role && role !== 'general' && (
+                            <div style={{ gridColumn: '1 / -1' }}>
+                                <label style={staffLabelStyle}>
+                                    Office Location {isManager ? '(dept + Head Office)' : ''}
+                                </label>
+                                <input required className="glass-input"
+                                    value={formData.office_location}
+                                    onChange={e => setFormData({ ...formData, office_location: e.target.value })} />
+                            </div>
                         )}
-                        {(departments.find(d => d.dept_id == formData.dept_id)?.dept_name.toLowerCase().includes('care') || departments.find(d => d.dept_id == formData.dept_id)?.dept_name.toLowerCase().includes('animal')) && (
-                            <input placeholder="Specialization (Species)" required className="glass-input" value={formData.specialization_species} onChange={e => setFormData({ ...formData, specialization_species: e.target.value })} />
+
+                        {needsSupervisor && (
+                            <div style={{ gridColumn: '1 / -1' }}>
+                                <label style={staffLabelStyle}>Supervisor (manager in this dept)</label>
+                                <select required className="glass-input"
+                                    value={formData.manager_id}
+                                    onChange={e => setFormData({ ...formData, manager_id: e.target.value })}>
+                                    <option value="" disabled>
+                                        {deptManagers.length === 0
+                                            ? 'No managers in this department yet — create a manager first.'
+                                            : 'Select supervisor...'}
+                                    </option>
+                                    {deptManagers.map(m => (
+                                        <option key={m.employee_id} value={m.employee_id}>
+                                            {m.first_name} {m.last_name}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
                         )}
 
                         <div style={{ gridColumn: '1 / -1', marginTop: '10px' }}>
-                            <button type="submit" className="glass-button" style={{ background: 'var(--color-secondary)', width: '100%' }}>Save Staff Member</button>
+                            <button type="submit" className="glass-button" style={{ background: 'var(--color-secondary)', color: 'white', width: '100%', fontWeight: 700 }}>Save Staff Member</button>
                         </div>
                     </form>
                 </div>
-            )}
+                );
+            })()}
 
             {loading ? (
                 <p>Loading staff...</p>
@@ -319,13 +485,26 @@ export default function Staff() {
                             if (selectable) toggleSelect(person.employee_id);
                             else if (canEditCard) startEdit(person);
                         };
+                        // Role → pill colour so the manager/admin stands out
+                        // at a glance when filtered by department.
+                        const roleColor = person.role === 'admin'      ? { bg: 'rgba(168,85,247,0.18)', fg: '#7e22ce' }
+                                        : person.role === 'manager'    ? { bg: 'rgba(234,179,8,0.18)',  fg: '#a16207' }
+                                        : person.role === 'vet'        ? { bg: 'rgba(16,185,129,0.18)', fg: '#047857' }
+                                        : person.role === 'caretaker'  ? { bg: 'rgba(59,130,246,0.18)', fg: '#1d4ed8' }
+                                        : person.role === 'security'   ? { bg: 'rgba(239,68,68,0.18)',  fg: '#b91c1c' }
+                                        :                                { bg: 'rgba(121,162,128,0.18)', fg: 'rgb(102,122,66)' };
                         return (
                             <div
                                 key={person.employee_id}
                                 className="glass-panel"
                                 onClick={handleCardClick}
                                 style={{
-                                    padding: '20px', position: 'relative',
+                                    padding: '20px',
+                                    // Room at the bottom for the absolutely-positioned
+                                    // Log button so it never overlaps content.
+                                    paddingBottom: canManage ? '56px' : '20px',
+                                    position: 'relative',
+                                    minHeight: '230px',
                                     opacity: inactive ? 0.55 : 1,
                                     cursor: (selectable || canEditCard) ? 'pointer' : 'default',
                                     outline: checked ? '2px solid #ef4444' : 'none',
@@ -343,10 +522,6 @@ export default function Staff() {
                                         style={{ position: 'absolute', top: '12px', left: '12px', width: '18px', height: '18px', accentColor: '#ef4444', zIndex: 2 }}
                                     />
                                 )}
-                                {/* Inactive badge moved to the top-right ribbon so it sits
-                                    next to the role icon instead of crashing into the name
-                                    on the left. When the manage-mode checkbox is present we
-                                    keep left-padding for it but never for the badge. */}
                                 {inactive && (
                                     <span style={{
                                         position: 'absolute', top: '12px', right: '14px',
@@ -359,61 +534,70 @@ export default function Staff() {
                                     display: 'flex', justifyContent: 'space-between', alignItems: 'start',
                                     marginBottom: '15px',
                                     paddingLeft: manageMode && !inactive ? '28px' : 0,
-                                    paddingRight: inactive ? '70px' : '0',
+                                    paddingRight: inactive ? '80px' : '0',
                                     transition: 'padding 150ms',
+                                    gap: '10px',
                                 }}>
                                     <div>
-                                        <h3 style={{ margin: '0 0 5px' }}>{person.first_name} {person.last_name}</h3>
-                                        <span style={{
-                                            fontSize: '12px',
-                                            padding: '4px 8px',
-                                            borderRadius: '20px',
-                                            background: 'rgba(255,255,255,0.1)',
-                                            color: 'var(--color-text-muted)'
-                                        }}>
-                                            {person.dept_name || 'Unassigned'}
-                                        </span>
+                                        <h3 style={{ margin: '0 0 6px' }}>{person.first_name} {person.last_name}</h3>
+                                        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                                            <span style={{
+                                                fontSize: '11px', padding: '3px 10px', borderRadius: '20px',
+                                                background: roleColor.bg, color: roleColor.fg,
+                                                fontWeight: 700, textTransform: 'capitalize',
+                                            }}>{person.role || 'staff'}</span>
+                                            <span style={{
+                                                fontSize: '12px',
+                                                padding: '4px 8px',
+                                                borderRadius: '20px',
+                                                background: 'rgba(255,255,255,0.1)',
+                                                color: 'var(--color-text-muted)'
+                                            }}>
+                                                {person.dept_name || 'Unassigned'}
+                                            </span>
+                                        </div>
                                     </div>
                                     {!inactive && getRoleIcon(person.dept_name)}
                                 </div>
 
-                                <div style={{ fontSize: '14px', color: 'var(--color-text-muted)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                    <p>Shift: {person.shift_timeframe}</p>
-
+                                <div style={{ fontSize: '14px', color: 'var(--color-text-muted)', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                    <p style={{ margin: 0 }}>Shift: {formatShiftTimeframe(person.shift_timeframe) || 'N/A'}</p>
+                                    {/* Vet license shows for real vets AND for vet-dept
+                                        managers — the JOIN fills license_no/specialty
+                                        for anyone with a row in `vets`. */}
                                     {person.license_no && (
                                         <div style={{ color: 'var(--color-primary)' }}>
-                                            <p>Vet License: {person.license_no}</p>
-                                            <p>Specialty: {person.specialty}</p>
+                                            <p style={{ margin: 0 }}>Vet License: {person.license_no}</p>
+                                            {person.specialty && <p style={{ margin: 0 }}>Specialty: {person.specialty}</p>}
                                         </div>
                                     )}
                                     {person.specialization_species && (
-                                        <div style={{ color: 'var(--color-text)' }}>
-                                            <p>Specialization: {person.specialization_species}</p>
-                                        </div>
+                                        <p style={{ margin: 0 }}>Specialization: {person.specialization_species}</p>
                                     )}
                                     {person.office_location && (
-                                        <p>Office: {person.office_location}</p>
+                                        <p style={{ margin: 0 }}>Office: {person.office_location}</p>
+                                    )}
+                                    {person.contact_info && (
+                                        <p style={{ margin: 0 }}>Contact: {person.contact_info}</p>
                                     )}
                                 </div>
 
-                                {/* Log button anchored bottom-right — mirrors the visual
-                                    position Log occupies on the Animals cards (third item
-                                    in that row). Here it's the only button, so we pin it
-                                    to the right for consistency. */}
+                                {/* Log button pinned to the bottom-right of every card
+                                    — absolute positioning guarantees the same spot
+                                    regardless of how tall the content above grows. */}
                                 {canManage && (
-                                    <div style={{ marginTop: '15px', display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                                        <LifecycleLogButton
-                                            compact
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                setLogTarget({
-                                                    entity: 'employee',
-                                                    id:   person.employee_id,
-                                                    name: `${person.first_name} ${person.last_name}`,
-                                                });
-                                            }}
-                                        />
-                                    </div>
+                                    <LifecycleLogButton
+                                        compact
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setLogTarget({
+                                                entity: 'employee',
+                                                id:   person.employee_id,
+                                                name: `${person.first_name} ${person.last_name}`,
+                                            });
+                                        }}
+                                        style={{ position: 'absolute', right: '16px', bottom: '16px' }}
+                                    />
                                 )}
 
                             </div>
@@ -469,20 +653,89 @@ export default function Staff() {
                                 </select>
                             </div>
                             <div>
-                                <label style={staffLabelStyle}>Shift</label>
-                                <input className="glass-input" placeholder="e.g. 09:00-17:00" value={editForm.shift_timeframe}
-                                    onChange={e => setEditForm({ ...editForm, shift_timeframe: e.target.value })} />
+                                <label style={staffLabelStyle}>Shift Start</label>
+                                <input type="time" className="glass-input" value={editForm.shift_start || ''}
+                                    onChange={e => setEditForm({ ...editForm, shift_start: e.target.value })} />
+                            </div>
+                            <div>
+                                <label style={staffLabelStyle}>Shift End</label>
+                                <input type="time" className="glass-input" value={editForm.shift_end || ''}
+                                    onChange={e => setEditForm({ ...editForm, shift_end: e.target.value })} />
                             </div>
                             <div>
                                 <label style={staffLabelStyle}>Hourly Rate ($)</label>
                                 <input type="number" step="0.01" min="0" className="glass-input" value={editForm.pay_rate}
                                     onChange={e => setEditForm({ ...editForm, pay_rate: e.target.value })} />
                             </div>
+                            <div>
+                                <label style={staffLabelStyle}>Role</label>
+                                <input className="glass-input" value={editForm.role || ''} disabled
+                                    title="Role changes aren't supported here — create a new account if needed." />
+                            </div>
+                            <div style={{ gridColumn: '1 / -1' }}>
+                                <label style={staffLabelStyle}>Date of Birth</label>
+                                <input type="date" className="glass-input"
+                                    max={new Date().toISOString().slice(0, 10)}
+                                    value={editForm.date_of_birth || ''}
+                                    onChange={e => setEditForm({ ...editForm, date_of_birth: e.target.value })} />
+                            </div>
                             <div style={{ gridColumn: '1 / -1' }}>
                                 <label style={staffLabelStyle}>Contact Info</label>
                                 <input className="glass-input" value={editForm.contact_info}
                                     onChange={e => setEditForm({ ...editForm, contact_info: e.target.value })} />
                             </div>
+
+                            {/* Role-specific fields — visible so admins can fix
+                                licenses / specialties / office without having to
+                                recreate the account. */}
+                            {editForm.role === 'vet' && (<>
+                                <div>
+                                    <label style={staffLabelStyle}>Vet License #</label>
+                                    <input className="glass-input" value={editForm.license_no || ''}
+                                        disabled title="Locked — recreate the account to change." />
+                                </div>
+                                <div>
+                                    <label style={staffLabelStyle}>Specialty</label>
+                                    <input className="glass-input" value={editForm.specialty || ''}
+                                        disabled title="Locked — recreate the account to change." />
+                                </div>
+                            </>)}
+                            {editForm.role === 'caretaker' && (
+                                <div style={{ gridColumn: '1 / -1' }}>
+                                    <label style={staffLabelStyle}>Specialization (species)</label>
+                                    <input className="glass-input" value={editForm.specialization_species || ''}
+                                        disabled title="Locked — recreate the account to change." />
+                                </div>
+                            )}
+                            {editForm.role === 'manager' && (
+                                <div style={{ gridColumn: '1 / -1' }}>
+                                    <label style={staffLabelStyle}>Office Location</label>
+                                    <input className="glass-input" value={editForm.office_location || ''}
+                                        disabled title="Locked — recreate the account to change." />
+                                </div>
+                            )}
+
+                            {/* Supervisor — required for every non-admin / non-manager. */}
+                            {editForm.role && editForm.role !== 'admin' && editForm.role !== 'manager' && (
+                                <div style={{ gridColumn: '1 / -1' }}>
+                                    <label style={staffLabelStyle}>Supervisor</label>
+                                    <select required className="glass-input"
+                                        value={editForm.manager_id}
+                                        onChange={e => setEditForm({ ...editForm, manager_id: e.target.value })}>
+                                        <option value="" disabled>
+                                            {deptManagers.length === 0
+                                                ? 'No managers in this department yet — create a manager first.'
+                                                : 'Select supervisor...'}
+                                        </option>
+                                        {deptManagers.map(m => (
+                                            <option key={m.employee_id} value={m.employee_id}>
+                                                {m.first_name} {m.last_name}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                            )}
+
                             <div style={{ gridColumn: '1 / -1', display: 'flex', gap: '10px', marginTop: '4px' }}>
                                 <button type="button" onClick={cancelEdit} className="glass-button" style={{ flex: 1 }}>
                                     Cancel

@@ -137,8 +137,10 @@ export default function LifecycleLogModal({ entity, id, name, onClose }) {
 }
 
 // Small pill-button used by list views to open the lifecycle modal.
-// Kept here so every caller picks up the same styling.
-export function LifecycleLogButton({ onClick, compact = false }) {
+// Kept here so every caller picks up the same styling. Callers can
+// pass extra `style` overrides (e.g. absolute positioning) to pin it
+// to a corner of their card.
+export function LifecycleLogButton({ onClick, compact = false, style }) {
     return (
         <button
             onClick={onClick}
@@ -149,6 +151,7 @@ export function LifecycleLogButton({ onClick, compact = false }) {
                 fontSize: compact ? '11px' : '12px',
                 padding: compact ? '4px 10px' : '6px 12px',
                 background: 'rgba(121,162,128,0.18)', color: GREEN_DARK, fontWeight: 600,
+                ...(style || {}),
             }}>
             <History size={compact ? 11 : 13} /> Log
         </button>

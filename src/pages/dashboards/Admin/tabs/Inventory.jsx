@@ -107,10 +107,10 @@ export default function Inventory() {
         const h = setTimeout(() => loadActivity(), 220);
         return () => clearTimeout(h);
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [activityPage, logFrom, logTo, activitySearch, mainTab]);
+    }, [activityPage, logFrom, logTo, activitySearch, deptFilter, mainTab]);
     // Reset to first page when filters change so narrowed results don't
     // leave the user on a now-empty page 3.
-    useEffect(() => { setActivityPage(0); }, [logFrom, logTo, activitySearch]);
+    useEffect(() => { setActivityPage(0); }, [logFrom, logTo, activitySearch, deptFilter]);
 
     async function fetchAll() {
         setLoading(true);
@@ -133,14 +133,29 @@ export default function Inventory() {
     async function loadActivity() {
         setActivityLoading(true);
         try {
-            const hasRange = !!(logFrom || logTo);
+            // Always 25/page, even with a date range active, and push the
+            // dept-bucket filter to the server so each returned page really
+            // is 25 rows (client-side filtering would leave half-empty pages).
+            //   'retail' → only shop-inventory events (target_type=inventory)
+            //   dept-id  → performer works in that dept AND event ISN'T a
+            //              shop restock (so they don't double-count)
+            //   'all'    → no extra filter beyond the action-type whitelist
+            const deptArgs = deptFilter === 'all'
+                ? {}
+              : deptFilter === 'retail'
+                ? { targetType: 'inventory' }
+              : {
+                    performerDeptId: parseInt(deptFilter),
+                    excludeTargetType: 'inventory',
+                };
             const { rows, total } = await queryActivity({
-                limit:       hasRange ? 1000 : ACTIVITY_PAGE_SIZE,
-                offset:      hasRange ? 0 : activityPage * ACTIVITY_PAGE_SIZE,
+                limit:       ACTIVITY_PAGE_SIZE,
+                offset:      activityPage * ACTIVITY_PAGE_SIZE,
                 actionTypes: Array.from(INV_ACTIONS),
                 from:        logFrom || '',
                 to:          logTo   || '',
                 search:      activitySearch,
+                ...deptArgs,
             });
             setActivity(rows);
             setActivityTotal(total);
@@ -234,24 +249,18 @@ export default function Inventory() {
         }
     }, [deptTabs, deptFilter]);
 
-    // Server filters by action_type whitelist, date range, and search.
-    // Client still narrows by dept pill because retail/ops bucketing
-    // depends on a mix of target_type and the performer's department —
-    // not something SQL would model cleanly here.
-    //   • Retail pill → target_type === 'inventory' (shop-item restocks only).
-    //   • A real department pill → performer works in that dept AND the event
-    //     is not a shop-item restock (so shop restocks don't double-count).
+    // Server now handles all filtering (action_type whitelist, dept bucket,
+    // date range, search). The only thing left client-side is honouring the
+    // per-role bucket visibility (managers can't see buckets outside their
+    // dept) — a safety net in case the dept pill is somehow bypassed.
     const filteredActivity = useMemo(() => {
         return (activity || []).filter(a => {
             const bucket = a.target_type === 'inventory'
                 ? 'retail'
                 : String(a.performer?.dept_id || '');
-            if (!canSeeBucket(bucket)) return false;
-            if (deptFilter === 'all') return true;
-            if (deptFilter === 'retail') return bucket === 'retail';
-            return bucket === deptFilter;
+            return canSeeBucket(bucket);
         });
-    }, [activity, deptFilter, allowedBuckets]);
+    }, [activity, allowedBuckets]);
 
     // ── Add / Delete handlers ──
     async function handleAddItem(e) {
@@ -649,17 +658,12 @@ export default function Inventory() {
                         loading={activityLoading}
                         items={filteredActivity}
                     />
-                    {!activityLoading && !(logFrom || logTo) && (
+                    {!activityLoading && (
                         <ZooPaginator
                             page={activityPage}
                             totalPages={Math.max(1, Math.ceil(activityTotal / ACTIVITY_PAGE_SIZE))}
                             onChange={(p) => setActivityPage(p)}
                         />
-                    )}
-                    {!activityLoading && (logFrom || logTo) && activityTotal > 0 && (
-                        <p style={{ marginTop: '12px', fontSize: '12px', color: GREEN_DARK, opacity: 0.8 }}>
-                            Showing all {activityTotal} inventory event{activityTotal === 1 ? '' : 's'} in the selected range.
-                        </p>
                     )}
                 </>
             )}

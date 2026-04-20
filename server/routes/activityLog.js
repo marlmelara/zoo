@@ -23,7 +23,9 @@ router.get('/', requireRole('admin','manager'), async (req, res) => {
         const {
             limit = 25, offset = 0,
             action_type, action_types,
-            dept_id, from, to, search,
+            dept_id, performer_dept_id,
+            target_type, exclude_target_type,
+            from, to, search,
             include_total,
         } = req.query;
         const where = [];
@@ -36,7 +38,14 @@ router.get('/', requireRole('admin','manager'), async (req, res) => {
                 params.push(...arr);
             }
         }
-        if (dept_id) { where.push('e.dept_id = ?');      params.push(parseInt(dept_id)); }
+        if (dept_id)           { where.push('e.dept_id = ?');           params.push(parseInt(dept_id)); }
+        if (performer_dept_id) { where.push('e.dept_id = ?');           params.push(parseInt(performer_dept_id)); }
+        if (target_type)       { where.push('al.target_type = ?');      params.push(target_type); }
+        if (exclude_target_type) {
+            // "events whose target_type is not X" — includes rows with NULL target_type.
+            where.push('(al.target_type IS NULL OR al.target_type <> ?)');
+            params.push(exclude_target_type);
+        }
         if (from)    { where.push('al.created_at >= ?'); params.push(`${from} 00:00:00`); }
         if (to)      { where.push('al.created_at <= ?'); params.push(`${to} 23:59:59`); }
         if (search && String(search).trim()) {

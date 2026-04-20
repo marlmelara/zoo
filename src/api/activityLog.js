@@ -18,23 +18,29 @@ export const getMyActivity     = (employeeId, limit=20) =>
 // When `from`/`to` is set, callers typically pass a large `limit` to
 // effectively disable pagination within the range.
 export async function queryActivity({
-    limit       = 25,
-    offset      = 0,
-    deptId      = null,
-    actionTypes = null,   // array of strings
-    from        = '',
-    to          = '',
-    search      = '',
+    limit              = 25,
+    offset             = 0,
+    deptId             = null,
+    actionTypes        = null,   // array of strings
+    from               = '',
+    to                 = '',
+    search             = '',
+    targetType         = '',     // filter events by target_type (e.g. 'inventory')
+    excludeTargetType  = '',     // exclude events where target_type = X
+    performerDeptId    = null,   // filter by the performer's department
 } = {}) {
     const params = new URLSearchParams();
     params.set('limit',  String(limit));
     params.set('offset', String(offset));
     params.set('include_total', '1');
-    if (deptId != null) params.set('dept_id', String(deptId));
+    if (deptId != null)          params.set('dept_id',             String(deptId));
+    if (performerDeptId != null) params.set('performer_dept_id',   String(performerDeptId));
     if (actionTypes && actionTypes.length) params.set('action_types', actionTypes.join(','));
-    if (from)   params.set('from',   from);
-    if (to)     params.set('to',     to);
-    if (search) params.set('search', search);
+    if (from)              params.set('from', from);
+    if (to)                params.set('to',   to);
+    if (search)            params.set('search', search);
+    if (targetType)        params.set('target_type', targetType);
+    if (excludeTargetType) params.set('exclude_target_type', excludeTargetType);
     const data = await api.get(`/activity-log?${params.toString()}`);
     // Server returns { rows, total } when include_total=1.
     return data && typeof data === 'object' && 'rows' in data

@@ -64,14 +64,20 @@ router.delete('/:id', requireRole('admin','manager'), async (req, res) => {
 });
 
 // GET /api/supplies/requests — supply requests
+//   admin   → sees everything
+//   manager → sees only requests made by someone in their department
+//             (even if that someone reports to a different manager in the
+//              same dept; the dept is the boundary for approvals)
+//   other   → sees only their own requests
 router.get('/requests', requireAuth, async (req, res) => {
     try {
-        const { role, employeeId } = req.user;
+        const { role, employeeId, deptId } = req.user;
         let rows;
-        if (role === 'admin' || role === 'manager') {
+        if (role === 'admin') {
             [rows] = await db.query(
                 `SELECT sr.*,
                         req.first_name AS req_first, req.last_name AS req_last,
+                        req.dept_id    AS req_dept_id,
                         reqd.dept_name AS req_dept_name,
                         rev.first_name AS rev_first, rev.last_name AS rev_last
                  FROM supply_requests sr
@@ -79,6 +85,20 @@ router.get('/requests', requireAuth, async (req, res) => {
                  LEFT JOIN departments reqd ON req.dept_id     = reqd.dept_id
                  LEFT JOIN employees   rev  ON sr.reviewed_by  = rev.employee_id
                  ORDER BY sr.created_at DESC`
+            );
+        } else if (role === 'manager') {
+            [rows] = await db.query(
+                `SELECT sr.*,
+                        req.first_name AS req_first, req.last_name AS req_last,
+                        req.dept_id    AS req_dept_id,
+                        reqd.dept_name AS req_dept_name,
+                        rev.first_name AS rev_first, rev.last_name AS rev_last
+                 FROM supply_requests sr
+                 LEFT JOIN employees   req  ON sr.requested_by = req.employee_id
+                 LEFT JOIN departments reqd ON req.dept_id     = reqd.dept_id
+                 LEFT JOIN employees   rev  ON sr.reviewed_by  = rev.employee_id
+                 WHERE req.dept_id = ?
+                 ORDER BY sr.created_at DESC`, [deptId]
             );
         } else {
             [rows] = await db.query(

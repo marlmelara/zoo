@@ -41,6 +41,7 @@ export default function AnimalsPanel({ title = 'Animals', accentColor = 'var(--c
         age: '',
         zone_id: '',
         arrived_date: '',
+        date_of_birth: '',
     });
 
     const [searchTerm, setSearchTerm] = useState('');
@@ -99,6 +100,14 @@ export default function AnimalsPanel({ title = 'Animals', accentColor = 'var(--c
 
     async function handleSubmit(e) {
         e.preventDefault();
+        // DOB sanity: either no DOB, or DOB is on/before the arrival date.
+        // The server enforces the same invariant — this just surfaces
+        // a friendly message before we round-trip.
+        if (formData.date_of_birth && formData.arrived_date
+            && formData.date_of_birth > formData.arrived_date) {
+            toast.warn('Date of birth must be on or before the arrival date.');
+            return;
+        }
         try {
             if (editing) {
                 await api.patch(`/animals/${editing.animal_id}`, {
@@ -108,6 +117,7 @@ export default function AnimalsPanel({ title = 'Animals', accentColor = 'var(--c
                     age: formData.age === '' ? null : parseInt(formData.age),
                     zone_id: formData.zone_id === '' ? null : parseInt(formData.zone_id),
                     arrived_date: formData.arrived_date || null,
+                    date_of_birth: formData.date_of_birth || null,
                 });
             } else {
                 await api.post('/animals', {
@@ -115,11 +125,12 @@ export default function AnimalsPanel({ title = 'Animals', accentColor = 'var(--c
                     age: parseInt(formData.age),
                     zone_id: parseInt(formData.zone_id),
                     arrived_date: formData.arrived_date || null,
+                    date_of_birth: formData.date_of_birth || null,
                 });
             }
             setShowForm(false);
             setEditing(null);
-            setFormData({ name: '', species_common_name: '', species_binomial: '', age: '', zone_id: '', arrived_date: '' });
+            setFormData({ name: '', species_common_name: '', species_binomial: '', age: '', zone_id: '', arrived_date: '', date_of_birth: '' });
             fetchAnimals();
         } catch (error) {
             console.error('Error saving animal:', error);
@@ -135,7 +146,8 @@ export default function AnimalsPanel({ title = 'Animals', accentColor = 'var(--c
             species_binomial: animal.species_binomial || '',
             age: animal.age ?? '',
             zone_id: animal.zone_id ?? '',
-            arrived_date: animal.arrived_date ? animal.arrived_date.slice(0, 10) : '',
+            arrived_date: animal.arrived_date ? String(animal.arrived_date).slice(0, 10) : '',
+            date_of_birth: animal.date_of_birth ? String(animal.date_of_birth).slice(0, 10) : '',
         });
         setShowForm(true);
         window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -144,7 +156,7 @@ export default function AnimalsPanel({ title = 'Animals', accentColor = 'var(--c
     function cancelForm() {
         setShowForm(false);
         setEditing(null);
-        setFormData({ name: '', species_common_name: '', species_binomial: '', age: '', zone_id: '', arrived_date: '' });
+        setFormData({ name: '', species_common_name: '', species_binomial: '', age: '', zone_id: '', arrived_date: '', date_of_birth: '' });
     }
 
     function toggleSelect(id) {
@@ -294,6 +306,20 @@ export default function AnimalsPanel({ title = 'Animals', accentColor = 'var(--c
                                 placeholder="Defaults to today"
                             />
                         </div>
+                        <div>
+                            <label style={{ display: 'block', marginBottom: '5px' }}>Date of Birth</label>
+                            <input
+                                type="date"
+                                className="glass-input"
+                                value={formData.date_of_birth}
+                                // Can't be born in the future, and can't be born
+                                // after the animal arrived at the zoo. The server
+                                // re-checks both rules.
+                                max={formData.arrived_date || new Date().toISOString().slice(0, 10)}
+                                onChange={e => setFormData({ ...formData, date_of_birth: e.target.value })}
+                                placeholder="Same day as arrival if born here"
+                            />
+                        </div>
                         <div style={{ gridColumn: '1 / -1', marginTop: '10px', display: 'flex', gap: '10px' }}>
                             <button type="submit" className="glass-button" style={{ background: accentColor, color: 'white', flex: 1 }}>
                                 {editing ? 'Save Changes' : 'Save Animal'}
@@ -363,10 +389,13 @@ export default function AnimalsPanel({ title = 'Animals', accentColor = 'var(--c
                                         </p>
                                     )}
                                 </div>
-                                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                                {/* Bottom row: left group (actions) and right group (Log).
+                                    `marginLeft: auto` on the right group pushes Log flush
+                                    to the card's bottom-right — matches Staff cards. */}
+                                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
                                     <button
                                         className="glass-button"
-                                        style={{ flex: 1, fontSize: '12px', padding: '8px' }}
+                                        style={{ fontSize: '12px', padding: '8px' }}
                                         onClick={(e) => {
                                             e.stopPropagation();
                                             setSelectedAnimal(animal);
@@ -385,13 +414,15 @@ export default function AnimalsPanel({ title = 'Animals', accentColor = 'var(--c
                                             <Pencil size={12} /> Edit
                                         </button>
                                     )}
-                                    <LifecycleLogButton
-                                        compact
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            setLogTarget({ entity: 'animal', id: animal.animal_id, name: animal.name });
-                                        }}
-                                    />
+                                    <div style={{ marginLeft: 'auto' }}>
+                                        <LifecycleLogButton
+                                            compact
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setLogTarget({ entity: 'animal', id: animal.animal_id, name: animal.name });
+                                            }}
+                                        />
+                                    </div>
                                 </div>
                             </div>
                         );

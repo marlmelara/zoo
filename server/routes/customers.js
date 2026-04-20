@@ -1,6 +1,7 @@
 import { Router } from '../lib/router.js';
 import db from '../db.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
+import { toIsoUtc } from '../lib/dates.js';
 
 const router = Router();
 
@@ -175,7 +176,7 @@ router.get('/:id/lifecycle-log', requireRole('admin', 'manager'), async (req, re
               ORDER BY al.created_at DESC`,
             [req.params.id]
         );
-        return res.json(rows);
+        return res.json(rows.map(r => ({ ...r, created_at: toIsoUtc(r.created_at) })));
     } catch (err) {
         return res.status(500).json({ error: err.message });
     }

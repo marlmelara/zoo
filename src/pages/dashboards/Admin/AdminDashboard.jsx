@@ -3,6 +3,7 @@ import { LayoutDashboard, Users, Ticket, ShoppingBag, DollarSign, Database, Chev
 import api from '../../../lib/api';
 import LifecycleLogModal, { LifecycleLogButton } from '../../../components/LifecycleLogModal';
 import { useToast, useConfirm } from '../../../components/Feedback';
+import { defaultOfficeFor } from '../../../utils/staff';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import {
     getAdminDashboardStats,
@@ -45,18 +46,35 @@ export default function AdminDashboard() {
     // Role defaults to '' so the dropdown shows the "Select Role..." placeholder
     // instead of silently pre-selecting Security. The form is fully reset any
     // time the modal closes via closeCreateUser() so reopening starts clean.
+    //
+    // Shift lives as two time strings (start / end); on submit we compose
+    // them into "HH:MM-HH:MM" to match what the rest of the app reads.
     const emptyNewUser = {
-        email: '', password: '', first_name: '', last_name: '', dept_id: '', role: ''
+        email: '', password: '', first_name: '', last_name: '',
+        dept_id: '', role: '',
+        shift_start: '09:00', shift_end: '17:00',
+        pay_rate: '',          // dollars — converted to cents at submit
+        contact_info: '',
+        date_of_birth: '',
+        // Role-specific:
+        license_no: '', specialty: '',
+        specialization_species: '',
+        office_location: '',
+        // Supervisor (required for non-admin / non-manager):
+        manager_id: '',
     };
     const [newUser, setNewUser] = useState(emptyNewUser);
     // Confirm-password is local-only — never sent to the server.
     const [confirmPassword, setConfirmPassword] = useState('');
     const [departments, setDepartments] = useState([]);
+    // Managers in the selected department — populates the supervisor picker.
+    const [deptManagers, setDeptManagers] = useState([]);
 
     const closeCreateUser = () => {
         setShowCreateUser(false);
         setNewUser(emptyNewUser);
         setConfirmPassword('');
+        setDeptManagers([]);
     };
 
     useEffect(() => {
@@ -68,6 +86,22 @@ export default function AdminDashboard() {
             getDepartments().then(setDepartments).catch(console.error);
         }
     }, [showCreateUser]);
+
+    // Reload the manager list whenever the target dept changes. Only fires
+    // for roles that actually need a supervisor (admins/managers don't).
+    useEffect(() => {
+        if (!showCreateUser) return;
+        if (!newUser.dept_id || newUser.role === 'admin' || newUser.role === 'manager') {
+            setDeptManagers([]);
+            return;
+        }
+        api.get(`/employees/managers?dept_id=${newUser.dept_id}`)
+            .then(setDeptManagers)
+            .catch(err => {
+                console.error('Error loading managers:', err);
+                setDeptManagers([]);
+            });
+    }, [showCreateUser, newUser.dept_id, newUser.role]);
 
     async function fetchAdminData() {
         try {
@@ -91,13 +125,34 @@ export default function AdminDashboard() {
     }
 
     // When role changes, auto-set department (except manager who picks their own)
+    // and prefill the office based on the role/dept pair so admins don't have
+    // to type canonical strings like "Veterinary Clinic, Head Office".
     const handleRoleChange = (role) => {
         const deptName = ROLE_DEPT_MAP[role];
         const matchedDept = departments.find(d => d.dept_name === deptName);
+        const nextDeptName = matchedDept ? matchedDept.dept_name : '';
         setNewUser({
             ...newUser,
             role,
             dept_id: matchedDept ? String(matchedDept.dept_id) : '',
+            office_location: defaultOfficeFor(role, nextDeptName),
+            // Wipe role-specific fields so stale values don't leak between roles.
+            license_no: '',
+            specialty: '',
+            specialization_species: '',
+            manager_id: '',
+        });
+    };
+
+    // Dept can be changed by hand for the `manager` role. When it changes,
+    // recompute the office + clear the supervisor so the picker reloads.
+    const handleDeptChange = (deptId) => {
+        const deptName = (departments.find(d => String(d.dept_id) === String(deptId)) || {}).dept_name || '';
+        setNewUser({
+            ...newUser,
+            dept_id: deptId,
+            office_location: defaultOfficeFor(newUser.role, deptName),
+            manager_id: '',
         });
     };
 
@@ -107,8 +162,43 @@ export default function AdminDashboard() {
             toast.warn('Passwords do not match. Please re-enter.');
             return;
         }
+        if (newUser.shift_start && newUser.shift_end
+            && newUser.shift_start >= newUser.shift_end) {
+            toast.warn('Shift end time must be after the start time.');
+            return;
+        }
+        // Non-admin, non-manager needs a supervisor. The server will also
+        // reject this, but catching here surfaces a friendly message.
+        if (newUser.role !== 'admin' && newUser.role !== 'manager' && !newUser.manager_id) {
+            toast.warn('Please pick a supervising manager for this employee.');
+            return;
+        }
         try {
-            await createZooUser(newUser);
+            const payload = {
+                email:        newUser.email,
+                password:     newUser.password,
+                first_name:   newUser.first_name,
+                last_name:    newUser.last_name,
+                dept_id:      newUser.dept_id,
+                role:         newUser.role,
+                contact_info: newUser.contact_info || newUser.email,
+                date_of_birth: newUser.date_of_birth || null,
+                shift_timeframe: newUser.shift_start && newUser.shift_end
+                    ? `${newUser.shift_start}-${newUser.shift_end}`
+                    : null,
+                pay_rate_cents: newUser.pay_rate
+                    ? Math.round(parseFloat(newUser.pay_rate) * 100)
+                    : 2000,
+                manager_id: (newUser.role === 'admin' || newUser.role === 'manager')
+                    ? null
+                    : parseInt(newUser.manager_id),
+                // Role-specific — server only reads the one that matches.
+                license_no:            newUser.license_no || null,
+                specialty:             newUser.specialty || null,
+                specialization_species: newUser.specialization_species || null,
+                office_location:       newUser.office_location || null,
+            };
+            await createZooUser(payload);
             toast.success({ title: 'User created', message: `${newUser.first_name} ${newUser.last_name} can now sign in.` });
             closeCreateUser();
             fetchAdminData();
@@ -179,53 +269,186 @@ export default function AdminDashboard() {
             </div>
 
             {/* Create User Modal */}
-            {showCreateUser && (
+            {showCreateUser && (() => {
+                const needsSupervisor = newUser.role && newUser.role !== 'admin' && newUser.role !== 'manager';
+                const isVet        = newUser.role === 'vet';
+                const isCaretaker  = newUser.role === 'caretaker';
+                const isManager    = newUser.role === 'manager';
+                // A manager whose department is Veterinary Services is still
+                // a practising vet in-world, so they fill out the license
+                // + specialty fields in addition to the office location.
+                const selectedDeptName = (departments.find(d => String(d.dept_id) === String(newUser.dept_id)) || {}).dept_name || '';
+                const isVetManager = isManager && /veterinary/i.test(selectedDeptName);
+                const labelStyle = {
+                    display: 'block', fontSize: '11px', color: 'rgb(102, 122, 66)',
+                    fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em',
+                    marginBottom: '4px',
+                };
+                return (
                 <div
                     onClick={closeCreateUser}
                     style={{
                         position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-                        background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000
+                        background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px',
                     }}>
-                    <div onClick={e => e.stopPropagation()} className="glass-panel" style={{ padding: '30px', width: '500px', maxWidth: '90%' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
+                    <div onClick={e => e.stopPropagation()} className="glass-panel" style={{ padding: '28px', width: '560px', maxWidth: '95%', maxHeight: '92vh', overflowY: 'auto' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '18px' }}>
                             <h2 style={{ margin: 0, color: 'rgb(102, 122, 66)' }}>Create New User</h2>
                             <button onClick={closeCreateUser} style={{ background: 'none', border: 'none', color: 'rgb(102, 122, 66)', fontSize: '20px', cursor: 'pointer' }}>×</button>
                         </div>
-                        <form onSubmit={handleCreateUser} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
-                            <input required placeholder="First Name" className="glass-input" value={newUser.first_name} onChange={e => setNewUser({ ...newUser, first_name: e.target.value })} />
-                            <input required placeholder="Last Name" className="glass-input" value={newUser.last_name} onChange={e => setNewUser({ ...newUser, last_name: e.target.value })} />
+                        <form onSubmit={handleCreateUser} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                            <div>
+                                <label style={labelStyle}>First Name</label>
+                                <input required className="glass-input" value={newUser.first_name} onChange={e => setNewUser({ ...newUser, first_name: e.target.value })} />
+                            </div>
+                            <div>
+                                <label style={labelStyle}>Last Name</label>
+                                <input required className="glass-input" value={newUser.last_name} onChange={e => setNewUser({ ...newUser, last_name: e.target.value })} />
+                            </div>
+                            <div style={{ gridColumn: '1/-1' }}>
+                                <label style={labelStyle}>Email</label>
+                                <input required type="email" className="glass-input" value={newUser.email} onChange={e => setNewUser({ ...newUser, email: e.target.value })} />
+                            </div>
+                            <div>
+                                <label style={labelStyle}>Password</label>
+                                <input required type="password" className="glass-input" value={newUser.password} onChange={e => setNewUser({ ...newUser, password: e.target.value })} />
+                            </div>
+                            <div>
+                                <label style={labelStyle}>Confirm Password</label>
+                                <input required type="password" className="glass-input" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} />
+                            </div>
 
-                            <input required type="email" placeholder="Email" className="glass-input" style={{ gridColumn: '1/-1' }} value={newUser.email} onChange={e => setNewUser({ ...newUser, email: e.target.value })} />
-                            <input required type="password" placeholder="Password" className="glass-input" style={{ gridColumn: '1/-1' }} value={newUser.password} onChange={e => setNewUser({ ...newUser, password: e.target.value })} />
-                            <input required type="password" placeholder="Confirm Password" className="glass-input" style={{ gridColumn: '1/-1' }} value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} />
+                            <div style={{ gridColumn: '1/-1' }}>
+                                <label style={labelStyle}>Role</label>
+                                <select required className="glass-input" value={newUser.role} onChange={e => handleRoleChange(e.target.value)}>
+                                    <option value="" disabled>Select Role...</option>
+                                    <option value="security">Security</option>
+                                    <option value="retail">Retail</option>
+                                    <option value="caretaker">Caretaker</option>
+                                    <option value="vet">Vet</option>
+                                    <option value="manager">Manager</option>
+                                    <option value="admin">Admin</option>
+                                </select>
+                            </div>
 
-                            <select required className="glass-input" style={{ gridColumn: '1/-1' }} value={newUser.role} onChange={e => handleRoleChange(e.target.value)}>
-                                <option value="" disabled>Select Role...</option>
-                                <option value="security">Role: Security</option>
-                                <option value="retail">Role: Retail</option>
-                                <option value="caretaker">Role: Caretaker</option>
-                                <option value="vet">Role: Vet</option>
-                                <option value="manager">Role: Manager</option>
-                                <option value="admin">Role: Admin</option>
-                            </select>
+                            <div style={{ gridColumn: '1/-1' }}>
+                                <label style={labelStyle}>Department</label>
+                                <select
+                                    required
+                                    className="glass-input"
+                                    style={{ opacity: isDeptAutoSet ? 0.6 : 1 }}
+                                    value={newUser.dept_id}
+                                    onChange={e => handleDeptChange(e.target.value)}
+                                    disabled={isDeptAutoSet}
+                                >
+                                    <option value="">Select Department...</option>
+                                    {departments.map(d => <option key={d.dept_id} value={d.dept_id}>{d.dept_name}</option>)}
+                                </select>
+                            </div>
 
-                            <select
-                                required
-                                className="glass-input"
-                                style={{ gridColumn: '1/-1', opacity: isDeptAutoSet ? 0.6 : 1 }}
-                                value={newUser.dept_id}
-                                onChange={e => setNewUser({ ...newUser, dept_id: e.target.value })}
-                                disabled={isDeptAutoSet}
-                            >
-                                <option value="">Select Department...</option>
-                                {departments.map(d => <option key={d.dept_id} value={d.dept_id}>{d.dept_name}</option>)}
-                            </select>
+                            {/* Structured shift pickers — prevents garbage like "8-4pm". */}
+                            <div>
+                                <label style={labelStyle}>Shift Start</label>
+                                <input required type="time" className="glass-input" value={newUser.shift_start}
+                                    onChange={e => setNewUser({ ...newUser, shift_start: e.target.value })} />
+                            </div>
+                            <div>
+                                <label style={labelStyle}>Shift End</label>
+                                <input required type="time" className="glass-input" value={newUser.shift_end}
+                                    onChange={e => setNewUser({ ...newUser, shift_end: e.target.value })} />
+                            </div>
 
-                            <button type="submit" className="glass-button" style={{ gridColumn: '1/-1', background: 'var(--color-secondary)', marginTop: '10px' }}>Create Account</button>
+                            <div>
+                                <label style={labelStyle}>Hourly Rate ($)</label>
+                                <input required type="number" step="0.01" min="0" className="glass-input"
+                                    placeholder="20.00"
+                                    value={newUser.pay_rate}
+                                    onChange={e => setNewUser({ ...newUser, pay_rate: e.target.value })} />
+                            </div>
+                            <div>
+                                <label style={labelStyle}>Contact (phone / ext.)</label>
+                                <input className="glass-input" placeholder="Defaults to email"
+                                    value={newUser.contact_info}
+                                    onChange={e => setNewUser({ ...newUser, contact_info: e.target.value })} />
+                            </div>
+
+                            <div style={{ gridColumn: '1/-1' }}>
+                                <label style={labelStyle}>Date of Birth</label>
+                                <input required type="date" className="glass-input"
+                                    max={new Date().toISOString().slice(0, 10)}
+                                    value={newUser.date_of_birth}
+                                    onChange={e => setNewUser({ ...newUser, date_of_birth: e.target.value })} />
+                            </div>
+
+                            {/* Supervisor — REQUIRED for every non-admin, non-manager role. */}
+                            {needsSupervisor && (
+                                <div style={{ gridColumn: '1/-1' }}>
+                                    <label style={labelStyle}>Supervisor (manager in this dept)</label>
+                                    <select required className="glass-input"
+                                        value={newUser.manager_id}
+                                        onChange={e => setNewUser({ ...newUser, manager_id: e.target.value })}>
+                                        <option value="" disabled>
+                                            {deptManagers.length === 0
+                                                ? 'No managers in this department yet — create a manager first.'
+                                                : 'Select supervisor...'}
+                                        </option>
+                                        {deptManagers.map(m => (
+                                            <option key={m.employee_id} value={m.employee_id}>
+                                                {m.first_name} {m.last_name}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                            )}
+
+                            {/* Role-specific fields. */}
+                            {(isVet || isVetManager) && (
+                                <>
+                                    <div>
+                                        <label style={labelStyle}>Vet License #</label>
+                                        <input required className="glass-input"
+                                            value={newUser.license_no}
+                                            onChange={e => setNewUser({ ...newUser, license_no: e.target.value })} />
+                                    </div>
+                                    <div>
+                                        <label style={labelStyle}>Specialty</label>
+                                        <input className="glass-input" placeholder="Large mammals, reptiles, …"
+                                            value={newUser.specialty}
+                                            onChange={e => setNewUser({ ...newUser, specialty: e.target.value })} />
+                                    </div>
+                                </>
+                            )}
+                            {isCaretaker && (
+                                <div style={{ gridColumn: '1/-1' }}>
+                                    <label style={labelStyle}>Specialization (species)</label>
+                                    <input required className="glass-input" placeholder="Primates, penguins, …"
+                                        value={newUser.specialization_species}
+                                        onChange={e => setNewUser({ ...newUser, specialization_species: e.target.value })} />
+                                </div>
+                            )}
+
+                            {/* Office location — auto-prefilled from role × dept.
+                                Managers bookend their dept location with the
+                                Head Office; everyone else gets the single
+                                canonical spot. Kept editable so admins can
+                                adjust for the odd one-off. */}
+                            {newUser.role && (
+                                <div style={{ gridColumn: '1/-1' }}>
+                                    <label style={labelStyle}>
+                                        Office Location {isManager ? '(dept + Head Office)' : ''}
+                                    </label>
+                                    <input required className="glass-input"
+                                        value={newUser.office_location}
+                                        onChange={e => setNewUser({ ...newUser, office_location: e.target.value })} />
+                                </div>
+                            )}
+
+                            <button type="submit" className="glass-button" style={{ gridColumn: '1/-1', background: 'var(--color-secondary)', color: 'white', marginTop: '10px', fontWeight: 700 }}>Create Account</button>
                         </form>
                     </div>
                 </div>
-            )}
+                );
+            })()}
 
             {/* Tab Navigation */}
             <div style={{ display: 'flex', gap: '10px', marginBottom: '30px', flexWrap: 'wrap' }}>

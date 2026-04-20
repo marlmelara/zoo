@@ -1,6 +1,7 @@
 import { Router } from '../lib/router.js';
 import db from '../db.js';
 import { requireRole, requireAuth } from '../middleware/auth.js';
+import { toIsoUtc } from '../lib/dates.js';
 
 const router = Router();
 
@@ -117,7 +118,7 @@ router.get('/:id/lifecycle-log', requireRole('admin', 'manager'), async (req, re
               ORDER BY al.created_at DESC`,
             [req.params.id]
         );
-        return res.json(rows);
+        return res.json(rows.map(r => ({ ...r, created_at: toIsoUtc(r.created_at) })));
     } catch (err) {
         return res.status(500).json({ error: err.message });
     }
@@ -313,18 +314,31 @@ router.post('/:id/care-log', requireRole('admin','manager','vet','caretaker'), a
 
 // POST /api/animals
 router.post('/', requireRole('admin', 'manager', 'vet', 'caretaker'), async (req, res) => {
-    const { name, species_common_name, species_binomial, age, zone_id, arrived_date } = req.body;
+    const { name, species_common_name, species_binomial, age, zone_id,
+            arrived_date, date_of_birth } = req.body;
+
+    // DOB rule: born-at-zoo shares the arrival day; acquired animals were
+    // born before they got here. So DOB <= arrived_date always. Reject
+    // up-front with a friendly message instead of leaking the CHECK error.
+    const effectiveArrival = arrived_date || new Date().toISOString().slice(0, 10);
+    if (date_of_birth && date_of_birth > effectiveArrival) {
+        return res.status(400).json({
+            error: 'Date of birth must be on or before the arrival date.',
+        });
+    }
+
     const conn = await db.getConnection();
     try {
         await conn.beginTransaction();
         const [hrResult] = await conn.query('INSERT INTO health_records (vet_id) VALUES (NULL)');
         const [result] = await conn.query(
             `INSERT INTO animals
-             (name, species_common_name, species_binomial, age, zone_id, health_record_id, arrived_date)
-             VALUES (?, ?, ?, ?, ?, ?, ?)`,
+             (name, species_common_name, species_binomial, age, zone_id,
+              health_record_id, arrived_date, date_of_birth)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
             [name, species_common_name, species_binomial || null,
              age || null, zone_id || null, hrResult.insertId,
-             arrived_date || new Date().toISOString().slice(0, 10)]
+             effectiveArrival, date_of_birth || null]
         );
         await conn.commit();
         try {
@@ -414,14 +428,30 @@ router.post('/:id/medical-history', requireRole('admin', 'manager', 'vet'), asyn
 // PATCH /api/animals/:id
 router.patch('/:id', requireRole('admin', 'manager', 'vet', 'caretaker'), async (req, res) => {
     const fields = ['name', 'species_common_name', 'species_binomial', 'age', 'zone_id',
-                    'arrived_date', 'departed_date'];
+                    'arrived_date', 'departed_date', 'date_of_birth'];
     const updates = []; const vals = [];
     for (const f of fields) {
         if (req.body[f] !== undefined) { updates.push(`${f} = ?`); vals.push(req.body[f]); }
     }
     if (updates.length === 0) return res.status(400).json({ error: 'No fields to update.' });
-    vals.push(req.params.id);
+
+    // Keep the DOB ≤ arrived_date invariant. Load current values for any
+    // fields the client didn't overwrite, then validate the final pair.
     try {
+        const [[current]] = await db.query(
+            'SELECT date_of_birth, arrived_date FROM animals WHERE animal_id = ?',
+            [req.params.id]
+        );
+        if (!current) return res.status(404).json({ error: 'Animal not found.' });
+        const nextDob     = req.body.date_of_birth !== undefined ? req.body.date_of_birth : current.date_of_birth;
+        const nextArrived = req.body.arrived_date  !== undefined ? req.body.arrived_date  : current.arrived_date;
+        if (nextDob && nextArrived && String(nextDob) > String(nextArrived)) {
+            return res.status(400).json({
+                error: 'Date of birth must be on or before the arrival date.',
+            });
+        }
+
+        vals.push(req.params.id);
         await db.query(`UPDATE animals SET ${updates.join(', ')} WHERE animal_id = ?`, vals);
         return res.json({ success: true });
     } catch (err) {

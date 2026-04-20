@@ -2,6 +2,7 @@ import { Router } from '../lib/router.js';
 import bcrypt from 'bcryptjs';
 import db from '../db.js';
 import { requireRole, requireAuth } from '../middleware/auth.js';
+import { toIsoUtc } from '../lib/dates.js';
 
 const router = Router();
 
@@ -85,6 +86,9 @@ router.post('/:id/reactivate', requireRole('admin'), async (req, res) => {
 
 // GET /api/employees/:id/lifecycle-log — activation/deactivation history
 // for one employee. Returns rows newest-first with the performer's name.
+// created_at gets the ISO-UTC treatment so the browser localizes it —
+// mysql2's naive string would otherwise be parsed as local and display
+// shifted by the server↔client offset.
 router.get('/:id/lifecycle-log', requireRole('admin', 'manager'), async (req, res) => {
     try {
         const [rows] = await db.query(
@@ -100,6 +104,52 @@ router.get('/:id/lifecycle-log', requireRole('admin', 'manager'), async (req, re
               ORDER BY al.created_at DESC`,
             [req.params.id]
         );
+        return res.json(rows.map(r => ({ ...r, created_at: toIsoUtc(r.created_at) })));
+    } catch (err) {
+        return res.status(500).json({ error: err.message });
+    }
+});
+
+// GET /api/employees/my-team — manager-scoped view of their direct reports.
+// Returns the manager themselves (flagged is_self=1) plus every employee
+// whose manager_id points at them. Admin gets everyone (no supervisor
+// concept applies).
+router.get('/my-team', requireRole('admin', 'manager'), async (req, res) => {
+    try {
+        const { role, employeeId } = req.user;
+        let sql, params;
+        if (role === 'admin') {
+            sql = `SELECT e.*, d.dept_name,
+                          v.license_no, v.specialty,
+                          ac.specialization_species,
+                          mg.office_location,
+                          (e.employee_id = ?) AS is_self
+                     FROM employees e
+                     LEFT JOIN departments    d  ON d.dept_id     = e.dept_id
+                     LEFT JOIN vets           v  ON v.employee_id = e.employee_id
+                     LEFT JOIN animal_caretakers ac ON ac.employee_id = e.employee_id
+                     LEFT JOIN managers       mg ON mg.employee_id = e.employee_id
+                    WHERE e.is_active = 1
+                    ORDER BY e.employee_id ASC`;
+            params = [employeeId];
+        } else {
+            // Manager sees themselves + everyone reporting to them.
+            sql = `SELECT e.*, d.dept_name,
+                          v.license_no, v.specialty,
+                          ac.specialization_species,
+                          mg.office_location,
+                          (e.employee_id = ?) AS is_self
+                     FROM employees e
+                     LEFT JOIN departments    d  ON d.dept_id     = e.dept_id
+                     LEFT JOIN vets           v  ON v.employee_id = e.employee_id
+                     LEFT JOIN animal_caretakers ac ON ac.employee_id = e.employee_id
+                     LEFT JOIN managers       mg ON mg.employee_id = e.employee_id
+                    WHERE e.is_active = 1
+                      AND (e.employee_id = ? OR e.manager_id = ?)
+                    ORDER BY (e.employee_id = ?) DESC, e.last_name ASC, e.first_name ASC`;
+            params = [employeeId, employeeId, employeeId, employeeId];
+        }
+        const [rows] = await db.query(sql, params);
         return res.json(rows);
     } catch (err) {
         return res.status(500).json({ error: err.message });
@@ -147,6 +197,27 @@ router.get('/vets', requireRole('admin', 'manager'), async (req, res) => {
     }
 });
 
+// GET /api/employees/managers — active managers, optionally filtered by
+// department. Used by the supervisor dropdown when creating/editing an
+// employee — every non-admin, non-manager must pick one.
+router.get('/managers', requireRole('admin', 'manager'), async (req, res) => {
+    try {
+        const { dept_id } = req.query;
+        const params = [];
+        let sql = `SELECT e.employee_id, e.first_name, e.last_name, e.dept_id,
+                          d.dept_name
+                     FROM employees e
+                     LEFT JOIN departments d ON d.dept_id = e.dept_id
+                    WHERE e.role = 'manager' AND e.is_active = 1`;
+        if (dept_id) { sql += ' AND e.dept_id = ?'; params.push(parseInt(dept_id)); }
+        sql += ' ORDER BY e.last_name ASC, e.first_name ASC';
+        const [rows] = await db.query(sql, params);
+        return res.json(rows);
+    } catch (err) {
+        return res.status(500).json({ error: err.message });
+    }
+});
+
 // GET /api/employees/caretakers — admin/manager
 router.get('/caretakers', requireRole('admin', 'manager'), async (req, res) => {
     try {
@@ -182,10 +253,37 @@ router.get('/:id', requireRole('admin', 'manager'), async (req, res) => {
 router.post('/', requireRole('admin', 'manager'), async (req, res) => {
     const { email, password, first_name, last_name, middle_name,
             contact_info, pay_rate_cents, shift_timeframe,
-            dept_id, manager_id, role } = req.body;
+            dept_id, manager_id, role, date_of_birth } = req.body;
 
     if (!email || !password || !first_name || !last_name || !role) {
         return res.status(400).json({ error: 'Missing required fields.' });
+    }
+
+    // Supervisor rule: every non-admin / non-manager must be assigned to
+    // a manager. Admins never have supervisors (their role is unique), and
+    // managers sit at the top of their dept so they don't either. Anyone
+    // else — vet, caretaker, security, retail — needs a manager_id.
+    if (role !== 'admin' && role !== 'manager') {
+        if (!manager_id) {
+            return res.status(400).json({
+                error: `${role} must be assigned to a supervising manager.`,
+            });
+        }
+        // Validate the chosen manager is real, active, and in the same dept.
+        const [mgrRows] = await db.query(
+            `SELECT employee_id, dept_id, is_active, role
+               FROM employees WHERE employee_id = ?`, [manager_id]
+        );
+        const mgr = mgrRows[0];
+        if (!mgr || mgr.is_active !== 1 || mgr.role !== 'manager') {
+            return res.status(400).json({ error: 'Chosen supervisor is not an active manager.' });
+        }
+        if (dept_id && mgr.dept_id !== parseInt(dept_id)) {
+            return res.status(400).json({ error: 'Supervisor must be in the same department.' });
+        }
+    } else if (manager_id) {
+        // Admins/managers can't have a supervisor — quietly ignore.
+        // (Caller shouldn't send one; this is a safety net.)
     }
 
     const conn = await db.getConnection();
@@ -208,15 +306,21 @@ router.post('/', requireRole('admin', 'manager'), async (req, res) => {
         const [empResult] = await conn.query(
             `INSERT INTO employees
              (first_name, middle_name, last_name, contact_info, pay_rate_cents,
-              shift_timeframe, dept_id, user_id, manager_id, role)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+              shift_timeframe, dept_id, user_id, manager_id, role, date_of_birth)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [first_name, middle_name || null, last_name,
              contact_info || email, pay_rate_cents || 2000,
              shift_timeframe || '09:00-17:00',
-             dept_id || null, userId, manager_id || null, role]
+             dept_id || null, userId, manager_id || null, role,
+             date_of_birth || null]
         );
 
-        // Insert into sub-type table if needed
+        // Insert into sub-type table(s) as needed.
+        //
+        // A manager in Veterinary Services is still a practising vet, so
+        // they get a row in BOTH `managers` and `vets` when a license is
+        // supplied. This keeps Sarah-the-vet-manager's license discoverable
+        // via the existing vets JOIN everywhere else in the app.
         if (role === 'vet' && req.body.license_no) {
             await conn.query(
                 'INSERT INTO vets (employee_id, license_no, specialty) VALUES (?, ?, ?)',
@@ -232,6 +336,21 @@ router.post('/', requireRole('admin', 'manager'), async (req, res) => {
                 'INSERT INTO managers (employee_id, office_location) VALUES (?, ?)',
                 [empResult.insertId, req.body.office_location || null]
             );
+            // Vet-dept managers keep their clinical license on file too.
+            // Look up the dept name so we don't rely on the caller to
+            // flag this — any manager with a license + dept name
+            // matching "Veterinary" gets the extra row.
+            if (req.body.license_no && dept_id) {
+                const [[dept]] = await conn.query(
+                    'SELECT dept_name FROM departments WHERE dept_id = ?', [dept_id]
+                );
+                if (dept && /veterinary/i.test(dept.dept_name)) {
+                    await conn.query(
+                        'INSERT INTO vets (employee_id, license_no, specialty) VALUES (?, ?, ?)',
+                        [empResult.insertId, req.body.license_no, req.body.specialty || null]
+                    );
+                }
+            }
         }
 
         await conn.commit();
@@ -256,14 +375,45 @@ router.post('/', requireRole('admin', 'manager'), async (req, res) => {
 // PATCH /api/employees/:id
 router.patch('/:id', requireRole('admin', 'manager'), async (req, res) => {
     const fields = ['first_name', 'middle_name', 'last_name', 'contact_info',
-                    'pay_rate_cents', 'shift_timeframe', 'dept_id', 'manager_id', 'role'];
+                    'pay_rate_cents', 'shift_timeframe', 'dept_id', 'manager_id', 'role',
+                    'date_of_birth'];
     const updates = []; const vals = [];
     for (const f of fields) {
         if (req.body[f] !== undefined) { updates.push(`${f} = ?`); vals.push(req.body[f]); }
     }
     if (updates.length === 0) return res.status(400).json({ error: 'No fields to update.' });
-    vals.push(req.params.id);
+
+    // Keep the supervisor invariant intact across edits. Pull the current
+    // role/dept if the caller didn't include them, then validate.
     try {
+        const [[current]] = await db.query(
+            'SELECT role, dept_id, manager_id FROM employees WHERE employee_id = ?',
+            [req.params.id]
+        );
+        if (!current) return res.status(404).json({ error: 'Employee not found.' });
+        const nextRole     = req.body.role       !== undefined ? req.body.role       : current.role;
+        const nextDeptId   = req.body.dept_id    !== undefined ? req.body.dept_id    : current.dept_id;
+        const nextMgrId    = req.body.manager_id !== undefined ? req.body.manager_id : current.manager_id;
+        if (nextRole !== 'admin' && nextRole !== 'manager') {
+            if (!nextMgrId) {
+                return res.status(400).json({
+                    error: `${nextRole} must be assigned to a supervising manager.`,
+                });
+            }
+            const [mgrRows] = await db.query(
+                `SELECT employee_id, dept_id, is_active, role
+                   FROM employees WHERE employee_id = ?`, [nextMgrId]
+            );
+            const mgr = mgrRows[0];
+            if (!mgr || mgr.is_active !== 1 || mgr.role !== 'manager') {
+                return res.status(400).json({ error: 'Chosen supervisor is not an active manager.' });
+            }
+            if (nextDeptId != null && mgr.dept_id !== parseInt(nextDeptId)) {
+                return res.status(400).json({ error: 'Supervisor must be in the same department.' });
+            }
+        }
+
+        vals.push(req.params.id);
         await db.query(`UPDATE employees SET ${updates.join(', ')} WHERE employee_id = ?`, vals);
         return res.json({ success: true });
     } catch (err) {

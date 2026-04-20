@@ -14,6 +14,7 @@ import AnimalMedicalPanel from '../../../components/AnimalMedicalPanel';
 import { StatusFilter, DateRangeFilter } from '../../../components/AnimalsPanel';
 import { useToast } from '../../../components/Feedback';
 import ZooPaginator from '../../../components/ZooPaginator';
+import { formatShiftTimeframe } from '../../../utils/staff';
 import {
     LayoutDashboard, Users, ClipboardList, Calendar, Package,
     CheckCircle, XCircle, Clock, AlertTriangle, Shield, Activity,
@@ -214,12 +215,12 @@ export default function ManagerDashboard() {
         const id = depId || resolvedDeptId || deptId;
         setActivityLoading(true);
         try {
-            // Date range set → fetch everything in the range (page controls
-            // are hidden in that mode). Otherwise page through 25 at a time.
-            const hasRange = !!(logFrom || logTo);
+            // Always paginate 25/page — even when a date range is set we
+            // walk through matches 25 at a time so the UI never dumps a
+            // giant list in one shot.
             const { rows, total } = await queryActivity({
-                limit:  hasRange ? 1000 : ACTIVITY_PAGE_SIZE,
-                offset: hasRange ? 0 : activityPage * ACTIVITY_PAGE_SIZE,
+                limit:  ACTIVITY_PAGE_SIZE,
+                offset: activityPage * ACTIVITY_PAGE_SIZE,
                 deptId: isAdmin ? null : id,
                 from:   logFrom || '',
                 to:     logTo   || '',
@@ -262,13 +263,12 @@ export default function ManagerDashboard() {
     }
 
     async function fetchStaff(depId) {
-        const id = depId || resolvedDeptId || deptId;
+        // /employees/my-team returns self + direct reports for managers, and
+        // every active employee for admins. The response flags self with
+        // is_self=1 so the UI can surface "(Me)" without recomputing.
         try {
-            const data = await api.get('/employees');
-            const filtered = (!isAdmin && id)
-                ? data.filter(e => e.dept_id === id || e.dept_id === parseInt(id))
-                : data;
-            setStaff(filtered);
+            const data = await api.get('/employees/my-team');
+            setStaff(data || []);
         } catch (err) {
             console.error('Error fetching staff:', err);
         } finally {
@@ -466,8 +466,9 @@ export default function ManagerDashboard() {
     });
 
     // My Staff — case-insensitive match on name, role, dept, and
-    // vet specialty / caretaker species. Sorted alphabetically by
-    // last name (then first) so the list is stable and scannable.
+    // vet specialty / caretaker species. Self (is_self=1) always floats
+    // to the top with a "(Me)" badge; everyone else sorts alphabetically
+    // by last name so the list is stable and scannable.
     const filteredStaff = staff
         .filter(p => {
             if (!staffSearch.trim()) return true;
@@ -475,10 +476,22 @@ export default function ManagerDashboard() {
             return [
                 p.first_name, p.last_name, p.dept_name, p.role,
                 p.shift_timeframe, p.contact_info,
-                p.vets?.specialty, p.animal_caretakers?.specialization_species,
+                p.specialty, p.specialization_species,
             ].some(v => (v || '').toString().toLowerCase().includes(q));
         })
         .sort((a, b) => {
+            // Self always floats to the very top with the "(Me)" badge.
+            if ((b.is_self || 0) - (a.is_self || 0) !== 0) {
+                return (b.is_self || 0) - (a.is_self || 0);
+            }
+            // Then managers (admins are never returned here), then everyone
+            // else — so team hierarchy is obvious at a glance.
+            const priority = (p) =>
+                p.role === 'admin'   ? 0
+              : p.role === 'manager' ? 1
+              :                        2;
+            const pa = priority(a), pb = priority(b);
+            if (pa !== pb) return pa - pb;
             const lastCmp = (a.last_name || '').localeCompare(b.last_name || '');
             return lastCmp !== 0 ? lastCmp : (a.first_name || '').localeCompare(b.first_name || '');
         });
@@ -773,11 +786,25 @@ export default function ManagerDashboard() {
                                     : person.role === 'caretaker' ? { bg: 'rgba(59,130,246,0.18)', fg: '#1d4ed8' }
                                     : person.role === 'security'  ? { bg: 'rgba(168,85,247,0.18)', fg: '#7e22ce' }
                                     : { bg: 'rgba(121,162,128,0.18)', fg: MGR_GREEN_DARK };
+                                const isMe = !!person.is_self;
                                 return (
-                                    <div key={person.employee_id} className="glass-panel" style={{ padding: '20px', background: 'rgba(255, 245, 231, 0.78)', border: '1px solid rgba(121,162,128,0.25)' }}>
+                                    <div key={person.employee_id} className="glass-panel" style={{
+                                        padding: '20px',
+                                        background: isMe ? 'rgba(121,162,128,0.18)' : 'rgba(255, 245, 231, 0.78)',
+                                        border: isMe ? '2px solid rgba(121,162,128,0.55)' : '1px solid rgba(121,162,128,0.25)',
+                                    }}>
                                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '15px' }}>
                                             <div>
-                                                <h3 style={{ margin: '0 0 5px', color: 'var(--color-text-dark)' }}>{person.first_name} {person.last_name}</h3>
+                                                <h3 style={{ margin: '0 0 5px', color: 'var(--color-text-dark)', display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                                                    {person.first_name} {person.last_name}
+                                                    {isMe && (
+                                                        <span style={{
+                                                            fontSize: '10px', padding: '2px 8px', borderRadius: '10px',
+                                                            background: MGR_GREEN, color: 'white',
+                                                            fontWeight: 700, letterSpacing: '0.06em',
+                                                        }}>(Me)</span>
+                                                    )}
+                                                </h3>
                                                 <span style={{
                                                     fontSize: '12px', padding: '4px 10px', borderRadius: '20px',
                                                     background: 'rgba(121,162,128,0.18)', color: MGR_GREEN_DARK, fontWeight: 600,
@@ -794,10 +821,12 @@ export default function ManagerDashboard() {
                                             </span>
                                         </div>
                                         <div style={{ fontSize: '14px', color: MGR_GREEN_DARK, display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                                            <p style={{ margin: 0 }}>Shift: <strong style={{ color: 'var(--color-text-dark)' }}>{person.shift_timeframe || 'N/A'}</strong></p>
+                                            <p style={{ margin: 0 }}>Shift: <strong style={{ color: 'var(--color-text-dark)' }}>{formatShiftTimeframe(person.shift_timeframe) || 'N/A'}</strong></p>
                                             <p style={{ margin: 0 }}>Contact: <strong style={{ color: 'var(--color-text-dark)' }}>{person.contact_info || 'N/A'}</strong></p>
-                                            {person.vets && <p style={{ margin: 0 }}>Specialty: <strong style={{ color: 'var(--color-text-dark)' }}>{person.vets.specialty}</strong></p>}
-                                            {person.animal_caretakers && <p style={{ margin: 0 }}>Species: <strong style={{ color: 'var(--color-text-dark)' }}>{person.animal_caretakers.specialization_species}</strong></p>}
+                                            {person.license_no             && <p style={{ margin: 0 }}>Vet License: <strong style={{ color: 'var(--color-text-dark)' }}>{person.license_no}</strong></p>}
+                                            {person.specialty              && <p style={{ margin: 0 }}>Specialty: <strong style={{ color: 'var(--color-text-dark)' }}>{person.specialty}</strong></p>}
+                                            {person.specialization_species && <p style={{ margin: 0 }}>Species: <strong style={{ color: 'var(--color-text-dark)' }}>{person.specialization_species}</strong></p>}
+                                            {person.office_location        && <p style={{ margin: 0 }}>Office: <strong style={{ color: 'var(--color-text-dark)' }}>{person.office_location}</strong></p>}
                                         </div>
                                     </div>
                                 );
@@ -873,19 +902,15 @@ export default function ManagerDashboard() {
                         </div>
                     )}
 
-                    {/* Pagination footer — hidden when a date range is active
-                        (the fetch already pulls everything in range). */}
-                    {!activityLoading && !activityHasRange && (
+                    {/* Pager is always shown when there's more than one page,
+                        regardless of whether a date range is active. Capped
+                        at 25/page so the list never dumps everything at once. */}
+                    {!activityLoading && (
                         <ZooPaginator
                             page={activityPage}
                             totalPages={activityMaxPage + 1}
                             onChange={(p) => setActivityPage(p)}
                         />
-                    )}
-                    {!activityLoading && activityHasRange && activityTotal > 0 && (
-                        <p style={{ marginTop: '12px', fontSize: '12px', color: MGR_GREEN_DARK, opacity: 0.8 }}>
-                            Showing all {activityTotal} result{activityTotal === 1 ? '' : 's'} in the selected range.
-                        </p>
                     )}
                 </div>
             )}

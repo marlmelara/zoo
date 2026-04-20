@@ -9,6 +9,9 @@ import {
 } from '../../../components/EmployeeDashboardPanels';
 import { Clock, User } from 'lucide-react';
 
+const GREEN      = 'rgb(123, 144, 79)';
+const GREEN_DARK = 'rgb(102, 122, 66)';
+
 const TABS = ['My Schedule', 'My Events', 'Supplies', 'My Requests'];
 
 export default function GenEmployeeDashboard() {
@@ -208,23 +211,31 @@ export default function GenEmployeeDashboard() {
                 </div>
             </div>
 
-            {/* Tab Navigation */}
+            {/* Tab Navigation — match the green palette used across the
+                other employee dashboards so the active tab reads as "selected"
+                on the cream background (was pink accent + near-invisible
+                white 5%-alpha). */}
             <div style={{ display: 'flex', gap: '10px', marginBottom: '30px', flexWrap: 'wrap' }}>
-                {TABS.map(tab => (
-                    <button
-                        key={tab}
-                        className="glass-button"
-                        onClick={() => setActiveTab(tab)}
-                        style={{
-                            background: activeTab === tab ? 'var(--color-accent)' : 'rgba(255,255,255,0.05)',
-                            padding: '10px 20px',
-                            fontSize: '14px',
-                            fontWeight: activeTab === tab ? 700 : 400
-                        }}
-                    >
-                        {tab}
-                    </button>
-                ))}
+                {TABS.map(tab => {
+                    const active = activeTab === tab;
+                    return (
+                        <button
+                            key={tab}
+                            className="glass-button"
+                            onClick={() => setActiveTab(tab)}
+                            style={{
+                                background: active ? GREEN : 'rgba(255, 245, 231, 0.72)',
+                                color:      active ? 'white' : GREEN_DARK,
+                                border:     active ? 'none' : '1px solid rgba(121,162,128,0.25)',
+                                padding: '10px 20px',
+                                fontSize: '14px',
+                                fontWeight: active ? 700 : 600,
+                            }}
+                        >
+                            {tab}
+                        </button>
+                    );
+                })}
             </div>
 
             {/* ═══════════ MY SCHEDULE TAB ═══════════ */}
@@ -244,11 +255,14 @@ export default function GenEmployeeDashboard() {
                                         <User size={30} color="white" />
                                     </div>
                                     <div>
-                                        <h2 style={{ margin: 0 }}>{profile.first_name} {profile.last_name}</h2>
+                                        <h2 style={{ margin: 0, color: 'var(--color-text-dark)' }}>
+                                            {profile.first_name} {profile.last_name}
+                                        </h2>
                                         <span style={{
                                             fontSize: '13px', padding: '4px 10px', borderRadius: '20px',
-                                            background: role === 'security' ? 'rgba(168,85,247,0.2)' : 'rgba(236,72,153,0.2)',
-                                            textTransform: 'capitalize'
+                                            background: 'rgba(121,162,128,0.18)',
+                                            color: GREEN_DARK, fontWeight: 600,
+                                            textTransform: 'capitalize',
                                         }}>
                                             {roleLabel(role)}
                                         </span>
@@ -256,24 +270,24 @@ export default function GenEmployeeDashboard() {
                                 </div>
 
                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-                                    <div style={{ background: 'rgba(255,255,255,0.05)', padding: '15px', borderRadius: '10px' }}>
-                                        <p style={{ fontSize: '12px', color: 'var(--color-text-muted)', margin: '0 0 5px' }}>Department</p>
-                                        <p style={{ fontWeight: 600, margin: 0 }}>{profile.dept_name || 'Unassigned'}</p>
+                                    <div style={{ background: 'rgba(255, 245, 231, 0.78)', padding: '15px', borderRadius: '10px', border: '1px solid rgba(121,162,128,0.25)' }}>
+                                        <p style={{ fontSize: '12px', color: GREEN_DARK, margin: '0 0 5px', fontWeight: 600 }}>Department</p>
+                                        <p style={{ fontWeight: 600, margin: 0, color: 'var(--color-text-dark)' }}>{profile.dept_name || 'Unassigned'}</p>
                                     </div>
-                                    <div style={{ background: 'rgba(255,255,255,0.05)', padding: '15px', borderRadius: '10px' }}>
-                                        <p style={{ fontSize: '12px', color: 'var(--color-text-muted)', margin: '0 0 5px' }}>Shift</p>
-                                        <p style={{ fontWeight: 600, margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                            <Clock size={16} color="var(--color-secondary)" />
+                                    <div style={{ background: 'rgba(255, 245, 231, 0.78)', padding: '15px', borderRadius: '10px', border: '1px solid rgba(121,162,128,0.25)' }}>
+                                        <p style={{ fontSize: '12px', color: GREEN_DARK, margin: '0 0 5px', fontWeight: 600 }}>Shift</p>
+                                        <p style={{ fontWeight: 600, margin: 0, color: 'var(--color-text-dark)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                            <Clock size={16} color={GREEN} />
                                             {profile.shift_timeframe || 'Not set'}
                                         </p>
                                     </div>
-                                    <div style={{ background: 'rgba(255,255,255,0.05)', padding: '15px', borderRadius: '10px' }}>
-                                        <p style={{ fontSize: '12px', color: 'var(--color-text-muted)', margin: '0 0 5px' }}>Contact</p>
-                                        <p style={{ fontWeight: 600, margin: 0 }}>{profile.contact_info || 'Not set'}</p>
+                                    <div style={{ background: 'rgba(255, 245, 231, 0.78)', padding: '15px', borderRadius: '10px', border: '1px solid rgba(121,162,128,0.25)' }}>
+                                        <p style={{ fontSize: '12px', color: GREEN_DARK, margin: '0 0 5px', fontWeight: 600 }}>Contact</p>
+                                        <p style={{ fontWeight: 600, margin: 0, color: 'var(--color-text-dark)' }}>{profile.contact_info || 'Not set'}</p>
                                     </div>
-                                    <div style={{ background: 'rgba(255,255,255,0.05)', padding: '15px', borderRadius: '10px' }}>
-                                        <p style={{ fontSize: '12px', color: 'var(--color-text-muted)', margin: '0 0 5px' }}>Pay Rate</p>
-                                        <p style={{ fontWeight: 600, margin: 0 }}>${(profile.pay_rate_cents / 100).toFixed(2)}/hr</p>
+                                    <div style={{ background: 'rgba(255, 245, 231, 0.78)', padding: '15px', borderRadius: '10px', border: '1px solid rgba(121,162,128,0.25)' }}>
+                                        <p style={{ fontSize: '12px', color: GREEN_DARK, margin: '0 0 5px', fontWeight: 600 }}>Pay Rate</p>
+                                        <p style={{ fontWeight: 600, margin: 0, color: 'var(--color-text-dark)' }}>${(profile.pay_rate_cents / 100).toFixed(2)}/hr</p>
                                     </div>
                                 </div>
                             </div>

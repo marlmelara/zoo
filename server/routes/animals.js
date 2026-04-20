@@ -257,8 +257,9 @@ router.get('/:id/medical-history', requireAuth, async (req, res) => {
 
 // PATCH /api/animals/:id/health-status — set/update the quick-look flag.
 // This is the UPDATE that fires trg_animal_sick_notify (or the healthy
-// resolver).
-router.patch('/:id/health-status', requireAuth, async (req, res) => {
+// resolver). Only animal-care roles may flag status — customers and
+// retail/security staff cannot trigger clinical alerts.
+router.patch('/:id/health-status', requireRole('admin','manager','vet','caretaker'), async (req, res) => {
     const { health_status } = req.body;
     const allowed = ['healthy','under_observation','sick','critical','recovering'];
     if (!allowed.includes(health_status)) {

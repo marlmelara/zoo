@@ -21,7 +21,7 @@ import {
 } from 'recharts';
 import {
     Calendar, Download, Database, ChevronDown, ChevronUp, TrendingUp,
-    ShoppingBag, Users, AlertCircle,
+    ShoppingBag, Users, AlertCircle, Code2,
 } from 'lucide-react';
 
 const GREEN      = 'rgb(123, 144, 79)';
@@ -139,6 +139,163 @@ function Insight({ title, body, color = GREEN }) {
                 </strong>
             </div>
             <div style={{ fontSize: '14px', color: 'var(--color-text-dark)' }}>{body}</div>
+        </div>
+    );
+}
+
+// ─── Detailed breakdown — "who bought / who joined / what sold" ──
+// Human-readable drill-down behind each aggregated chart. Shows one
+// friendly row per transaction / customer / sale item with columns a
+// zoo owner actually cares about (customer names, dates, totals).
+// Auto-refetches whenever the date range changes. No SQL on screen.
+function JoinedView({ title, subtitle, fetchUrl, columns, from, to }) {
+    const [open, setOpen]       = useState(false);
+    const [rows, setRows]       = useState([]);
+    const [loading, setLoading] = useState(false);
+    const [error, setError]     = useState(null);
+
+    React.useEffect(() => {
+        if (!open) return;
+        let alive = true;
+        setLoading(true);
+        setError(null);
+        const qs = new URLSearchParams();
+        if (from) qs.set('from', from);
+        if (to)   qs.set('to',   to);
+        import('../../../../lib/api.js').then(({ default: api }) =>
+            api.get(`${fetchUrl}${qs.toString() ? `?${qs}` : ''}`)
+        )
+            .then(d => { if (alive) setRows(Array.isArray(d) ? d : []); })
+            .catch(e => { if (alive) setError(e.message); })
+            .finally(() => { if (alive) setLoading(false); });
+        return () => { alive = false; };
+    }, [open, from, to, fetchUrl]);
+
+    const downloadCsv = () => {
+        const escape = v => v === null || v === undefined ? ''
+            : (/[",\n]/.test(String(v)) ? `"${String(v).replace(/"/g,'""')}"` : String(v));
+        const header = columns.map(c => escape(c.label)).join(',');
+        const body   = rows.map(r => columns.map(c => {
+            const raw = c.map ? c.map(r[c.key], r) : r[c.key];
+            return escape(raw);
+        }).join(',')).join('\n');
+        const blob = new Blob([`${header}\n${body}\n`], { type: 'text/csv;charset=utf-8;' });
+        const url  = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${title.replace(/\s+/g, '-').toLowerCase()}_${from || 'all'}_${to || 'now'}.csv`;
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(url), 500);
+    };
+
+    return (
+        <div style={{
+            marginTop: '28px',
+            border: `1px solid ${GREEN}55`,
+            borderRadius: '14px',
+            background: 'rgba(255, 245, 231, 0.65)',
+            overflow: 'hidden',
+        }}>
+            <button type="button" onClick={() => setOpen(o => !o)}
+                style={{
+                    width: '100%', display: 'flex', alignItems: 'center', gap: '12px',
+                    padding: '16px 20px', background: 'transparent', border: 'none',
+                    cursor: 'pointer', textAlign: 'left',
+                    color: GREEN_DARK, fontWeight: 700, fontSize: '15px',
+                    borderBottom: open ? `1px solid ${GREEN}33` : 'none',
+                }}>
+                <Database size={18} />
+                <div style={{ flex: 1 }}>
+                    <div>{title}</div>
+                    {subtitle && (
+                        <div style={{ fontSize: '12px', fontWeight: 500, opacity: 0.78, marginTop: '2px' }}>
+                            {subtitle}
+                        </div>
+                    )}
+                </div>
+                <span style={{ fontSize: '12px', fontWeight: 500, opacity: 0.75 }}>
+                    {rows.length > 0 ? `${rows.length} row${rows.length === 1 ? '' : 's'}` : ''}
+                </span>
+                {open ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+            </button>
+
+            {open && (
+                <div style={{ padding: '18px 20px 22px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '10px' }}>
+                        <div style={{ fontSize: '13px', color: GREEN_DARK }}>
+                            {loading ? 'Loading…'
+                              : error  ? <span style={{ color: '#dc2626' }}>Error: {error}</span>
+                              : rows.length === 0
+                                  ? <em>No activity in this date range.</em>
+                                  : <>Showing <strong>{rows.length}</strong> entr{rows.length === 1 ? 'y' : 'ies'} (newest first, max 500). Follows the date range above.</>}
+                        </div>
+                        {rows.length > 0 && !loading && (
+                            <button type="button" className="glass-button"
+                                onClick={downloadCsv}
+                                style={{
+                                    fontSize: '12px', padding: '7px 14px',
+                                    background: GREEN, color: 'white', fontWeight: 700,
+                                    display: 'inline-flex', alignItems: 'center', gap: '6px',
+                                }}>
+                                <Download size={13} /> Download as CSV
+                            </button>
+                        )}
+                    </div>
+
+                    <div style={{
+                        background: 'white',
+                        border: `1px solid ${GREEN}33`,
+                        borderRadius: '10px', overflow: 'auto',
+                        maxHeight: '540px',
+                    }}>
+                        {!loading && rows.length === 0 && !error ? (
+                            <div style={{ padding: '32px', textAlign: 'center', color: GREEN_DARK, opacity: 0.7, fontStyle: 'italic' }}>
+                                Nothing to show yet — try widening the date range.
+                            </div>
+                        ) : (
+                            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                                <thead style={{ position: 'sticky', top: 0, background: 'white', zIndex: 1 }}>
+                                    <tr style={{ borderBottom: `2px solid ${GREEN}55`, textAlign: 'left' }}>
+                                        {columns.map(c => (
+                                            <th key={c.key} style={{
+                                                padding: '10px 14px',
+                                                color: GREEN_DARK, whiteSpace: 'nowrap',
+                                                fontWeight: 700,
+                                                textTransform: 'uppercase',
+                                                letterSpacing: '0.04em',
+                                                fontSize: '11px',
+                                            }}>
+                                                {c.label}
+                                            </th>
+                                        ))}
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {rows.map((r, i) => (
+                                        <tr key={i} style={{
+                                            borderBottom: '1px solid rgba(121,162,128,0.12)',
+                                            background: i % 2 === 0 ? 'transparent' : 'rgba(121,162,128,0.05)',
+                                        }}>
+                                            {columns.map(c => (
+                                                <td key={c.key} style={{
+                                                    padding: '9px 14px',
+                                                    color: 'var(--color-text-dark)',
+                                                    whiteSpace: c.wrap ? 'normal' : 'nowrap',
+                                                    maxWidth: c.wrap ? '320px' : undefined,
+                                                }}>
+                                                    {c.render ? c.render(r[c.key], r)
+                                                     : (c.map ? c.map(r[c.key], r)
+                                                     : (r[c.key] ?? '—'))}
+                                                </td>
+                                            ))}
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        )}
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
@@ -346,6 +503,30 @@ export function EventPerformanceTab() {
                     </ResponsiveContainer>
                 )}
             </div>
+
+            <JoinedView
+                title="Ticket Sales Detail"
+                subtitle="Every ticket sold per event, with who bought it and when."
+                from={from}
+                to={to}
+                fetchUrl="/dashboard/analytics/event-performance/rows"
+                columns={[
+                    { key: 'event_date',       label: 'Event Date',
+                      render: v => v ? String(v).slice(0,10) : '—' },
+                    { key: 'event_title',      label: 'Event', wrap: true },
+                    { key: 'venue_name',       label: 'Venue' },
+                    { key: 'max_capacity',     label: 'Capacity',
+                      render: v => v != null ? `${v}` : '—' },
+                    { key: 'ticket_type',      label: 'Ticket Type',
+                      render: v => v ? (v.charAt(0).toUpperCase() + v.slice(1)) : 'Unsold' },
+                    { key: 'price_cents',      label: 'Price',
+                      render: v => v != null ? dollars(v) : '—' },
+                    { key: 'customer_name',    label: 'Customer', wrap: true,
+                      render: (v, r) => v && v.trim() ? v : (r.customer_email ? r.customer_email : <em style={{ opacity: 0.55 }}>Guest</em>) },
+                    { key: 'transaction_date', label: 'Purchased On',
+                      render: v => v ? new Date(v).toLocaleDateString() : '—' },
+                ]}
+            />
         </div>
     );
 }
@@ -467,6 +648,33 @@ export function MembershipInsightsTab() {
                     </ResponsiveContainer>
                 )}
             </div>
+
+            <JoinedView
+                title="Customer Directory"
+                subtitle="Every guest who signed up in this window, how much they've spent, and whether they're a paid member."
+                from={from}
+                to={to}
+                fetchUrl="/dashboard/analytics/membership-insights/rows"
+                columns={[
+                    { key: 'first_name',           label: 'Customer', wrap: true,
+                      render: (_, r) => `${r.first_name || ''} ${r.last_name || ''}`.trim() || '—' },
+                    { key: 'email',                label: 'Email', wrap: true },
+                    { key: 'is_member',            label: 'Membership',
+                      render: (v, r) => v
+                        ? <span style={{ color: '#047857', fontWeight: 700, textTransform: 'capitalize' }}>
+                              {r.membership_type || 'Member'}
+                          </span>
+                        : <span style={{ color: 'var(--color-text-muted)' }}>Guest</span> },
+                    { key: 'created_at',           label: 'Signed Up',
+                      render: v => v ? new Date(v).toLocaleDateString() : '—' },
+                    { key: 'membership_start',     label: 'Member Since',
+                      render: v => v ? new Date(v).toLocaleDateString() : '—' },
+                    { key: 'lifetime_tx_count',    label: 'Visits',
+                      render: v => v || 0 },
+                    { key: 'lifetime_spend_cents', label: 'Total Spent',
+                      render: v => dollars(v) },
+                ]}
+            />
         </div>
     );
 }
@@ -620,6 +828,28 @@ export function ShopPerformanceTab() {
                     </ResponsiveContainer>
                 )}
             </div>
+
+            <JoinedView
+                title="Shop Sales Detail"
+                subtitle="Every item sold — what, where, when, to whom, and for how much."
+                from={from}
+                to={to}
+                fetchUrl="/dashboard/analytics/shop-performance/rows"
+                columns={[
+                    { key: 'transaction_date',   label: 'Purchase Date',
+                      render: v => v ? new Date(v).toLocaleDateString() : '—' },
+                    { key: 'item_name',          label: 'Item', wrap: true },
+                    { key: 'category',           label: 'Category' },
+                    { key: 'shop_name',          label: 'Shop' },
+                    { key: 'quantity',           label: 'Qty' },
+                    { key: 'price_at_sale_cents',label: 'Unit Price',
+                      render: v => dollars(v) },
+                    { key: 'line_total_cents',   label: 'Line Total',
+                      render: v => <strong>{dollars(v)}</strong> },
+                    { key: 'customer_name',      label: 'Customer', wrap: true,
+                      render: (v, r) => v && v.trim() ? v : (r.customer_email ? r.customer_email : <em style={{ opacity: 0.55 }}>Guest</em>) },
+                ]}
+            />
         </div>
     );
 }

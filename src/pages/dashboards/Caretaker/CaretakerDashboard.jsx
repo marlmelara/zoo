@@ -7,7 +7,8 @@ import { useToast } from '../../../components/Feedback';
 import {
     EmployeeSuppliesPanel, EmployeeRequestsPanel, EmployeeEventsPanel,
 } from '../../../components/EmployeeDashboardPanels';
-import { Cat } from 'lucide-react';
+import { setHealthStatus } from '../../../api/animals';
+import { Cat, Heart } from 'lucide-react';
 
 const TABS = ['My Animals', 'My Events', 'Supplies', 'My Requests'];
 
@@ -204,10 +205,43 @@ export default function CaretakerDashboard() {
                                             {animal.species_binomial}
                                         </p>
                                     )}
-                                    <div style={{ fontSize: '14px', color: 'var(--color-text-muted)' }}>
+                                    <div style={{ fontSize: '14px', color: 'var(--color-text-muted)', marginBottom: '12px' }}>
                                         <p>Age: {animal.age} years</p>
                                         <p>Zone: {animal.zone_name || 'Unassigned'}</p>
                                     </div>
+
+                                    {/* Health-status flag — caretakers can raise a concern;
+                                        flipping into sick/critical fires the trigger that
+                                        pages every vet, caretaker, vet/animal-care manager,
+                                        and admin. */}
+                                    <label style={{
+                                        display: 'flex', alignItems: 'center', gap: '6px',
+                                        fontSize: '11px', fontWeight: 700, letterSpacing: '0.04em',
+                                        textTransform: 'uppercase',
+                                        color: 'rgb(102, 122, 66)', marginBottom: '4px',
+                                    }}>
+                                        <Heart size={12} /> Health status
+                                    </label>
+                                    <select
+                                        className="glass-input"
+                                        defaultValue={animal.health_status || 'healthy'}
+                                        onChange={async (e) => {
+                                            try {
+                                                await setHealthStatus(animal.animal_id, e.target.value);
+                                                toast.success(`Marked ${animal.name} as ${e.target.value.replace('_', ' ')}.`);
+                                                fetchMyAnimals(resolvedEmpId || employeeId);
+                                            } catch (err) {
+                                                toast.error('Failed to update: ' + err.message);
+                                            }
+                                        }}
+                                        style={{ fontSize: '13px', padding: '6px 8px', width: '100%' }}
+                                    >
+                                        <option value="healthy">Healthy</option>
+                                        <option value="under_observation">Under observation</option>
+                                        <option value="recovering">Recovering</option>
+                                        <option value="sick">Sick</option>
+                                        <option value="critical">Critical</option>
+                                    </select>
                                 </div>
                             ))}
                         </div>

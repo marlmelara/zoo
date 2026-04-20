@@ -224,6 +224,102 @@ router.get('/analytics/membership-insights', requireRole('admin','manager'), asy
     }
 });
 
+// ─── "Joined view" endpoints — return the UNAGGREGATED rows produced
+// by the underlying JOIN, so the Admin can see the raw materials each
+// chart was built from. Limited to 500 rows per request to keep
+// payloads sane; the UI calls these on demand from a collapsible
+// "Joined View" panel.
+
+router.get('/analytics/event-performance/rows', requireRole('admin','manager'), async (req, res) => {
+    try {
+        const { from, to } = req.query;
+        const w = buildDateWhere('ev.event_date', from, to);
+        const [rows] = await db.query(
+            `SELECT tk.ticket_id, tk.type AS ticket_type, tk.price_cents,
+                    ev.event_id, ev.title AS event_title,
+                    ev.event_date, ev.max_capacity,
+                    v.venue_name, v.capacity AS venue_capacity,
+                    t.transaction_id, t.transaction_date,
+                    c.customer_id,
+                    TRIM(CONCAT(COALESCE(c.first_name, ''), ' ', COALESCE(c.last_name, ''))) AS customer_name,
+                    c.email AS customer_email
+               FROM events ev
+               LEFT JOIN venues       v  ON v.venue_id = ev.venue_id
+               LEFT JOIN tickets      tk ON tk.event_id = ev.event_id
+               LEFT JOIN transactions t  ON t.transaction_id = tk.transaction_id
+               LEFT JOIN customers    c  ON c.customer_id = t.customer_id
+              WHERE COALESCE(ev.is_archived, 0) = 0${w.sql}
+              ORDER BY ev.event_date DESC, tk.ticket_id ASC
+              LIMIT 500`,
+            w.vals
+        );
+        return res.json(rows);
+    } catch (err) {
+        return res.status(500).json({ error: err.message });
+    }
+});
+
+router.get('/analytics/membership-insights/rows', requireRole('admin','manager'), async (req, res) => {
+    try {
+        const { from, to } = req.query;
+        const dateCol = `COALESCE(c.membership_start, c.created_at)`;
+        const w = buildDateWhere(dateCol, from, to);
+        const [rows] = await db.query(
+            `SELECT c.customer_id, c.first_name, c.last_name, c.email,
+                    c.is_member, c.membership_type, c.membership_start, c.created_at,
+                    DATE_FORMAT(${dateCol}, '%Y-%m')        AS signup_period,
+                    COALESCE(t.tx_count, 0)                  AS lifetime_tx_count,
+                    COALESCE(t.lifetime_spend_cents, 0)      AS lifetime_spend_cents
+               FROM customers c
+               LEFT JOIN (
+                     SELECT customer_id,
+                            COUNT(*) AS tx_count,
+                            SUM(total_amount_cents) AS lifetime_spend_cents
+                       FROM transactions
+                      WHERE is_donation = 0 AND customer_id IS NOT NULL
+                      GROUP BY customer_id
+               ) t ON t.customer_id = c.customer_id
+              ${w.firstSql}
+              ORDER BY ${dateCol} DESC, c.customer_id DESC
+              LIMIT 500`,
+            w.vals
+        );
+        return res.json(rows);
+    } catch (err) {
+        return res.status(500).json({ error: err.message });
+    }
+});
+
+router.get('/analytics/shop-performance/rows', requireRole('admin','manager'), async (req, res) => {
+    try {
+        const { from, to } = req.query;
+        const w = buildDateWhere('t.transaction_date', from, to);
+        const [rows] = await db.query(
+            `SELECT si.sale_item_id, si.transaction_id, si.quantity, si.price_at_sale_cents,
+                    (si.quantity * si.price_at_sale_cents) AS line_total_cents,
+                    i.item_id, i.item_name,
+                    COALESCE(i.category, 'Misc') AS category,
+                    s.shop_id, s.name AS shop_name,
+                    t.transaction_date,
+                    c.customer_id,
+                    TRIM(CONCAT(COALESCE(c.first_name, ''), ' ', COALESCE(c.last_name, ''))) AS customer_name,
+                    c.email AS customer_email
+               FROM sale_items si
+               JOIN inventory   i ON i.item_id       = si.item_id
+               LEFT JOIN shops  s ON s.shop_id       = i.outlet_id
+               LEFT JOIN transactions t ON t.transaction_id = si.transaction_id
+               LEFT JOIN customers    c ON c.customer_id = t.customer_id
+              WHERE 1=1${w.sql}
+              ORDER BY t.transaction_date DESC, si.sale_item_id ASC
+              LIMIT 500`,
+            w.vals
+        );
+        return res.json(rows);
+    } catch (err) {
+        return res.status(500).json({ error: err.message });
+    }
+});
+
 // GET /api/dashboard/analytics/shop-performance
 // Joins: sale_items + inventory + transactions (+ shops).
 // Answers "which categories/items drive retail revenue?"

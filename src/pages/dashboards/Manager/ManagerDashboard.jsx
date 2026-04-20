@@ -48,12 +48,34 @@ function HealthBadge({ status }) {
     );
 }
 
-const TABS = ['Overview', 'Supply Requests', 'My Staff', 'Animal Assignments', 'Events', 'Activity Log'];
+// Managers whose department doesn't work with animals (Retail, Security,
+// Admin/Ops) shouldn't see animal workflows — matches the App.jsx check
+// for the /dashboard/animals route. Case-insensitive substring against
+// the dept name so "Vet", "Veterinary Services", "Animal Care", "Animal
+// Health" etc. all qualify.
+const isAnimalDept = (deptName) => {
+    const n = (deptName || '').toLowerCase();
+    return n.includes('vet') || n.includes('animal') || n.includes('care');
+};
 
 export default function ManagerDashboard() {
-    const { user, employeeId, deptId, role } = useAuth();
+    const { user, employeeId, deptId, deptName, role } = useAuth();
     const toast = useToast();
     const [activeTab, setActiveTab] = useState('Overview');
+
+    // Animal Assignments tab is hidden unless the user is admin or a
+    // manager in an animal-facing department.
+    const showAnimalTab = role === 'admin' || (role === 'manager' && isAnimalDept(deptName));
+    const TABS = showAnimalTab
+        ? ['Overview', 'Supply Requests', 'My Staff', 'Animal Assignments', 'Events', 'Activity Log']
+        : ['Overview', 'Supply Requests', 'My Staff', 'Events', 'Activity Log'];
+
+    // If the active tab just got hidden (e.g. role context loaded after
+    // mount), fall back to Overview so the page doesn't render blank.
+    React.useEffect(() => {
+        if (!TABS.includes(activeTab)) setActiveTab('Overview');
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [showAnimalTab]);
 
     // Resolved IDs — fetched directly from DB to avoid context timing issues
     const [resolvedEmpId, setResolvedEmpId] = useState(employeeId);

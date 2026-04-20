@@ -153,6 +153,40 @@ router.post('/:id/decrement', requireRole('admin','manager','retail'), async (re
     }
 });
 
+// PATCH /api/inventory/:id/remove — subtract quantity from stock_count.
+// Mirror of /restock so managers can write off damaged/expired inventory
+// directly from the dashboard without going through a supply request.
+// GREATEST(...,0) guards against stock going negative.
+router.patch('/:id/remove', requireRole('admin', 'manager', 'retail'), async (req, res) => {
+    const { quantity, reason } = req.body;
+    if (!quantity || quantity <= 0) return res.status(400).json({ error: 'Invalid quantity.' });
+    try {
+        await db.query(
+            'UPDATE inventory SET stock_count = GREATEST(stock_count - ?, 0) WHERE item_id = ?',
+            [quantity, req.params.id]
+        );
+        const [rows] = await db.query(
+            'SELECT item_name FROM inventory WHERE item_id = ?', [req.params.id]
+        );
+        const itemName = rows[0]?.item_name || `item #${req.params.id}`;
+        await db.query(
+            `INSERT INTO activity_log
+             (action_type, description, performed_by, target_type, target_id, metadata)
+             VALUES (?, ?, ?, 'inventory', ?, ?)`,
+            [
+                'supply_removed',
+                `Removed ${quantity}x ${itemName}${reason ? ` (${reason})` : ''}`,
+                req.user?.employeeId || null,
+                req.params.id,
+                JSON.stringify({ source: 'retail', quantity, item_name: itemName, reason: reason || null }),
+            ]
+        );
+        return res.json({ success: true });
+    } catch (err) {
+        return res.status(500).json({ error: err.message });
+    }
+});
+
 // DELETE /api/inventory/:id — hard delete a retail item. Admin + manager only.
 // sale_items / shop_items FKs are ON DELETE SET NULL / CASCADE so history stays intact.
 router.delete('/:id', requireRole('admin','manager'), async (req, res) => {

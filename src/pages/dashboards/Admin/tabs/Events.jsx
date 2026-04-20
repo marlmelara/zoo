@@ -3,6 +3,12 @@ import { createPortal } from 'react-dom';
 import { getAdminEvents as fetchEventsApi } from '../../../../api/events';
 import api from '../../../../lib/api';
 import { Calendar, Users, X, Plus, User, Cat, MapPin, Clock, Trash2, AlertTriangle, Archive, Pencil } from 'lucide-react';
+
+// Descriptions are free-form but previously had no cap, so a pasted wall
+// of text would push the events card off the layout. 400 chars is roughly
+// ~70 words — plenty for "Learn about lemurs & have snacks with the crew"
+// style blurbs without ever overflowing the card.
+const DESCRIPTION_MAX = 400;
 import { StatusFilter } from '../../../../components/AnimalsPanel';
 import BulkActionBar from '../../../../components/BulkActionBar';
 import { useToast, useConfirm } from '../../../../components/Feedback';
@@ -30,11 +36,13 @@ export default function Events() {
   const [animals, setAnimals] = useState([]);
   const [assignmentForm, setAssignmentForm] = useState({ employee_id: '', animal_id: '' });
 
-  // Create event modal
+  // Create event modal — max_capacity starts empty so the field reads as
+  // "pick a venue first". Once a venue is selected, it auto-fills with the
+  // venue's capacity and is hard-capped to that value on edit.
   const [showCreate, setShowCreate] = useState(false);
   const [createForm, setCreateForm] = useState({
     title: '', description: '', event_date: '', venue_id: '',
-    start_time: '', end_time: '', max_capacity: 100, ticket_price_cents: 0,
+    start_time: '', end_time: '', max_capacity: '', ticket_price_cents: 0,
   });
   const [createError, setCreateError] = useState('');
 
@@ -197,7 +205,7 @@ export default function Events() {
       setShowCreate(false);
       setCreateForm({
         title: '', description: '', event_date: '', venue_id: '',
-        start_time: '', end_time: '', max_capacity: 100, ticket_price_cents: 0,
+        start_time: '', end_time: '', max_capacity: '', ticket_price_cents: 0,
       });
       loadEvents();
     } catch (err) {
@@ -619,7 +627,14 @@ export default function Events() {
 
               <div>
                 <label style={editLabelStyle}>Description</label>
-                <textarea className="glass-input" style={{ minHeight: '60px', resize: 'vertical' }} value={createForm.description} onChange={e => setCreateForm(p => ({ ...p, description: e.target.value }))} placeholder="Optional description" />
+                <textarea className="glass-input" style={{ minHeight: '60px', resize: 'vertical' }}
+                  value={createForm.description}
+                  onChange={e => setCreateForm(p => ({ ...p, description: e.target.value.slice(0, DESCRIPTION_MAX) }))}
+                  maxLength={DESCRIPTION_MAX}
+                  placeholder="Optional description" />
+                <div style={{ fontSize: '10px', color: GREEN_DARK, opacity: 0.7, textAlign: 'right', marginTop: '2px' }}>
+                  {createForm.description.length} / {DESCRIPTION_MAX}
+                </div>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
@@ -629,7 +644,20 @@ export default function Events() {
                 </div>
                 <div>
                   <label style={editLabelStyle}>Venue <span style={{ color: '#b91c1c' }}>*</span></label>
-                  <select className="glass-input" value={createForm.venue_id} onChange={e => setCreateForm(p => ({ ...p, venue_id: e.target.value }))} required>
+                  <select className="glass-input" value={createForm.venue_id}
+                    onChange={e => {
+                      const venueId = e.target.value;
+                      // Auto-fill max_capacity with the chosen venue's capacity.
+                      // If the previous value exceeded the new venue's cap, clamp it.
+                      const v = venues.find(vv => String(vv.venue_id) === venueId);
+                      const current = parseInt(createForm.max_capacity, 10);
+                      const nextCap = v
+                        ? (Number.isFinite(current) && current > 0 && current <= v.capacity
+                             ? current
+                             : v.capacity)
+                        : '';
+                      setCreateForm(p => ({ ...p, venue_id: venueId, max_capacity: nextCap }));
+                    }} required>
                     <option value="">Select venue...</option>
                     {venues.map(v => <option key={v.venue_id} value={v.venue_id}>{v.venue_name} (Cap: {v.capacity})</option>)}
                   </select>
@@ -649,8 +677,41 @@ export default function Events() {
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                 <div>
-                  <label style={editLabelStyle}>Max Capacity</label>
-                  <input type="number" className="glass-input" value={createForm.max_capacity} onChange={e => setCreateForm(p => ({ ...p, max_capacity: e.target.value }))} min={1} />
+                  {(() => {
+                    const createVenue = venues.find(v => String(v.venue_id) === String(createForm.venue_id));
+                    const venueCap = createVenue?.capacity ?? null;
+                    return (
+                      <>
+                        <label style={editLabelStyle}>
+                          Max Capacity
+                          {venueCap != null && (
+                            <span style={{ color: GREEN_DARK, opacity: 0.7, fontWeight: 500, textTransform: 'none', letterSpacing: 0, fontSize: '10px', marginLeft: 6 }}>
+                              (max {venueCap})
+                            </span>
+                          )}
+                        </label>
+                        <input type="number" className="glass-input"
+                          value={createForm.max_capacity}
+                          onChange={e => {
+                            // Clamp to venue capacity so the field can never be
+                            // higher than the venue allows; empty string is fine
+                            // (lets the user clear + retype).
+                            let v = e.target.value;
+                            if (v !== '' && venueCap != null) {
+                              const n = parseInt(v, 10);
+                              if (Number.isFinite(n) && n > venueCap) v = String(venueCap);
+                            }
+                            setCreateForm(p => ({ ...p, max_capacity: v }));
+                          }}
+                          min={1}
+                          max={venueCap ?? undefined}
+                          disabled={!createForm.venue_id}
+                          placeholder={createForm.venue_id ? '' : 'Select venue first'}
+                          required
+                        />
+                      </>
+                    );
+                  })()}
                 </div>
                 <div>
                   <label style={editLabelStyle}>Ticket Price ($)</label>
@@ -694,7 +755,14 @@ export default function Events() {
               </div>
               <div>
                 <label style={editLabelStyle}>Description</label>
-                <textarea className="glass-input" style={{ minHeight: '60px', resize: 'vertical' }} value={editForm.description} onChange={e => setEditForm({ ...editForm, description: e.target.value })} />
+                <textarea className="glass-input" style={{ minHeight: '60px', resize: 'vertical' }}
+                  value={editForm.description || ''}
+                  onChange={e => setEditForm({ ...editForm, description: e.target.value.slice(0, DESCRIPTION_MAX) })}
+                  maxLength={DESCRIPTION_MAX}
+                />
+                <div style={{ fontSize: '10px', color: GREEN_DARK, opacity: 0.7, textAlign: 'right', marginTop: '2px' }}>
+                  {(editForm.description || '').length} / {DESCRIPTION_MAX}
+                </div>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                 <div>
@@ -703,7 +771,20 @@ export default function Events() {
                 </div>
                 <div>
                   <label style={editLabelStyle}>Venue *</label>
-                  <select required className="glass-input" value={editForm.venue_id} onChange={e => setEditForm({ ...editForm, venue_id: e.target.value })}>
+                  <select required className="glass-input" value={editForm.venue_id}
+                    onChange={e => {
+                      const venueId = e.target.value;
+                      const v = venues.find(vv => String(vv.venue_id) === venueId);
+                      const current = parseInt(editForm.max_capacity, 10);
+                      // Clamp the existing capacity down to the new venue's
+                      // cap if it exceeds; otherwise keep the user's value.
+                      const nextCap = v
+                        ? (Number.isFinite(current) && current > 0 && current <= v.capacity
+                             ? current
+                             : v.capacity)
+                        : '';
+                      setEditForm({ ...editForm, venue_id: venueId, max_capacity: nextCap });
+                    }}>
                     <option value="">Select venue...</option>
                     {venues.map(v => <option key={v.venue_id} value={v.venue_id}>{v.venue_name} (Cap: {v.capacity})</option>)}
                   </select>
@@ -721,8 +802,38 @@ export default function Events() {
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                 <div>
-                  <label style={editLabelStyle}>Max Capacity</label>
-                  <input type="number" min={1} className="glass-input" value={editForm.max_capacity} onChange={e => setEditForm({ ...editForm, max_capacity: e.target.value })} />
+                  {(() => {
+                    const editVenue = venues.find(v => String(v.venue_id) === String(editForm.venue_id));
+                    const venueCap = editVenue?.capacity ?? null;
+                    return (
+                      <>
+                        <label style={editLabelStyle}>
+                          Max Capacity
+                          {venueCap != null && (
+                            <span style={{ color: GREEN_DARK, opacity: 0.7, fontWeight: 500, textTransform: 'none', letterSpacing: 0, fontSize: '10px', marginLeft: 6 }}>
+                              (max {venueCap})
+                            </span>
+                          )}
+                        </label>
+                        <input type="number" className="glass-input"
+                          value={editForm.max_capacity ?? ''}
+                          onChange={e => {
+                            let v = e.target.value;
+                            if (v !== '' && venueCap != null) {
+                              const n = parseInt(v, 10);
+                              if (Number.isFinite(n) && n > venueCap) v = String(venueCap);
+                            }
+                            setEditForm({ ...editForm, max_capacity: v });
+                          }}
+                          min={1}
+                          max={venueCap ?? undefined}
+                          disabled={!editForm.venue_id}
+                          placeholder={editForm.venue_id ? '' : 'Select venue first'}
+                          required
+                        />
+                      </>
+                    );
+                  })()}
                 </div>
                 <div>
                   <label style={editLabelStyle}>Ticket Price ($)</label>

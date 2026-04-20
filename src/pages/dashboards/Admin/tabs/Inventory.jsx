@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import api from '../../../../lib/api';
 import { useAuth } from '../../../../contexts/AuthContext';
 import {
-    ShoppingBag, AlertTriangle, Package, Plus, Trash2, Briefcase,
+    ShoppingBag, AlertTriangle, Package, Plus, Minus, Trash2, Briefcase,
     Stethoscope, PawPrint, Shield, Activity, ClipboardList,
     Pencil, X, ImagePlus,
 } from 'lucide-react';
@@ -347,14 +347,58 @@ export default function Inventory() {
             if (item.source === 'retail') {
                 await api.patch(`/inventory/${item.id}/restock`, { quantity: qty });
             } else {
-                // operational supplies don't have a restock endpoint; fall back
-                // to approving a zero-round-trip manager restock via PATCH.
-                await api.patch(`/supplies/${item.id}`, { stock_count_delta: qty });
+                await api.patch(`/supplies/${item.id}/restock`, { quantity: qty });
             }
             toast.success(`Restocked ${item.name} +${qty}.`);
             fetchAll();
         } catch (err) {
             toast.error('Restock failed: ' + err.message);
+        }
+    }
+
+    // Manager-driven write-off (damaged/expired/spoiled). Logs an activity
+    // entry so the Activity tab shows who removed stock and why — same audit
+    // trail as restocks.
+    async function handleRemove(item) {
+        const amt = await prompt({
+            title: `Remove stock — ${item.name}`,
+            message: `Current stock: ${item.stock}. Enter the quantity to remove (damaged, expired, lost, etc.).`,
+            placeholder: 'e.g. 3',
+            inputType: 'number',
+            defaultValue: '1',
+            confirmLabel: 'Remove',
+        });
+        if (amt == null) return;
+        const qty = parseInt(amt);
+        if (!(qty > 0)) return;
+        if (qty > item.stock) {
+            const ok = await confirm({
+                title: 'Remove more than in stock?',
+                message: `Only ${item.stock} in stock — removing ${qty} will leave the count at 0.`,
+                confirmLabel: 'Remove anyway',
+                tone: 'danger',
+            });
+            if (!ok) return;
+        }
+        const reason = await prompt({
+            title: 'Reason (optional)',
+            message: 'Add a short note explaining why — this shows in the activity log.',
+            placeholder: 'e.g. expired, damaged in transit',
+            inputType: 'text',
+            defaultValue: '',
+            confirmLabel: 'Confirm',
+        });
+        if (reason === null) return; // user cancelled
+        try {
+            if (item.source === 'retail') {
+                await api.patch(`/inventory/${item.id}/remove`, { quantity: qty, reason: reason || null });
+            } else {
+                await api.patch(`/supplies/${item.id}/remove`, { quantity: qty, reason: reason || null });
+            }
+            toast.success(`Removed ${qty} × ${item.name}.`);
+            fetchAll();
+        } catch (err) {
+            toast.error('Remove failed: ' + err.message);
         }
     }
 
@@ -635,6 +679,7 @@ export default function Inventory() {
                     selected={selected}
                     toggleSelect={toggleSelect}
                     onRestock={handleRestock}
+                    onRemove={canManage ? handleRemove : null}
                     onEdit={canManage ? startEditRetail : null}
                 />
             )}
@@ -686,7 +731,7 @@ export default function Inventory() {
 // Sub-components
 // ═══════════════════════════════════════════════════════════════
 
-function ItemsList({ loading, items, manageMode, selected, toggleSelect, onRestock, onEdit }) {
+function ItemsList({ loading, items, manageMode, selected, toggleSelect, onRestock, onRemove, onEdit }) {
     if (loading) return <p style={{ color: GREEN_DARK }}>Loading inventory...</p>;
     if (items.length === 0) return (
         <div className="glass-panel" style={{ padding: '40px', textAlign: 'center', color: GREEN_DARK, background: 'rgba(255, 245, 231, 0.72)' }}>
@@ -781,6 +826,7 @@ function ItemsList({ loading, items, manageMode, selected, toggleSelect, onResto
                                         </button>
                                     )}
                                     <button onClick={e => { e.stopPropagation(); onRestock(item); }}
+                                        title="Add stock"
                                         style={{
                                             padding: '6px 14px', fontSize: '12px', fontWeight: 600,
                                             background: GREEN, color: 'white', border: 'none',
@@ -789,6 +835,19 @@ function ItemsList({ loading, items, manageMode, selected, toggleSelect, onResto
                                         }}>
                                         <Plus size={14} /> Restock
                                     </button>
+                                    {onRemove && (
+                                        <button onClick={e => { e.stopPropagation(); onRemove(item); }}
+                                            title="Remove stock (damage / expiry / loss)"
+                                            style={{
+                                                padding: '6px 14px', fontSize: '12px', fontWeight: 600,
+                                                background: 'rgba(239,68,68,0.15)', color: '#b91c1c',
+                                                border: '1px solid rgba(239,68,68,0.35)',
+                                                borderRadius: '8px', cursor: 'pointer',
+                                                display: 'flex', alignItems: 'center', gap: '5px',
+                                            }}>
+                                            <Minus size={14} /> Remove
+                                        </button>
+                                    )}
                                 </div>
                             )}
                         </div>

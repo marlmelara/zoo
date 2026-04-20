@@ -251,7 +251,12 @@ export default function HoursDashboard() {
                             return (
                                 <div key={i} style={{
                                     display: 'grid',
-                                    gridTemplateColumns: '160px 110px 110px 90px 1fr 40px',
+                                    // Start/End widened from 110px → 150px so the
+                                    // browser-native time input has room to render
+                                    // its AM/PM selector. At 110px Chrome/Safari
+                                    // clipped the "AM"/"PM" of the End field
+                                    // because the hours column pushed it mid-grid.
+                                    gridTemplateColumns: '160px 150px 150px 90px 1fr 40px',
                                     gap: '10px', alignItems: 'end',
                                     padding: '12px', borderRadius: '10px',
                                     background: 'rgba(255, 245, 231, 0.55)',
@@ -532,7 +537,10 @@ function RequestList({ items, totalHours, formatDate, statusBadge, mode, onRevie
 const labelStyle = {
     display: 'block',
     fontSize: '11px',
-    color: 'var(--color-text-muted)',
+    // Was var(--color-text-muted) — too low-contrast on the cream panel,
+    // making "Start"/"End" hard to read. GREEN_DARK matches the rest of
+    // the dashboard's label color.
+    color: GREEN_DARK,
     marginBottom: '4px',
     fontWeight: 600,
 };

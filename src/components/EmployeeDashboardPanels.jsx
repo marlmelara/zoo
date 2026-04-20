@@ -4,9 +4,10 @@
 // slightly-different copy — drifting on button colors, missing threshold
 // displays, and inconsistent paginator support.
 import React, { useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
     Package, AlertTriangle, CheckCircle, XCircle, Clock,
-    ClipboardList, Send, Calendar,
+    ClipboardList, Send, Calendar, Pencil, X, Search,
 } from 'lucide-react';
 import ZooPaginator from './ZooPaginator';
 
@@ -23,7 +24,10 @@ function recommendRestock(stock, threshold) {
 }
 
 // ─── Single stock row, shared between Operational + Retail lists ───
-function StockRow({ item }) {
+// Renders the item + an Edit button that opens the request modal pre-filled
+// with the row's details. The `onEdit(item)` callback is optional so the
+// row can stay a pure display component when edits aren't available.
+function StockRow({ item, onEdit }) {
     const isLow = !!item.is_low_stock;
     const recommend = recommendRestock(item.stock_count, item.restock_threshold);
     return (
@@ -33,6 +37,7 @@ function StockRow({ item }) {
             padding: '14px 16px', borderRadius: '10px',
             border: isLow ? '1px solid rgba(239, 68, 68, 0.45)'
                           : '1px solid rgba(121, 162, 128, 0.25)',
+            gap: '12px',
         }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
                 <Package size={20} color={isLow ? '#dc2626' : GREEN_DARK} />
@@ -45,7 +50,7 @@ function StockRow({ item }) {
                     </div>
                 </div>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '18px', flexShrink: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexShrink: 0 }}>
                 <div style={{ textAlign: 'right' }}>
                     <div style={{ fontSize: '13px', color: 'var(--color-text-dark)' }}>
                         <strong style={{ fontSize: '18px' }}>{item.stock_count}</strong>
@@ -70,21 +75,36 @@ function StockRow({ item }) {
                         </div>
                     )}
                 </div>
+                {onEdit && (
+                    <button type="button" onClick={() => onEdit(item)}
+                        title="Request restock or removal"
+                        style={{
+                            padding: '7px 12px', fontSize: '12px', fontWeight: 600,
+                            background: 'rgba(121,162,128,0.18)', color: GREEN_DARK,
+                            border: '1px solid rgba(121,162,128,0.35)',
+                            borderRadius: '8px', cursor: 'pointer',
+                            display: 'inline-flex', alignItems: 'center', gap: '5px',
+                            flexShrink: 0,
+                        }}>
+                        <Pencil size={12} /> Edit
+                    </button>
+                )}
             </div>
         </div>
     );
 }
 
-// ─── Supplies panel (list + request-restock form) ───────────────────────
-// Themed to the green palette so the "+ Request Restock" button is visible
-// and consistent with the rest of the dashboard — the previous near-white
-// button on cream was effectively invisible.
+// ─── Supplies panel (list + per-row edit modal) ─────────────────────────
+// Per-row Edit buttons open a portaled modal pre-filled with the selected
+// item. The modal is portaled to <body> with `position: fixed` so it stays
+// centered in the viewport even when the list below it scrolls — previously
+// the inline form would push the page far down once the list got long.
 export function EmployeeSuppliesPanel({
     title = 'Supplies',
     supplies = [],
     suppliesLoading = false,
     retailItems = null,          // array or null — only Retail associates get this
-    showRequestForm,
+    showRequestForm,             // reused to toggle the modal visibility
     setShowRequestForm,
     requestForm,
     setRequestForm,
@@ -92,6 +112,51 @@ export function EmployeeSuppliesPanel({
     emptyLabel = 'No supplies available for your department.',
 }) {
     const hasRetail = Array.isArray(retailItems) && retailItems.length > 0;
+    // Client-side filter so employees can quickly find an item by name or
+    // category across both the operational + retail lists.
+    const [search, setSearch] = useState('');
+
+    const filteredSupplies = useMemo(() => {
+        const term = search.trim().toLowerCase();
+        if (!term) return supplies;
+        return supplies.filter(s =>
+            (s.item_name || '').toLowerCase().includes(term) ||
+            (s.category  || '').toLowerCase().includes(term) ||
+            (s.description || '').toLowerCase().includes(term)
+        );
+    }, [supplies, search]);
+    const filteredRetail = useMemo(() => {
+        if (!hasRetail) return [];
+        const term = search.trim().toLowerCase();
+        if (!term) return retailItems;
+        return retailItems.filter(r =>
+            (r.item_name || '').toLowerCase().includes(term) ||
+            (r.category  || '').toLowerCase().includes(term) ||
+            (r.description || '').toLowerCase().includes(term)
+        );
+    }, [retailItems, search, hasRetail]);
+
+    // Open the modal pre-filled with the clicked item. For retail items the
+    // supply_id is encoded "retail-<id>" so the parent submit handler can
+    // tell which catalog to hit.
+    function openEditFor(kind, item) {
+        const id = kind === 'retail' ? `retail-${item.item_id}` : `op-${item.supply_id}`;
+        const recQty = item.is_low_stock
+            ? String(recommendRestock(item.stock_count, item.restock_threshold))
+            : '';
+        setRequestForm({
+            supply_id: id,
+            action: 'restock',
+            quantity: recQty,
+            reason: '',
+            // Keep the display label handy for the modal header.
+            _display_name: item.item_name,
+        });
+        setShowRequestForm(true);
+    }
+    function closeModal() {
+        setShowRequestForm(false);
+    }
 
     return (
         <div>
@@ -100,167 +165,170 @@ export function EmployeeSuppliesPanel({
                 marginBottom: '14px', flexWrap: 'wrap', gap: '10px',
             }}>
                 <h2 style={{ margin: 0 }}>{title}</h2>
-                <button
-                    type="button"
-                    className="glass-button"
-                    onClick={() => setShowRequestForm(!showRequestForm)}
-                    style={{
-                        background: showRequestForm ? 'rgba(239, 68, 68, 0.18)' : GREEN,
-                        color: showRequestForm ? '#b91c1c' : 'white',
-                        padding: '10px 18px',
-                        fontSize: '14px', fontWeight: 700,
-                        border: showRequestForm ? '1px solid rgba(239,68,68,0.35)' : 'none',
-                        display: 'inline-flex', alignItems: 'center', gap: '6px',
-                    }}
-                >
-                    {showRequestForm ? '× Cancel' : '+ Request Restock'}
-                </button>
-            </div>
-
-            {showRequestForm && (
-                <div className="glass-panel" style={{
-                    padding: '20px', marginBottom: '20px',
-                    border: `1px solid ${GREEN}`,
-                    background: 'rgba(255, 245, 231, 0.9)',
-                }}>
-                    <h3 style={{ marginTop: 0, color: GREEN_DARK }}>New Supply Request</h3>
-                    {/* Action toggle — Restock (add) vs Remove (write-off).
-                        Removes are for damaged/expired stock that needs to
-                        leave the count; manager approval is still required. */}
-                    <div style={{
-                        display: 'inline-flex', gap: '4px',
-                        background: 'rgba(255, 245, 231, 0.72)',
-                        border: '1px solid rgba(121,162,128,0.25)',
-                        padding: '4px 6px', borderRadius: '12px', marginBottom: '15px',
-                    }}>
-                        <span style={{
-                            fontSize: '10px', color: GREEN_DARK, alignSelf: 'center',
-                            padding: '0 10px', textTransform: 'uppercase',
-                            letterSpacing: '0.08em', fontWeight: 700,
-                        }}>Action</span>
-                        {[
-                            { key: 'restock', label: 'Restock' },
-                            { key: 'remove',  label: 'Remove' },
-                        ].map(t => {
-                            const active = (requestForm.action || 'restock') === t.key;
-                            return (
-                                <button key={t.key} type="button"
-                                    onClick={() => setRequestForm({ ...requestForm, action: t.key })}
-                                    style={{
-                                        padding: '6px 14px', fontSize: '12px',
-                                        background: active ? (t.key === 'remove' ? '#dc2626' : GREEN) : 'transparent',
-                                        color: active ? 'white' : GREEN_DARK,
-                                        fontWeight: active ? 700 : 500,
-                                        border: 'none', borderRadius: '8px', cursor: 'pointer',
-                                    }}>{t.label}</button>
-                            );
-                        })}
-                    </div>
-                    <form onSubmit={onSubmitRequest} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
-                        <select
-                            required
-                            className="glass-input"
-                            value={requestForm.supply_id}
-                            onChange={(e) => {
-                                const v = e.target.value;
-                                // Auto-suggest the recommended quantity when the
-                                // selected item is already flagged low-stock.
-                                let recQty = '';
-                                if (v) {
-                                    const [kind, rawId] = v.split('-');
-                                    const id = parseInt(rawId, 10);
-                                    const item = kind === 'retail'
-                                        ? (retailItems || []).find(r => r.item_id === id)
-                                        : supplies.find(s => s.supply_id === id);
-                                    if (item && item.is_low_stock) {
-                                        recQty = String(recommendRestock(item.stock_count, item.restock_threshold));
-                                    }
-                                }
-                                setRequestForm({
-                                    ...requestForm,
-                                    supply_id: v,
-                                    quantity: recQty || requestForm.quantity,
-                                });
-                            }}
-                        >
-                            <option value="">Select Supply...</option>
-                            {supplies.length > 0 && (
-                                <optgroup label="Operational Supplies">
-                                    {supplies.map(s => (
-                                        <option key={`op-${s.supply_id}`} value={`op-${s.supply_id}`}>
-                                            {s.item_name} — stock {s.stock_count} / threshold {s.restock_threshold}
-                                        </option>
-                                    ))}
-                                </optgroup>
-                            )}
-                            {hasRetail && (
-                                <optgroup label="Shop Inventory (Retail)">
-                                    {retailItems.map(r => (
-                                        <option key={`retail-${r.item_id}`} value={`retail-${r.item_id}`}>
-                                            {r.item_name} — stock {r.stock_count} / threshold {r.restock_threshold}
-                                        </option>
-                                    ))}
-                                </optgroup>
-                            )}
-                        </select>
-                        <input
-                            type="number" min="1" required
-                            placeholder={(requestForm.action === 'remove')
-                                ? 'Quantity to Remove'
-                                : 'Quantity Needed'}
-                            className="glass-input"
-                            value={requestForm.quantity}
-                            onChange={e => setRequestForm({ ...requestForm, quantity: e.target.value })}
-                        />
-                        <div style={{ gridColumn: '1 / -1' }}>
-                            <input
-                                placeholder={(requestForm.action === 'remove')
-                                    ? 'Reason for removal (e.g., expired, damaged, spoiled)'
-                                    : 'Reason (e.g., Running low, new arrival, upcoming procedure)'}
-                                className="glass-input"
-                                value={requestForm.reason}
-                                onChange={e => setRequestForm({ ...requestForm, reason: e.target.value })}
-                            />
-                        </div>
-                        <div style={{ gridColumn: '1 / -1' }}>
-                            <button type="submit" className="glass-button"
-                                style={{
-                                    background: requestForm.action === 'remove' ? '#dc2626' : GREEN,
-                                    color: 'white', width: '100%', fontWeight: 700,
-                                }}>
-                                <Send size={14} style={{ marginRight: '5px' }} />
-                                Submit {requestForm.action === 'remove' ? 'Removal' : 'Restock'} Request
-                            </button>
-                        </div>
-                    </form>
+                <div style={{ position: 'relative', minWidth: '260px' }}>
+                    <Search size={14} color={GREEN_DARK}
+                        style={{
+                            position: 'absolute', left: '12px', top: '50%',
+                            transform: 'translateY(-50%)', opacity: 0.7, pointerEvents: 'none',
+                        }}
+                    />
+                    <input
+                        type="text"
+                        placeholder="Search inventory..."
+                        className="glass-input"
+                        value={search}
+                        onChange={e => setSearch(e.target.value)}
+                        style={{ paddingLeft: '32px' }}
+                    />
                 </div>
-            )}
+            </div>
 
             {suppliesLoading ? <p>Loading supplies...</p> : supplies.length === 0 && !hasRetail ? (
                 <p style={{ color: 'var(--color-text-dark)' }}>{emptyLabel}</p>
             ) : (
                 <>
                     {supplies.length > 0 && (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: hasRetail ? '24px' : '30px' }}>
-                            {supplies.map(item => <StockRow key={item.supply_id} item={item} />)}
-                        </div>
+                        filteredSupplies.length === 0 ? (
+                            <p style={{ color: 'var(--color-text-muted)', marginBottom: hasRetail ? '24px' : '30px' }}>
+                                No supplies match "{search}".
+                            </p>
+                        ) : (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: hasRetail ? '24px' : '30px' }}>
+                                {filteredSupplies.map(item => (
+                                    <StockRow
+                                        key={item.supply_id}
+                                        item={item}
+                                        onEdit={(i) => openEditFor('op', i)}
+                                    />
+                                ))}
+                            </div>
+                        )
                     )}
                     {hasRetail && (
                         <>
                             <h3 style={{ display: 'flex', alignItems: 'center', gap: '10px', color: 'var(--color-text-dark)' }}>
                                 <Package size={20} /> Shop Inventory
                             </h3>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '30px' }}>
-                                {retailItems.map(item => (
-                                    <StockRow key={item.item_id}
-                                        item={{ ...item, supply_id: `retail-${item.item_id}` }}
-                                    />
-                                ))}
-                            </div>
+                            {filteredRetail.length === 0 ? (
+                                <p style={{ color: 'var(--color-text-muted)', marginBottom: '30px' }}>
+                                    No shop items match "{search}".
+                                </p>
+                            ) : (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '30px' }}>
+                                    {filteredRetail.map(item => (
+                                        <StockRow
+                                            key={item.item_id}
+                                            item={{ ...item, supply_id: `retail-${item.item_id}` }}
+                                            onEdit={(i) => openEditFor('retail', i)}
+                                        />
+                                    ))}
+                                </div>
+                            )}
                         </>
                     )}
                 </>
             )}
+
+            {/* Request modal — portaled to <body> so `position: fixed` is
+                anchored to the viewport, not to a scrolled parent with
+                `backdrop-filter` (which would trap it mid-page). */}
+            {showRequestForm && createPortal((
+                <div onClick={closeModal} style={{
+                    position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
+                }}>
+                    <div onClick={e => e.stopPropagation()} style={{
+                        width: '520px', maxWidth: '92vw', maxHeight: '90vh', overflowY: 'auto',
+                        padding: '28px', background: 'rgba(255,255,255,0.96)',
+                        border: `1px solid ${GREEN}`, borderRadius: '14px',
+                        boxShadow: '0 20px 60px rgba(0,0,0,0.3)', color: 'var(--color-text-dark)',
+                    }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+                            <h2 style={{ margin: 0, color: GREEN_DARK }}>
+                                {requestForm._display_name
+                                    ? `Request: ${requestForm._display_name}`
+                                    : 'New Supply Request'}
+                            </h2>
+                            <button onClick={closeModal}
+                                style={{ background: 'none', border: 'none', cursor: 'pointer', color: GREEN_DARK, padding: 4 }}>
+                                <X size={20} />
+                            </button>
+                        </div>
+
+                        {/* Action toggle — Restock (add) vs Remove (write-off).
+                            Removes are for damaged/expired stock that needs to
+                            leave the count; manager approval is still required. */}
+                        <div style={{
+                            display: 'inline-flex', gap: '4px',
+                            background: 'rgba(255, 245, 231, 0.72)',
+                            border: '1px solid rgba(121,162,128,0.25)',
+                            padding: '4px 6px', borderRadius: '12px', marginBottom: '15px',
+                        }}>
+                            <span style={{
+                                fontSize: '10px', color: GREEN_DARK, alignSelf: 'center',
+                                padding: '0 10px', textTransform: 'uppercase',
+                                letterSpacing: '0.08em', fontWeight: 700,
+                            }}>Action</span>
+                            {[
+                                { key: 'restock', label: 'Restock' },
+                                { key: 'remove',  label: 'Remove' },
+                            ].map(t => {
+                                const active = (requestForm.action || 'restock') === t.key;
+                                return (
+                                    <button key={t.key} type="button"
+                                        onClick={() => setRequestForm({ ...requestForm, action: t.key })}
+                                        style={{
+                                            padding: '6px 14px', fontSize: '12px',
+                                            background: active ? (t.key === 'remove' ? '#dc2626' : GREEN) : 'transparent',
+                                            color: active ? 'white' : GREEN_DARK,
+                                            fontWeight: active ? 700 : 500,
+                                            border: 'none', borderRadius: '8px', cursor: 'pointer',
+                                        }}>{t.label}</button>
+                                );
+                            })}
+                        </div>
+
+                        <form onSubmit={onSubmitRequest} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+                            <input
+                                type="number" min="1" required
+                                placeholder={(requestForm.action === 'remove')
+                                    ? 'Quantity to Remove'
+                                    : 'Quantity Needed'}
+                                className="glass-input"
+                                value={requestForm.quantity}
+                                onChange={e => setRequestForm({ ...requestForm, quantity: e.target.value })}
+                                style={{ gridColumn: '1 / -1' }}
+                                autoFocus
+                            />
+                            <div style={{ gridColumn: '1 / -1' }}>
+                                <input
+                                    placeholder={(requestForm.action === 'remove')
+                                        ? 'Reason for removal (e.g., expired, damaged, spoiled)'
+                                        : 'Reason (e.g., Running low, new arrival, upcoming procedure)'}
+                                    className="glass-input"
+                                    value={requestForm.reason}
+                                    onChange={e => setRequestForm({ ...requestForm, reason: e.target.value })}
+                                />
+                            </div>
+                            <div style={{ gridColumn: '1 / -1', display: 'flex', gap: '10px', marginTop: '4px' }}>
+                                <button type="button" onClick={closeModal} className="glass-button" style={{ flex: 1 }}>
+                                    Cancel
+                                </button>
+                                <button type="submit" className="glass-button"
+                                    style={{
+                                        flex: 2,
+                                        background: requestForm.action === 'remove' ? '#dc2626' : GREEN,
+                                        color: 'white', fontWeight: 700,
+                                        display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+                                    }}>
+                                    <Send size={14} />
+                                    Submit {requestForm.action === 'remove' ? 'Removal' : 'Restock'} Request
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            ), document.body)}
         </div>
     );
 }

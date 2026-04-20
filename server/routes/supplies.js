@@ -63,6 +63,70 @@ router.delete('/:id', requireRole('admin','manager'), async (req, res) => {
     }
 });
 
+// PATCH /api/supplies/:id/restock — add quantity to operational stock.
+// Mirrors /inventory/:id/restock so the manager UI has symmetric endpoints
+// for ops and retail; emits an activity_log row for the Activity tab.
+router.patch('/:id/restock', requireRole('admin','manager'), async (req, res) => {
+    const { quantity } = req.body;
+    if (!quantity || quantity <= 0) return res.status(400).json({ error: 'Invalid quantity.' });
+    try {
+        await db.query(
+            'UPDATE operational_supplies SET stock_count = stock_count + ? WHERE supply_id = ?',
+            [quantity, req.params.id]
+        );
+        const [rows] = await db.query(
+            'SELECT item_name FROM operational_supplies WHERE supply_id = ?', [req.params.id]
+        );
+        const itemName = rows[0]?.item_name || `supply #${req.params.id}`;
+        await db.query(
+            `INSERT INTO activity_log
+             (action_type, description, performed_by, target_type, target_id, metadata)
+             VALUES (?, ?, ?, 'operational_supply', ?, ?)`,
+            [
+                'supply_restocked',
+                `Restocked ${quantity}x ${itemName}`,
+                req.user?.employeeId || null,
+                req.params.id,
+                JSON.stringify({ source: 'operational', quantity, item_name: itemName }),
+            ]
+        );
+        return res.json({ success: true });
+    } catch (err) {
+        return res.status(500).json({ error: err.message });
+    }
+});
+
+// PATCH /api/supplies/:id/remove — subtract from operational stock.
+router.patch('/:id/remove', requireRole('admin','manager'), async (req, res) => {
+    const { quantity, reason } = req.body;
+    if (!quantity || quantity <= 0) return res.status(400).json({ error: 'Invalid quantity.' });
+    try {
+        await db.query(
+            'UPDATE operational_supplies SET stock_count = GREATEST(stock_count - ?, 0) WHERE supply_id = ?',
+            [quantity, req.params.id]
+        );
+        const [rows] = await db.query(
+            'SELECT item_name FROM operational_supplies WHERE supply_id = ?', [req.params.id]
+        );
+        const itemName = rows[0]?.item_name || `supply #${req.params.id}`;
+        await db.query(
+            `INSERT INTO activity_log
+             (action_type, description, performed_by, target_type, target_id, metadata)
+             VALUES (?, ?, ?, 'operational_supply', ?, ?)`,
+            [
+                'supply_removed',
+                `Removed ${quantity}x ${itemName}${reason ? ` (${reason})` : ''}`,
+                req.user?.employeeId || null,
+                req.params.id,
+                JSON.stringify({ source: 'operational', quantity, item_name: itemName, reason: reason || null }),
+            ]
+        );
+        return res.json({ success: true });
+    } catch (err) {
+        return res.status(500).json({ error: err.message });
+    }
+});
+
 // GET /api/supplies/requests — supply requests
 //   admin   → sees everything
 //   manager → sees only requests made by someone in their department
@@ -101,13 +165,20 @@ router.get('/requests', requireAuth, async (req, res) => {
                  ORDER BY sr.created_at DESC`, [deptId]
             );
         } else {
+            // Include the reviewer join so the employee can see WHO approved
+            // or denied their request ("approved by <name>"). Without it the
+            // UI showed "approved by on <date>" — reviewer came back null.
+            // LEFT JOIN intentionally ignores employees.is_active so disabled
+            // reviewers still surface their name on historical requests.
             [rows] = await db.query(
                 `SELECT sr.*,
                         req.first_name AS req_first, req.last_name AS req_last,
-                        reqd.dept_name AS req_dept_name
+                        reqd.dept_name AS req_dept_name,
+                        rev.first_name AS rev_first, rev.last_name AS rev_last
                  FROM supply_requests sr
                  LEFT JOIN employees   req  ON sr.requested_by = req.employee_id
                  LEFT JOIN departments reqd ON req.dept_id     = reqd.dept_id
+                 LEFT JOIN employees   rev  ON sr.reviewed_by  = rev.employee_id
                  WHERE sr.requested_by = ?
                  ORDER BY sr.created_at DESC`, [employeeId]
             );
@@ -124,9 +195,12 @@ router.get('/requests', requireAuth, async (req, res) => {
                 last_name:  r.req_last,
                 departments: r.req_dept_name ? { dept_name: r.req_dept_name } : null,
             } : null,
-            reviewer: r.reviewed_by ? {
-                first_name: r.rev_first,
-                last_name:  r.rev_last,
+            // Prefer the live join (current name) but fall back to the
+            // snapshot so reviews keep their attribution after the
+            // employee record is removed/disabled.
+            reviewer: (r.rev_first || r.reviewer_first_name || r.reviewed_by) ? {
+                first_name: r.rev_first || r.reviewer_first_name || null,
+                last_name:  r.rev_last  || r.reviewer_last_name  || null,
             } : null,
         }));
         return res.json(shaped);
@@ -165,10 +239,19 @@ router.patch('/requests/:id', requireRole('admin','manager'), async (req, res) =
     const conn = await db.getConnection();
     try {
         await conn.beginTransaction();
+        // Snapshot the reviewer's name so the log survives the reviewer
+        // being deactivated/removed (FK goes to NULL on delete).
+        const [revRows] = await conn.query(
+            'SELECT first_name, last_name FROM employees WHERE employee_id = ?',
+            [req.user.employeeId]
+        );
+        const rev = revRows[0] || {};
         await conn.query(
-            `UPDATE supply_requests SET status=?, reviewed_by=?, reviewed_at=NOW()
-             WHERE request_id=?`,
-            [status, req.user.employeeId, req.params.id]
+            `UPDATE supply_requests
+                SET status=?, reviewed_by=?, reviewed_at=NOW(),
+                    reviewer_first_name=?, reviewer_last_name=?
+              WHERE request_id=?`,
+            [status, req.user.employeeId, rev.first_name || null, rev.last_name || null, req.params.id]
         );
         // If approved, apply the requested action.
         // `action='remove'` subtracts (e.g., damage/expiry write-offs);
@@ -239,6 +322,14 @@ router.post('/requests/bulk-review', requireRole('admin','manager'), async (req,
     if (!['approved','denied'].includes(status)) {
         return res.status(400).json({ error: 'Status must be approved or denied.' });
     }
+    // Resolve the reviewer's name once for the whole batch so each row
+    // snapshots it (see single-review route for rationale).
+    const [revRowsBatch] = await db.query(
+        'SELECT first_name, last_name FROM employees WHERE employee_id = ?',
+        [req.user.employeeId]
+    );
+    const revBatch = revRowsBatch[0] || {};
+
     const results = [];
     for (const rawId of ids) {
         const id = parseInt(rawId, 10);
@@ -247,9 +338,11 @@ router.post('/requests/bulk-review', requireRole('admin','manager'), async (req,
         try {
             await conn.beginTransaction();
             await conn.query(
-                `UPDATE supply_requests SET status=?, reviewed_by=?, reviewed_at=NOW()
-                 WHERE request_id=? AND status='pending'`,
-                [status, req.user.employeeId, id]
+                `UPDATE supply_requests
+                    SET status=?, reviewed_by=?, reviewed_at=NOW(),
+                        reviewer_first_name=?, reviewer_last_name=?
+                  WHERE request_id=? AND status='pending'`,
+                [status, req.user.employeeId, revBatch.first_name || null, revBatch.last_name || null, id]
             );
             if (status === 'approved') {
                 const [reqRows] = await conn.query(

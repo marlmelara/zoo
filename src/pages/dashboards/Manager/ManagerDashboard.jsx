@@ -1390,7 +1390,10 @@ export default function ManagerDashboard() {
                                                 ))}
                                             </div>
 
-                                            <p style={{ fontSize: '12px', color: 'var(--color-text-muted)', margin: '0 0 8px' }}>Animals:</p>
+                                            {/* Animal chips. The remove (×) button only renders
+                                                for admins and vet/animal-care managers — other managers
+                                                can see who's assigned but can't unassign, matching the
+                                                server rule in POST /api/events/:id/assign. */}
                                             <p style={{ fontSize: '11px', color: MGR_GREEN_DARK, margin: '10px 0 8px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Animals</p>
                                             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '10px' }}>
                                                 {assigned.filter(a => a.animal_id).length === 0 ? (
@@ -1403,13 +1406,15 @@ export default function ManagerDashboard() {
                                                     }}>
                                                         <Cat size={14} />
                                                         <span>{a.animal_name}</span>
-                                                        <button
-                                                            onClick={() => handleRemoveEventAssignment(a.assignment_id)}
-                                                            style={{ background: 'none', border: 'none', color: '#b91c1c', cursor: 'pointer', padding: '0 2px', fontSize: '16px', lineHeight: 1, fontWeight: 700 }}
-                                                            title="Remove"
-                                                        >
-                                                            &times;
-                                                        </button>
+                                                        {showAnimalTab && (
+                                                            <button
+                                                                onClick={() => handleRemoveEventAssignment(a.assignment_id)}
+                                                                style={{ background: 'none', border: 'none', color: '#b91c1c', cursor: 'pointer', padding: '0 2px', fontSize: '16px', lineHeight: 1, fontWeight: 700 }}
+                                                                title="Remove"
+                                                            >
+                                                                &times;
+                                                            </button>
+                                                        )}
                                                     </div>
                                                 ))}
                                             </div>

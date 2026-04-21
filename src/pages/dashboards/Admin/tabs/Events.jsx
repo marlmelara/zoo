@@ -12,14 +12,26 @@ const DESCRIPTION_MAX = 400;
 import { StatusFilter } from '../../../../components/AnimalsPanel';
 import BulkActionBar from '../../../../components/BulkActionBar';
 import { useToast, useConfirm } from '../../../../components/Feedback';
+import { useAuth } from '../../../../contexts/AuthContext';
 import { formatTime } from '../../../../utils/staff';
 
 const GREEN      = 'rgb(123, 144, 79)';
 const GREEN_DARK = 'rgb(102, 122, 66)';
 
+// Animals can only be assigned by admin or a Vet/Animal-Care manager —
+// matches the server check in POST /api/events/:id/assign. Other managers
+// (Retail, Security) see the staff dropdown only so we don't render
+// controls that would just 403 on submit.
+const isAnimalDept = (deptName) => {
+    const n = (deptName || '').toLowerCase();
+    return n.includes('vet') || n.includes('animal') || n.includes('care');
+};
+
 export default function Events() {
   const toast   = useToast();
   const confirm = useConfirm();
+  const { role, deptName } = useAuth();
+  const canAssignAnimals = role === 'admin' || (role === 'manager' && isAnimalDept(deptName));
   const [events, setEvents] = useState([]);
   const [venues, setVenues] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -541,8 +553,14 @@ export default function Events() {
               )}
             </div>
 
-            <h3 style={{ color: GREEN_DARK, margin: '0 0 12px' }}>Personnel & Animals</h3>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '20px' }}>
+            <h3 style={{ color: GREEN_DARK, margin: '0 0 12px' }}>
+                {canAssignAnimals ? 'Personnel & Animals' : 'Personnel'}
+            </h3>
+            {/* Animals column only shows for admins + vet/caretaker managers.
+                Other managers can't assign animals to events, so the column
+                would just be read-only noise. Personnel column alone takes
+                the full row width in that case. */}
+            <div style={{ display: 'grid', gridTemplateColumns: canAssignAnimals ? '1fr 1fr' : '1fr', gap: '14px', marginBottom: '20px' }}>
               <div style={{ background: 'rgba(121,162,128,0.08)', border: `1px solid ${GREEN}33`, padding: '12px', borderRadius: '10px' }}>
                 <h4 style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: 0, marginBottom: '10px', fontSize: '0.88rem', color: GREEN_DARK }}><User size={14} /> Personnel</h4>
                 {assignments.filter(a => a.employee_id).map(a => (
@@ -556,33 +574,41 @@ export default function Events() {
                 ))}
                 {assignments.filter(a => a.employee_id).length === 0 && <p style={{ fontSize: '0.75rem', color: GREEN_DARK, opacity: 0.7, margin: 0, fontStyle: 'italic' }}>None assigned.</p>}
               </div>
-              <div style={{ background: 'rgba(121,162,128,0.08)', border: `1px solid ${GREEN}33`, padding: '12px', borderRadius: '10px' }}>
-                <h4 style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: 0, marginBottom: '10px', fontSize: '0.88rem', color: GREEN_DARK }}><Cat size={14} /> Animals</h4>
-                {assignments.filter(a => a.animal_id).map(a => (
-                  <div key={a.assignment_id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.82rem', marginBottom: '4px', color: 'var(--color-text-dark)' }}>
-                    <span>
-                      {a.animal_name}
-                      <span style={{ fontSize: '0.7rem', color: GREEN_DARK, marginLeft: '4px', opacity: 0.8 }}>({a.species_common_name})</span>
-                    </span>
-                    <button onClick={() => handleRemoveAssignment(a.assignment_id)} style={{ background: 'none', border: 'none', color: '#b91c1c', cursor: 'pointer', padding: '0 4px', fontSize: '16px', lineHeight: 1, fontWeight: 700 }} title="Remove">&times;</button>
-                  </div>
-                ))}
-                {assignments.filter(a => a.animal_id).length === 0 && <p style={{ fontSize: '0.75rem', color: GREEN_DARK, opacity: 0.7, margin: 0, fontStyle: 'italic' }}>None assigned.</p>}
-              </div>
+              {canAssignAnimals && (
+                <div style={{ background: 'rgba(121,162,128,0.08)', border: `1px solid ${GREEN}33`, padding: '12px', borderRadius: '10px' }}>
+                  <h4 style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: 0, marginBottom: '10px', fontSize: '0.88rem', color: GREEN_DARK }}><Cat size={14} /> Animals</h4>
+                  {assignments.filter(a => a.animal_id).map(a => (
+                    <div key={a.assignment_id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.82rem', marginBottom: '4px', color: 'var(--color-text-dark)' }}>
+                      <span>
+                        {a.animal_name}
+                        <span style={{ fontSize: '0.7rem', color: GREEN_DARK, marginLeft: '4px', opacity: 0.8 }}>({a.species_common_name})</span>
+                      </span>
+                      <button onClick={() => handleRemoveAssignment(a.assignment_id)} style={{ background: 'none', border: 'none', color: '#b91c1c', cursor: 'pointer', padding: '0 4px', fontSize: '16px', lineHeight: 1, fontWeight: 700 }} title="Remove">&times;</button>
+                    </div>
+                  ))}
+                  {assignments.filter(a => a.animal_id).length === 0 && <p style={{ fontSize: '0.75rem', color: GREEN_DARK, opacity: 0.7, margin: 0, fontStyle: 'italic' }}>None assigned.</p>}
+                </div>
+              )}
             </div>
 
             <form onSubmit={handleAssign} style={{ background: 'rgba(121,162,128,0.08)', border: `1px solid ${GREEN}33`, padding: '16px', borderRadius: '10px' }}>
-              <h4 style={{ marginTop: 0, marginBottom: '10px', fontSize: '0.88rem', color: GREEN_DARK }}>Assign Personnel / Animal</h4>
+              <h4 style={{ marginTop: 0, marginBottom: '10px', fontSize: '0.88rem', color: GREEN_DARK }}>
+                {canAssignAnimals ? 'Assign Personnel / Animal' : 'Assign Personnel'}
+              </h4>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '8px' }}>
                 <select style={modalSelectStyle} value={assignmentForm.employee_id} onChange={(e) => setAssignmentForm({ employee_id: e.target.value, animal_id: '' })}>
                   <option value="">Select Staff...</option>
                   {staff.filter(s => !assignments.some(a => a.employee_id === s.employee_id)).map(s => <option key={s.employee_id} value={s.employee_id}>{s.first_name} {s.last_name}</option>)}
                 </select>
-                <div style={{ textAlign: 'center', fontSize: '0.75rem', color: GREEN_DARK, fontWeight: 600, letterSpacing: '0.08em' }}>OR</div>
-                <select style={modalSelectStyle} value={assignmentForm.animal_id} onChange={(e) => setAssignmentForm({ animal_id: e.target.value, employee_id: '' })}>
-                  <option value="">Select Animal...</option>
-                  {animals.filter(a => !assignments.some(asn => asn.animal_id === a.animal_id)).map(a => <option key={a.animal_id} value={a.animal_id}>{a.name} ({a.species_common_name})</option>)}
-                </select>
+                {canAssignAnimals && (
+                  <>
+                    <div style={{ textAlign: 'center', fontSize: '0.75rem', color: GREEN_DARK, fontWeight: 600, letterSpacing: '0.08em' }}>OR</div>
+                    <select style={modalSelectStyle} value={assignmentForm.animal_id} onChange={(e) => setAssignmentForm({ animal_id: e.target.value, employee_id: '' })}>
+                      <option value="">Select Animal...</option>
+                      {animals.filter(a => !assignments.some(asn => asn.animal_id === a.animal_id)).map(a => <option key={a.animal_id} value={a.animal_id}>{a.name} ({a.species_common_name})</option>)}
+                    </select>
+                  </>
+                )}
               </div>
               <button type="submit" disabled={!assignmentForm.employee_id && !assignmentForm.animal_id}
                 style={{

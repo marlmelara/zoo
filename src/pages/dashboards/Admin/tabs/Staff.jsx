@@ -31,6 +31,14 @@ export default function Staff() {
     // Lifecycle log modal — viewing activation/deactivation history for
     // one staff member at a time.
     const [logTarget, setLogTarget] = useState(null);
+    // Reassign-manager modal — opens when the server blocks a deactivate
+    // with a 409 REASSIGN_REQUIRED (the target has active reports or
+    // manages departments). Stores the blocked target + the list of
+    // eligible replacements so the admin can pick one.
+    const [reassign, setReassign] = useState(null);
+    // { ids:number[], name:string, reports_count, departments_count,
+    //   candidates:[{employee_id, first_name, last_name, dept_name}],
+    //   selection:number|'' }
     const emptyFormData = {
         first_name: '', last_name: '', contact_info: '', pay_rate_cents: '',
         shift_start: '09:00', shift_end: '17:00',
@@ -257,6 +265,24 @@ export default function Staff() {
         }
     }
 
+    // One-shot deactivate call that centralises the 409 handling. Caller
+    // passes an optional `reassignTo` employee_id; returns
+    //   { ok: true }                                   on success
+    //   { reassign: {...blockers} }                    on 409 (needs picker)
+    //   { ok: false, message }                         on any other error
+    async function attemptDeactivate(id, reassignTo) {
+        try {
+            const body = reassignTo ? { reassign_to_manager_id: reassignTo } : undefined;
+            await api.delete(`/employees/${id}`, body);
+            return { ok: true };
+        } catch (err) {
+            if (err.status === 409 && err.data?.code === 'REASSIGN_REQUIRED') {
+                return { reassign: err.data };
+            }
+            return { ok: false, message: err.message };
+        }
+    }
+
     async function handleRemoveSelected() {
         if (selected.size === 0) return;
         const ok = await confirm({
@@ -266,13 +292,75 @@ export default function Staff() {
             tone: 'danger',
         });
         if (!ok) return;
+
         const ids = Array.from(selected);
-        const results = await Promise.allSettled(ids.map(id => api.delete(`/employees/${id}`)));
-        const failed = results.filter(r => r.status === 'rejected');
-        if (failed.length) {
-            toast.error(`${failed.length} deactivation${failed.length === 1 ? '' : 's'} failed.`);
-        } else {
-            toast.success(`Deactivated ${ids.length} staff member${ids.length === 1 ? '' : 's'}.`);
+        let successCount = 0;
+        const failures = [];
+
+        for (const id of ids) {
+            const res = await attemptDeactivate(id);
+            if (res.ok) { successCount++; continue; }
+
+            if (res.reassign) {
+                // Manager has live links. Open the reassign picker and wait
+                // for the admin to choose a replacement, then retry this ID.
+                const person = staff.find(p => p.employee_id === id);
+                const personName = person ? `${person.first_name} ${person.last_name}` : `#${id}`;
+                // Replacements must be active managers or admins, and not
+                // the person we're deactivating themselves.
+                const candidates = await api.get('/employees/managers')
+                    .then(list => (list || []).filter(m => m.employee_id !== id))
+                    .catch(() => []);
+                const adminsList = await api.get('/employees/admins')
+                    .then(list => (list || []).filter(m => m.employee_id !== id))
+                    .catch(() => []);
+                // De-dup by employee_id, managers first so the dept-level
+                // picks come before the catch-all admins.
+                const seen = new Set();
+                const merged = [...candidates, ...adminsList].filter(m => {
+                    if (seen.has(m.employee_id)) return false;
+                    seen.add(m.employee_id);
+                    return true;
+                });
+
+                const choice = await new Promise(resolve => {
+                    setReassign({
+                        id,
+                        name: personName,
+                        reports_count: res.reassign.reports_count,
+                        departments_count: res.reassign.departments_count,
+                        reports: res.reassign.reports || [],
+                        departments: res.reassign.departments || [],
+                        candidates: merged,
+                        selection: '',
+                        onResolve: resolve,   // closed by the modal
+                    });
+                });
+
+                setReassign(null);
+                if (choice == null) {
+                    failures.push({ id, name: personName, msg: 'cancelled' });
+                    continue;
+                }
+
+                const retry = await attemptDeactivate(id, choice);
+                if (retry.ok) {
+                    successCount++;
+                } else {
+                    failures.push({ id, name: personName, msg: retry.message || 'failed' });
+                }
+                continue;
+            }
+
+            failures.push({ id, msg: res.message || 'failed' });
+        }
+
+        if (failures.length === 0 && successCount > 0) {
+            toast.success(`Deactivated ${successCount} staff member${successCount === 1 ? '' : 's'}.`);
+        } else if (successCount > 0) {
+            toast.info(`Deactivated ${successCount}, ${failures.length} skipped.`);
+        } else if (failures.length > 0) {
+            toast.error(`${failures.length} deactivation${failures.length === 1 ? '' : 's'} failed.`);
         }
         exitManageMode();
         fetchStaff();
@@ -748,6 +836,101 @@ export default function Staff() {
                     onClose={() => setLogTarget(null)}
                 />
             )}
+
+            {/* Reassign-manager picker. Opens when the backend refuses a
+                deactivate because the target still has active reports or
+                manages a department; we can't drop them without handing
+                those off first. */}
+            {reassign && createPortal((
+                <div onClick={() => reassign.onResolve(null)} style={{
+                    position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)',
+                    backdropFilter: 'blur(4px)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1500,
+                }}>
+                    <div onClick={e => e.stopPropagation()} style={{
+                        width: '520px', maxWidth: '92vw', maxHeight: '90vh', overflowY: 'auto',
+                        padding: '26px', background: 'rgba(255,255,255,0.98)',
+                        border: `1px solid ${GREEN}`, borderRadius: '14px',
+                        boxShadow: '0 20px 60px rgba(0,0,0,0.3)', color: 'var(--color-text-dark)',
+                    }}>
+                        <h2 style={{ margin: '0 0 8px', color: GREEN_DARK, fontSize: '18px' }}>
+                            Reassign {reassign.name}'s work
+                        </h2>
+                        <p style={{ margin: '0 0 14px', fontSize: '13px', lineHeight: 1.5 }}>
+                            You're deactivating a manager who still oversees
+                            {reassign.reports_count > 0 && (
+                                <> <strong>{reassign.reports_count} report{reassign.reports_count === 1 ? '' : 's'}</strong></>
+                            )}
+                            {reassign.reports_count > 0 && reassign.departments_count > 0 && ' and '}
+                            {reassign.departments_count > 0 && (
+                                <> <strong>{reassign.departments_count} department{reassign.departments_count === 1 ? '' : 's'}</strong></>
+                            )}
+                            . Pick a replacement manager — those ties move over before {reassign.name} goes inactive.
+                        </p>
+
+                        {reassign.reports.length > 0 && (
+                            <div style={{ marginBottom: '10px', fontSize: '12px', color: GREEN_DARK }}>
+                                <strong>Reports:</strong>{' '}
+                                {reassign.reports.map(r => `${r.first_name} ${r.last_name}`).join(', ')}
+                            </div>
+                        )}
+                        {reassign.departments.length > 0 && (
+                            <div style={{ marginBottom: '14px', fontSize: '12px', color: GREEN_DARK }}>
+                                <strong>Departments:</strong>{' '}
+                                {reassign.departments.map(d => d.dept_name).join(', ')}
+                            </div>
+                        )}
+
+                        <label style={{
+                            display: 'block', fontSize: '11px', fontWeight: 700,
+                            color: GREEN_DARK, textTransform: 'uppercase', letterSpacing: '0.05em',
+                            marginBottom: '6px',
+                        }}>
+                            Replacement manager
+                        </label>
+                        <select
+                            className="glass-input"
+                            autoFocus
+                            value={reassign.selection}
+                            onChange={e => setReassign(r => ({ ...r, selection: e.target.value }))}
+                            style={{ width: '100%', marginBottom: '18px', padding: '10px', fontSize: '14px' }}
+                        >
+                            <option value="">Select a manager or admin...</option>
+                            {reassign.candidates.map(c => (
+                                <option key={c.employee_id} value={c.employee_id}>
+                                    {c.first_name} {c.last_name}
+                                    {c.dept_name ? ` · ${c.dept_name}` : ''}
+                                </option>
+                            ))}
+                        </select>
+
+                        <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                            <button
+                                type="button"
+                                onClick={() => reassign.onResolve(null)}
+                                className="glass-button"
+                                style={{ padding: '8px 18px', fontSize: '13px', fontWeight: 600 }}
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                disabled={!reassign.selection}
+                                onClick={() => reassign.onResolve(Number(reassign.selection))}
+                                className="glass-button"
+                                style={{
+                                    padding: '8px 18px', fontSize: '13px', fontWeight: 700,
+                                    background: reassign.selection ? 'rgb(220, 38, 38)' : 'rgba(220,38,38,0.4)',
+                                    color: 'white',
+                                    cursor: reassign.selection ? 'pointer' : 'not-allowed',
+                                }}
+                            >
+                                Reassign & Deactivate
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            ), document.body)}
 
             {/* Portaled edit modal — escapes the parent glass-panel backdrop-filter. */}
             {editing && createPortal((

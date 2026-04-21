@@ -36,7 +36,13 @@ async function request(method, path, body) {
     const data = text ? JSON.parse(text) : null;
 
     if (!res.ok) {
-        throw new Error(data?.error || `Request failed: ${res.status}`);
+        // Attach the status and the full response body to the Error so
+        // callers can branch on 409s (e.g., "REASSIGN_REQUIRED") without
+        // losing the human-readable message in the default throw.
+        const err = new Error(data?.error || `Request failed: ${res.status}`);
+        err.status = res.status;
+        err.data   = data;
+        throw err;
     }
     return data;
 }
@@ -46,7 +52,9 @@ export const api = {
     post:   (path, body)   => request('POST',   path, body),
     patch:  (path, body)   => request('PATCH',  path, body),
     put:    (path, body)   => request('PUT',    path, body),
-    delete: (path)         => request('DELETE', path),
+    // DELETE occasionally carries a body (e.g. a deactivate that also
+    // reassigns reports to a replacement manager).
+    delete: (path, body)   => request('DELETE', path, body),
 };
 
 export default api;

@@ -526,25 +526,136 @@ router.patch('/:id', requireRole('admin', 'manager'), async (req, res) => {
     }
 });
 
-// DELETE /api/employees/:id — soft-delete (deactivate). Reactivate later via
-// POST /api/employees/:id/reactivate. Emits an activity_log row so the
-// lifecycle modal on the profile can show who took the action and when.
+// DELETE /api/employees/:id — soft-delete (deactivate). Reactivate later
+// via POST /api/employees/:id/reactivate.
+//
+// Orphan-proofing: the FKs employees.manager_id and departments.manager_id
+// are `ON DELETE SET NULL`, but deactivate is an UPDATE, so those cascades
+// never fire — leaving reports pointing at a manager who can't log in.
+//
+// So before flipping is_active=0 we check what's attached:
+//   • active direct reports
+//   • departments this employee manages
+// If either exists, the request must carry `reassign_to_manager_id`
+// naming an active replacement manager. Reports + departments are moved
+// over in the same transaction as the deactivate so we never end up in
+// a half-migrated state. Returns 409 with the blocking counts if the
+// caller forgot to supply a replacement; the admin UI uses that 409 to
+// pop the "pick a replacement" picker.
 router.delete('/:id', requireRole('admin'), async (req, res) => {
+    const targetId = Number(req.params.id);
+    const { reassign_to_manager_id } = req.body || {};
+
+    const conn = await db.getConnection();
     try {
-        const [rows] = await db.query(
-            'SELECT first_name, last_name FROM employees WHERE employee_id = ?',
-            [req.params.id]
+        await conn.beginTransaction();
+
+        const [[target]] = await conn.query(
+            'SELECT employee_id, first_name, last_name, is_active, role FROM employees WHERE employee_id = ?',
+            [targetId]
         );
-        await db.query('UPDATE employees SET is_active = 0 WHERE employee_id = ?', [req.params.id]);
-        const name = rows[0] ? `${rows[0].first_name} ${rows[0].last_name}` : `employee #${req.params.id}`;
-        await db.query(
-            `INSERT INTO activity_log (action_type, description, performed_by, target_type, target_id)
-             VALUES ('employee_deactivated', ?, ?, 'employee', ?)`,
-            [`Deactivated ${name}`, req.user.employeeId || null, req.params.id]
+        if (!target) {
+            await conn.rollback();
+            return res.status(404).json({ error: 'Employee not found.' });
+        }
+        if (!target.is_active) {
+            await conn.rollback();
+            return res.status(400).json({ error: 'Employee is already deactivated.' });
+        }
+
+        // Who reports to them right now? Which departments do they run?
+        const [reports] = await conn.query(
+            'SELECT employee_id, first_name, last_name FROM employees WHERE manager_id = ? AND is_active = 1',
+            [targetId]
         );
-        return res.json({ success: true });
+        const [deptsRun] = await conn.query(
+            'SELECT dept_id, dept_name FROM departments WHERE manager_id = ?',
+            [targetId]
+        );
+
+        const hasLinks = reports.length > 0 || deptsRun.length > 0;
+
+        if (hasLinks) {
+            // Must be told where to move them. 409 Conflict + details so the
+            // admin UI can show a picker with the specific blockers.
+            if (!reassign_to_manager_id) {
+                await conn.rollback();
+                return res.status(409).json({
+                    error: 'Replacement manager required.',
+                    code: 'REASSIGN_REQUIRED',
+                    reports_count:   reports.length,
+                    departments_count: deptsRun.length,
+                    reports,
+                    departments: deptsRun,
+                });
+            }
+            const replacementId = Number(reassign_to_manager_id);
+            if (replacementId === targetId) {
+                await conn.rollback();
+                return res.status(400).json({ error: 'Replacement manager must be someone else.' });
+            }
+            // Validate the replacement: must be an active manager (or admin).
+            const [[replacement]] = await conn.query(
+                `SELECT employee_id, role, is_active FROM employees
+                  WHERE employee_id = ?`, [replacementId]
+            );
+            if (!replacement || !replacement.is_active) {
+                await conn.rollback();
+                return res.status(400).json({ error: 'Replacement manager is not an active employee.' });
+            }
+            if (!['admin', 'manager'].includes(replacement.role)) {
+                await conn.rollback();
+                return res.status(400).json({ error: 'Replacement must be a manager or admin.' });
+            }
+
+            if (reports.length > 0) {
+                await conn.query(
+                    'UPDATE employees SET manager_id = ? WHERE manager_id = ? AND is_active = 1',
+                    [replacementId, targetId]
+                );
+            }
+            if (deptsRun.length > 0) {
+                await conn.query(
+                    'UPDATE departments SET manager_id = ? WHERE manager_id = ?',
+                    [replacementId, targetId]
+                );
+            }
+        }
+
+        await conn.query('UPDATE employees SET is_active = 0 WHERE employee_id = ?', [targetId]);
+
+        const name = `${target.first_name} ${target.last_name}`;
+        const suffix = hasLinks
+            ? ` — reassigned ${reports.length} report${reports.length === 1 ? '' : 's'}`
+                + (deptsRun.length ? ` and ${deptsRun.length} dept${deptsRun.length === 1 ? '' : 's'}` : '')
+            : '';
+        await conn.query(
+            `INSERT INTO activity_log (action_type, description, performed_by, target_type, target_id, metadata)
+             VALUES ('employee_deactivated', ?, ?, 'employee', ?, ?)`,
+            [
+                `Deactivated ${name}${suffix}`,
+                req.user.employeeId || null,
+                targetId,
+                JSON.stringify({
+                    reassigned_to: hasLinks ? Number(reassign_to_manager_id) : null,
+                    reports_moved: reports.length,
+                    departments_moved: deptsRun.length,
+                }),
+            ]
+        );
+
+        await conn.commit();
+        return res.json({
+            success: true,
+            reassigned: hasLinks,
+            reports_moved: reports.length,
+            departments_moved: deptsRun.length,
+        });
     } catch (err) {
+        await conn.rollback();
         return res.status(500).json({ error: err.message });
+    } finally {
+        conn.release();
     }
 });
 

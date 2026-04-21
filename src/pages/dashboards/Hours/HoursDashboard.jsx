@@ -6,7 +6,7 @@ import {
     reviewHoursRequest,
 } from '../../../api/hours';
 import {
-    Clock, Plus, Trash2, CheckCircle, XCircle, Calendar, User
+    Clock, Plus, Trash2, CheckCircle, XCircle, Calendar, User, Search,
 } from 'lucide-react';
 import { DateRangeFilter } from '../../../components/AnimalsPanel';
 import { useToast, usePrompt } from '../../../components/Feedback';
@@ -87,9 +87,24 @@ export default function HoursDashboard() {
     const [entries, setEntries] = useState([blankEntry()]);
     const [submitting, setSubmitting] = useState(false);
 
-    // Review filter
+    // Review filter + shared "happened-between" date range + text search.
+    // Every list view (My Submissions, Review Queue, My Reviews) carries the
+    // same filter strip so employees, managers, and admins all have the
+    // same ergonomics. "Happened between" narrows by the entries' work_date,
+    // not the submission/review timestamp, so the question it answers is
+    // "what hours were worked in this window?" which is the one a manager
+    // actually asks.
     const [reviewFilter, setReviewFilter] = useState('pending');
-    // My Reviews date range
+    // Submissions (employee "My Submissions")
+    const [mineSearch, setMineSearch] = useState('');
+    const [mineFrom, setMineFrom] = useState('');
+    const [mineTo,   setMineTo]   = useState('');
+    // Review queue (admin/manager)
+    const [revSearch, setRevSearch] = useState('');
+    const [revFrom,   setRevFrom]   = useState('');
+    const [revTo,     setRevTo]     = useState('');
+    // My Reviews (admin/manager)
+    const [myRevSearch, setMyRevSearch] = useState('');
     const [myRevFrom, setMyRevFrom] = useState('');
     const [myRevTo,   setMyRevTo]   = useState('');
 
@@ -188,9 +203,70 @@ export default function HoursDashboard() {
 
     const totalHours = (req) => (req.entries || []).reduce((s, e) => s + Number(e.hours || 0), 0);
 
-    const filteredReview = reviewFilter === 'all'
-        ? allRequests
-        : allRequests.filter(r => r.status === reviewFilter);
+    // Shared narrowing helper — matches a request against a text query +
+    // a work_date range. Text search covers every line a reviewer actually
+    // wants to search: employee name, role, department, status, request
+    // number, and each entry's description. Date range matches any entry
+    // whose work_date falls inside [from, to].
+    const applyFilters = (rows, { search, from, to, dateMode = 'entries' }) => {
+        const term = (search || '').trim().toLowerCase();
+        return rows.filter(req => {
+            if (term) {
+                const hay = [
+                    req.employee?.first_name, req.employee?.last_name,
+                    req.employee?.role, req.employee?.dept_name,
+                    req.status, req.review_notes,
+                    req.reviewer?.first_name, req.reviewer?.last_name,
+                    `request #${req.request_id}`,
+                    ...(req.entries || []).map(e => e.description),
+                ].filter(Boolean).join(' ').toLowerCase();
+                if (!hay.includes(term)) return false;
+            }
+            if (from || to) {
+                if (dateMode === 'reviewed') {
+                    if (!req.reviewed_at) return false;
+                    const ts = new Date(req.reviewed_at).getTime();
+                    if (from && ts < new Date(from + 'T00:00:00').getTime()) return false;
+                    if (to   && ts > new Date(to   + 'T23:59:59').getTime()) return false;
+                } else {
+                    // "Happened between": any entry inside the window wins.
+                    const fromStr = from || '';
+                    const toStr   = to   || '';
+                    const hit = (req.entries || []).some(e => {
+                        const d = (e.work_date || '').slice(0, 10);
+                        if (!d) return false;
+                        if (fromStr && d < fromStr) return false;
+                        if (toStr   && d > toStr)   return false;
+                        return true;
+                    });
+                    if (!hit) return false;
+                }
+            }
+            return true;
+        });
+    };
+
+    const filteredReview = useMemo(() => {
+        const statusFiltered = reviewFilter === 'all'
+            ? allRequests
+            : allRequests.filter(r => r.status === reviewFilter);
+        return applyFilters(statusFiltered, { search: revSearch, from: revFrom, to: revTo });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [allRequests, reviewFilter, revSearch, revFrom, revTo]);
+
+    const filteredMine = useMemo(() =>
+        applyFilters(myRequests, { search: mineSearch, from: mineFrom, to: mineTo }),
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        [myRequests, mineSearch, mineFrom, mineTo]
+    );
+
+    const filteredReviewedByMe = useMemo(() =>
+        applyFilters(reviewedByMe, {
+            search: myRevSearch, from: myRevFrom, to: myRevTo, dateMode: 'reviewed',
+        }),
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        [reviewedByMe, myRevSearch, myRevFrom, myRevTo]
+    );
 
     // Build tabs per role. Managers/admins don't see Submit/My Submissions.
     const TABS = canReview
@@ -340,15 +416,24 @@ export default function HoursDashboard() {
             {/* ─── MY SUBMISSIONS (employees only) ─── */}
             {!canReview && tab === 'mine' && (
                 <div>
+                    <FilterStrip
+                        search={mineSearch} setSearch={setMineSearch}
+                        from={mineFrom} to={mineTo}
+                        setFrom={setMineFrom} setTo={setMineTo}
+                    />
                     {loading ? <p>Loading...</p>
                       : myRequests.length === 0 ? (
                         <div className="glass-panel" style={{ padding: '40px', textAlign: 'center', color: 'var(--color-text-muted)' }}>
                             <Clock size={40} style={{ opacity: 0.3, marginBottom: '10px' }} />
                             <p>No hours submitted yet.</p>
                         </div>
+                      ) : filteredMine.length === 0 ? (
+                        <div className="glass-panel" style={{ padding: '40px', textAlign: 'center', color: 'var(--color-text-muted)' }}>
+                            <p>No submissions match your filters.</p>
+                        </div>
                       ) : (
                         <RequestList
-                            items={myRequests}
+                            items={filteredMine}
                             totalHours={totalHours}
                             formatDate={formatDate}
                             statusBadge={statusBadge}
@@ -374,10 +459,15 @@ export default function HoursDashboard() {
                                 }}>{f}</button>
                         ))}
                     </div>
+                    <FilterStrip
+                        search={revSearch} setSearch={setRevSearch}
+                        from={revFrom} to={revTo}
+                        setFrom={setRevFrom} setTo={setRevTo}
+                    />
                     {loading ? <p>Loading...</p>
                       : filteredReview.length === 0 ? (
                         <div className="glass-panel" style={{ padding: '40px', textAlign: 'center', color: 'var(--color-text-muted)' }}>
-                            <p>No {reviewFilter} hours requests.</p>
+                            <p>No {reviewFilter} hours requests match your filters.</p>
                         </div>
                       ) : (
                         <RequestList
@@ -396,44 +486,59 @@ export default function HoursDashboard() {
             {/* ─── MY REVIEWS (admin / manager) ─── */}
             {canReview && tab === 'my-reviews' && (
                 <div>
-                    <DateRangeFilter
+                    <FilterStrip
+                        search={myRevSearch} setSearch={setMyRevSearch}
                         from={myRevFrom} to={myRevTo}
-                        onFrom={setMyRevFrom} onTo={setMyRevTo}
+                        setFrom={setMyRevFrom} setTo={setMyRevTo}
                         label="Reviewed between"
                     />
                     {loading ? <p>Loading...</p>
-                      : (() => {
-                            const fromTs = myRevFrom ? new Date(myRevFrom + 'T00:00:00').getTime() : null;
-                            const toTs   = myRevTo   ? new Date(myRevTo   + 'T23:59:59').getTime() : null;
-                            const filtered = reviewedByMe.filter(r => {
-                                if (!r.reviewed_at) return false;
-                                const ts = new Date(r.reviewed_at).getTime();
-                                if (fromTs && ts < fromTs) return false;
-                                if (toTs   && ts > toTs)   return false;
-                                return true;
-                            });
-                            if (filtered.length === 0) {
-                                return (
-                                    <div className="glass-panel" style={{ padding: '40px', textAlign: 'center', color: 'var(--color-text-muted)' }}>
-                                        <p>{reviewedByMe.length === 0
-                                            ? "You haven't reviewed any hours requests yet."
-                                            : 'No reviews in this date range.'}</p>
-                                    </div>
-                                );
-                            }
-                            return (
-                                <RequestList
-                                    items={filtered}
-                                    totalHours={totalHours}
-                                    formatDate={formatDate}
-                                    statusBadge={statusBadge}
-                                    mode="reviewed"
-                                    displayNumberFor={displayNumberFor}
-                                />
-                            );
-                        })()}
+                      : filteredReviewedByMe.length === 0 ? (
+                        <div className="glass-panel" style={{ padding: '40px', textAlign: 'center', color: 'var(--color-text-muted)' }}>
+                            <p>{reviewedByMe.length === 0
+                                ? "You haven't reviewed any hours requests yet."
+                                : 'No reviews match your filters.'}</p>
+                        </div>
+                      ) : (
+                        <RequestList
+                            items={filteredReviewedByMe}
+                            totalHours={totalHours}
+                            formatDate={formatDate}
+                            statusBadge={statusBadge}
+                            mode="reviewed"
+                            displayNumberFor={displayNumberFor}
+                        />
+                      )}
                 </div>
             )}
+        </div>
+    );
+}
+
+// Shared filter strip — search on top, date range below it. Matches the
+// Events tab layout so every dashboard feels consistent. Search is capped
+// at a sensible width instead of stretching full-page.
+function FilterStrip({ search, setSearch, from, to, setFrom, setTo, label = 'Happened between' }) {
+    return (
+        <div style={{
+            display: 'flex', flexDirection: 'column', gap: '10px',
+            marginBottom: '14px', alignItems: 'flex-start',
+        }}>
+            <div style={{ position: 'relative', width: '100%', maxWidth: '440px' }}>
+                <Search size={14} color={GREEN_DARK}
+                    style={{ position: 'absolute', left: '12px', top: '50%',
+                             transform: 'translateY(-50%)', opacity: 0.7, pointerEvents: 'none' }}
+                />
+                <input
+                    type="text"
+                    placeholder="Search by name, dept, description, status..."
+                    className="glass-input"
+                    value={search}
+                    onChange={e => setSearch(e.target.value)}
+                    style={{ paddingLeft: '32px', fontSize: '13px' }}
+                />
+            </div>
+            <DateRangeFilter from={from} to={to} onFrom={setFrom} onTo={setTo} label={label} />
         </div>
     );
 }

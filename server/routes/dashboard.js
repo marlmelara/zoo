@@ -214,10 +214,18 @@ router.get('/analytics/membership-insights', requireRole('admin','manager'), asy
             from ? [from, ...txW.vals] : txW.vals
         );
         // Summary top-line for the header cards + CSV footer.
+        // The "new in range" subquery must alias customers as `c` so the
+        // `c.membership_start` / `c.created_at` references inside
+        // `w.firstSql` resolve — without the alias, MySQL throws
+        // "Unknown column 'c.membership_start' in 'where clause'" the
+        // moment a date filter is applied, 500-ing the whole endpoint
+        // and making the graph + Show Data appear frozen on last-known
+        // data. (Customer Directory doesn't have this subquery, which is
+        // why the drill-down worked while the chart didn't.)
         const [[summary]] = await db.query(
             `SELECT
                 (SELECT COUNT(*) FROM customers WHERE is_member = 1 AND membership_end >= CURDATE()) AS active_members_now,
-                (SELECT COUNT(*) FROM customers${w.firstSql}) AS new_customers_in_range`,
+                (SELECT COUNT(*) FROM customers c${w.firstSql}) AS new_customers_in_range`,
             w.vals
         );
         return res.json({

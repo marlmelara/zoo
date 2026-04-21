@@ -1367,27 +1367,37 @@ export default function ManagerDashboard() {
 
                                         {/* Personnel & Animals */}
                                         <div style={{ borderTop: '1px solid rgba(121,162,128,0.25)', paddingTop: '12px', marginTop: '10px' }}>
+                                            {/* Personnel chips. Admins can × anybody (no
+                                                scoping); managers can × only employees in their
+                                                `staff` list (self + direct reports). Matches
+                                                the server scope on DELETE /api/events/assignments/:id
+                                                where admin short-circuits every ownership check. */}
                                             <p style={{ fontSize: '11px', color: MGR_GREEN_DARK, margin: '0 0 8px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Personnel</p>
                                             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '10px' }}>
                                                 {assigned.filter(a => a.employee_id).length === 0 ? (
                                                     <span style={{ fontSize: '13px', color: MGR_GREEN_DARK, fontStyle: 'italic', opacity: 0.75 }}>No staff assigned</span>
-                                                ) : assigned.filter(a => a.employee_id).map(a => (
-                                                    <div key={a.assignment_id} style={{
-                                                        display: 'flex', alignItems: 'center', gap: '6px',
-                                                        background: 'rgba(121,162,128,0.18)', color: MGR_GREEN_DARK, fontWeight: 600,
-                                                        padding: '5px 10px', borderRadius: '8px', fontSize: '13px'
-                                                    }}>
-                                                        <Users size={14} />
-                                                        <span>{a.first_name} {a.last_name}</span>
-                                                        <button
-                                                            onClick={() => handleRemoveEventAssignment(a.assignment_id)}
-                                                            style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '0 2px', fontSize: '16px', lineHeight: 1 }}
-                                                            title="Remove"
-                                                        >
-                                                            &times;
-                                                        </button>
-                                                    </div>
-                                                ))}
+                                                ) : assigned.filter(a => a.employee_id).map(a => {
+                                                    const canRemove = isAdmin || staff.some(s => s.employee_id === a.employee_id);
+                                                    return (
+                                                        <div key={a.assignment_id} style={{
+                                                            display: 'flex', alignItems: 'center', gap: '6px',
+                                                            background: 'rgba(121,162,128,0.18)', color: MGR_GREEN_DARK, fontWeight: 600,
+                                                            padding: '5px 10px', borderRadius: '8px', fontSize: '13px'
+                                                        }}>
+                                                            <Users size={14} />
+                                                            <span>{a.first_name} {a.last_name}</span>
+                                                            {canRemove && (
+                                                                <button
+                                                                    onClick={() => handleRemoveEventAssignment(a.assignment_id)}
+                                                                    style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '0 2px', fontSize: '16px', lineHeight: 1 }}
+                                                                    title="Remove"
+                                                                >
+                                                                    &times;
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                })}
                                             </div>
 
                                             {/* Animal chips. The remove (×) button only renders

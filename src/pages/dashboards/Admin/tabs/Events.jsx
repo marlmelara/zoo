@@ -92,14 +92,15 @@ export default function Events() {
   async function fetchResources() {
     try {
       // /employees/my-team returns the full roster for admins and just the
-      // reports for managers — same shape either way, so the dropdown
-      // automatically respects "can only assign my staff" without the
-      // frontend having to know the role.
+      // reports (plus self, flagged is_self=1) for managers. We keep self
+      // in the list so managers and admins can assign themselves to events
+      // when it makes sense — the server's managerOwnsEmployee check
+      // already treats self as "owned".
       const [staffData, animalData] = await Promise.all([
         api.get('/employees/my-team'),
         api.get('/animals'),
       ]);
-      setStaff((staffData || []).filter(e => !e.is_self));
+      setStaff(staffData || []);
       setAnimals(animalData || []);
     } catch (error) {
       console.error('Error fetching resources:', error);
@@ -563,15 +564,24 @@ export default function Events() {
             <div style={{ display: 'grid', gridTemplateColumns: canAssignAnimals ? '1fr 1fr' : '1fr', gap: '14px', marginBottom: '20px' }}>
               <div style={{ background: 'rgba(121,162,128,0.08)', border: `1px solid ${GREEN}33`, padding: '12px', borderRadius: '10px' }}>
                 <h4 style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: 0, marginBottom: '10px', fontSize: '0.88rem', color: GREEN_DARK }}><User size={14} /> Personnel</h4>
-                {assignments.filter(a => a.employee_id).map(a => (
-                  <div key={a.assignment_id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.82rem', marginBottom: '4px', color: 'var(--color-text-dark)' }}>
-                    <span>
-                      {a.first_name} {a.last_name}
-                      <span style={{ fontSize: '0.7rem', color: GREEN_DARK, marginLeft: '4px', opacity: 0.8 }}>({a.dept_name})</span>
-                    </span>
-                    <button onClick={() => handleRemoveAssignment(a.assignment_id)} style={{ background: 'none', border: 'none', color: '#b91c1c', cursor: 'pointer', padding: '0 4px', fontSize: '16px', lineHeight: 1, fontWeight: 700 }} title="Remove">&times;</button>
-                  </div>
-                ))}
+                {/* Admins can remove anyone (no scoping). Managers can
+                    only remove employees in their `staff` list (self +
+                    direct reports). Matches the server rule where admin
+                    short-circuits every ownership check. */}
+                {assignments.filter(a => a.employee_id).map(a => {
+                  const canRemove = role === 'admin' || staff.some(s => s.employee_id === a.employee_id);
+                  return (
+                    <div key={a.assignment_id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.82rem', marginBottom: '4px', color: 'var(--color-text-dark)' }}>
+                      <span>
+                        {a.first_name} {a.last_name}
+                        <span style={{ fontSize: '0.7rem', color: GREEN_DARK, marginLeft: '4px', opacity: 0.8 }}>({a.dept_name})</span>
+                      </span>
+                      {canRemove && (
+                        <button onClick={() => handleRemoveAssignment(a.assignment_id)} style={{ background: 'none', border: 'none', color: '#b91c1c', cursor: 'pointer', padding: '0 4px', fontSize: '16px', lineHeight: 1, fontWeight: 700 }} title="Remove">&times;</button>
+                      )}
+                    </div>
+                  );
+                })}
                 {assignments.filter(a => a.employee_id).length === 0 && <p style={{ fontSize: '0.75rem', color: GREEN_DARK, opacity: 0.7, margin: 0, fontStyle: 'italic' }}>None assigned.</p>}
               </div>
               {canAssignAnimals && (

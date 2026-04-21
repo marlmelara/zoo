@@ -206,9 +206,30 @@ router.patch('/:id', requireRole('admin', 'manager'), async (req, res) => {
     }
 });
 
-// DELETE /api/events/assignments/:assignmentId — admin/manager
+// DELETE /api/events/assignments/:assignmentId — admin / manager.
+//
+// Same scope rules as /assign:
+//   • admin                    — can remove anyone / any animal
+//   • manager                  — can only remove assignments for employees
+//                                who report to them (or themselves)
+//   • animal assignments       — only admin or vet/animal-care managers
+// Non-matching callers get 403. Looking up the assignment first lets us
+// return a clean 404 when the row doesn't exist.
 router.delete('/assignments/:assignmentId', requireRole('admin', 'manager'), async (req, res) => {
     try {
+        const [[assign]] = await db.query(
+            'SELECT assignment_id, employee_id, animal_id FROM event_assignments WHERE assignment_id = ?',
+            [req.params.assignmentId]
+        );
+        if (!assign) return res.status(404).json({ error: 'Assignment not found.' });
+
+        if (assign.employee_id && !(await managerOwnsEmployee(req.user, assign.employee_id))) {
+            return res.status(403).json({ error: 'You can only unassign your own staff.' });
+        }
+        if (assign.animal_id && !(await isAnimalDeptManager(req.user))) {
+            return res.status(403).json({ error: 'Only admins and Vet/Animal-Care managers can unassign animals.' });
+        }
+
         await db.query(
             'DELETE FROM event_assignments WHERE assignment_id = ?',
             [req.params.assignmentId]

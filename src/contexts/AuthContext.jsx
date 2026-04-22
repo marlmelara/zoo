@@ -19,6 +19,13 @@ export function AuthProvider({ children }) {
         setEmployeeId(userData.employeeId || null);
         setDeptId(userData.deptId || null);
         setDeptName(userData.deptName || null);
+        // Remember "last known kind" — sticks around after clearAuth so
+        // deactivation-triggered redirects know whether to send the user to
+        // the staff login or the customer account page. Token/user blob go
+        // away on logout; this sticky value doesn't.
+        if (userData.role) {
+            localStorage.setItem('zoo_last_role', userData.role);
+        }
     }, []);
 
     const clearAuth = useCallback(() => {
@@ -29,6 +36,8 @@ export function AuthProvider({ children }) {
         setEmployeeId(null);
         setDeptId(null);
         setDeptName(null);
+        // intentionally leave zoo_last_role so PrivateRoute can route
+        // the next redirect to the right login page.
     }, []);
 
     // ── Hydrate from localStorage on mount ──────────────────

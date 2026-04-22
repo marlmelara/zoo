@@ -35,11 +35,14 @@ export default function AnimalsPanel({ title = 'Animals', accentColor = 'var(--c
     // animal is selected" state here.
     const [selectedAnimal, setSelectedAnimal] = useState(null);
 
+    // `age` used to be a hand-entered input but the two fields drifted —
+    // someone would fix a DOB and forget to bump the age. The form now
+    // only takes DOB and the server derives `age` from it so the column
+    // can't contradict the DOB of record.
     const [formData, setFormData] = useState({
         name: '',
         species_common_name: '',
         species_binomial: '',
-        age: '',
         zone_id: '',
         arrived_date: '',
         date_of_birth: '',
@@ -84,21 +87,27 @@ export default function AnimalsPanel({ title = 'Animals', accentColor = 'var(--c
         }
         try {
             if (editing) {
+                // Only include DOB in the PATCH if the user touched it, so
+                // saving an edit on a legacy animal (no DOB on file) without
+                // filling it in doesn't silently clear their existing `age`
+                // via the server's recompute.
+                const dobChanged = formData.date_of_birth !==
+                    (editing.date_of_birth ? String(editing.date_of_birth).slice(0, 10) : '');
                 await api.patch(`/animals/${editing.animal_id}`, {
                     name: formData.name,
                     species_common_name: formData.species_common_name,
                     species_binomial: formData.species_binomial || null,
-                    age: formData.age === '' ? null : parseInt(formData.age),
                     zone_id: formData.zone_id === '' ? null : parseInt(formData.zone_id),
                     arrived_date: formData.arrived_date || null,
-                    date_of_birth: formData.date_of_birth || null,
+                    ...(dobChanged ? { date_of_birth: formData.date_of_birth || null } : {}),
                     image_url: formData.image_url?.trim() || null,
                 });
             } else {
                 await api.post('/animals', {
-                    ...formData,
-                    age: parseInt(formData.age),
-                    zone_id: parseInt(formData.zone_id),
+                    name: formData.name,
+                    species_common_name: formData.species_common_name,
+                    species_binomial: formData.species_binomial || null,
+                    zone_id: formData.zone_id === '' ? null : parseInt(formData.zone_id),
                     arrived_date: formData.arrived_date || null,
                     date_of_birth: formData.date_of_birth || null,
                     image_url: formData.image_url?.trim() || null,
@@ -106,7 +115,7 @@ export default function AnimalsPanel({ title = 'Animals', accentColor = 'var(--c
             }
             setShowForm(false);
             setEditing(null);
-            setFormData({ name: '', species_common_name: '', species_binomial: '', age: '', zone_id: '', arrived_date: '', date_of_birth: '', image_url: '' });
+            setFormData({ name: '', species_common_name: '', species_binomial: '', zone_id: '', arrived_date: '', date_of_birth: '', image_url: '' });
             fetchAnimals();
         } catch (error) {
             console.error('Error saving animal:', error);
@@ -120,7 +129,6 @@ export default function AnimalsPanel({ title = 'Animals', accentColor = 'var(--c
             name: animal.name || '',
             species_common_name: animal.species_common_name || '',
             species_binomial: animal.species_binomial || '',
-            age: animal.age ?? '',
             zone_id: animal.zone_id ?? '',
             arrived_date: animal.arrived_date ? String(animal.arrived_date).slice(0, 10) : '',
             date_of_birth: animal.date_of_birth ? String(animal.date_of_birth).slice(0, 10) : '',
@@ -132,7 +140,7 @@ export default function AnimalsPanel({ title = 'Animals', accentColor = 'var(--c
     function cancelForm() {
         setShowForm(false);
         setEditing(null);
-        setFormData({ name: '', species_common_name: '', species_binomial: '', age: '', zone_id: '', arrived_date: '', date_of_birth: '', image_url: '' });
+        setFormData({ name: '', species_common_name: '', species_binomial: '', zone_id: '', arrived_date: '', date_of_birth: '', image_url: '' });
     }
 
     function toggleSelect(id) {
@@ -275,10 +283,6 @@ export default function AnimalsPanel({ title = 'Animals', accentColor = 'var(--c
                                 <input className="glass-input" value={formData.species_binomial} onChange={e => setFormData({ ...formData, species_binomial: e.target.value })} />
                             </div>
                             <div>
-                                <label style={animalLabelStyle}>Age (Years)</label>
-                                <input required type="number" className="glass-input" value={formData.age} onChange={e => setFormData({ ...formData, age: e.target.value })} />
-                            </div>
-                            <div>
                                 <label style={animalLabelStyle}>Zone</label>
                                 <select required className="glass-input" value={formData.zone_id} onChange={e => setFormData({ ...formData, zone_id: e.target.value })}>
                                     <option value="">Select Zone...</option>
@@ -297,7 +301,26 @@ export default function AnimalsPanel({ title = 'Animals', accentColor = 'var(--c
                                 />
                             </div>
                             <div style={{ gridColumn: '1 / -1' }}>
-                                <label style={animalLabelStyle}>Date of Birth</label>
+                                <label style={animalLabelStyle}>
+                                    Date of Birth
+                                    {formData.date_of_birth && (() => {
+                                        // Age is always derived from DOB — show the computed
+                                        // value inline so whoever's filling the form sees the
+                                        // age that's going to land on the card.
+                                        const b = new Date(formData.date_of_birth + 'T00:00:00');
+                                        if (isNaN(b)) return null;
+                                        const n = new Date();
+                                        let y = n.getFullYear() - b.getFullYear();
+                                        if (n.getMonth() < b.getMonth() ||
+                                            (n.getMonth() === b.getMonth() && n.getDate() < b.getDate())) y -= 1;
+                                        return (
+                                            <span style={{ marginLeft: '8px', fontSize: '11px', fontWeight: 500,
+                                                color: GREEN_DARK, opacity: 0.75, textTransform: 'none', letterSpacing: 0 }}>
+                                                (age {Math.max(0, y)})
+                                            </span>
+                                        );
+                                    })()}
+                                </label>
                                 <input
                                     type="date"
                                     className="glass-input"

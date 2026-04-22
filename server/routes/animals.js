@@ -356,9 +356,23 @@ router.post('/:id/care-log', requireRole('admin','manager','caretaker'), async (
     }
 });
 
+// Whole years since a date of birth. Returns null for a missing DOB.
+function ageFromDob(dob) {
+    if (!dob) return null;
+    const birth = new Date(String(dob).slice(0, 10) + 'T00:00:00');
+    if (isNaN(birth.getTime())) return null;
+    const now = new Date();
+    let years = now.getFullYear() - birth.getFullYear();
+    const preBirthday =
+        now.getMonth() < birth.getMonth() ||
+        (now.getMonth() === birth.getMonth() && now.getDate() < birth.getDate());
+    if (preBirthday) years -= 1;
+    return Math.max(0, years);
+}
+
 // POST /api/animals
 router.post('/', requireRole('admin', 'manager', 'vet', 'caretaker'), async (req, res) => {
-    const { name, species_common_name, species_binomial, age, zone_id,
+    const { name, species_common_name, species_binomial, zone_id,
             arrived_date, date_of_birth, image_url } = req.body;
 
     // DOB rule: born-at-zoo shares the arrival day; acquired animals were
@@ -371,6 +385,12 @@ router.post('/', requireRole('admin', 'manager', 'vet', 'caretaker'), async (req
         });
     }
 
+    // `age` is now a derived column — computed from DOB instead of entered
+    // by hand so it can't drift out of sync. Legacy rows without a DOB
+    // land as NULL; callers can still backfill DOB later and a PATCH
+    // will recompute.
+    const computedAge = ageFromDob(date_of_birth);
+
     const conn = await db.getConnection();
     try {
         await conn.beginTransaction();
@@ -381,7 +401,7 @@ router.post('/', requireRole('admin', 'manager', 'vet', 'caretaker'), async (req
               health_record_id, arrived_date, date_of_birth, image_url)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [name, species_common_name, species_binomial || null,
-             age || null, zone_id || null, hrResult.insertId,
+             computedAge, zone_id || null, hrResult.insertId,
              effectiveArrival, date_of_birth || null,
              image_url && String(image_url).trim() ? String(image_url).trim() : null]
         );
@@ -492,8 +512,11 @@ router.post('/:id/medical-history', requireRole('admin', 'manager', 'vet'), asyn
 });
 
 // PATCH /api/animals/:id
+// `age` is intentionally NOT in the editable list — it's derived from
+// date_of_birth server-side so nobody can set a conflicting value. Any
+// time DOB is updated, we recompute and update age in the same query.
 router.patch('/:id', requireRole('admin', 'manager', 'vet', 'caretaker'), async (req, res) => {
-    const fields = ['name', 'species_common_name', 'species_binomial', 'age', 'zone_id',
+    const fields = ['name', 'species_common_name', 'species_binomial', 'zone_id',
                     'arrived_date', 'departed_date', 'date_of_birth', 'image_url'];
     const updates = []; const vals = [];
     for (const f of fields) {
@@ -515,6 +538,13 @@ router.patch('/:id', requireRole('admin', 'manager', 'vet', 'caretaker'), async 
             return res.status(400).json({
                 error: 'Date of birth must be on or before the arrival date.',
             });
+        }
+
+        // Recompute age if DOB was touched — keeps the denormalised
+        // age column in lockstep with the DOB of record.
+        if (req.body.date_of_birth !== undefined) {
+            updates.push('age = ?');
+            vals.push(ageFromDob(nextDob));
         }
 
         vals.push(req.params.id);

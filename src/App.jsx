@@ -56,7 +56,15 @@ const PrivateRoute = () => {
     return <div style={loadingScreenStyle}>Loading...</div>;
   }
 
-  return user ? <Outlet /> : <Navigate to="/login" replace />;
+  if (user) return <Outlet />;
+
+  // When a customer's account is deactivated (or their session expires)
+  // we still want to drop them on the customer portal, not the staff
+  // login. AuthContext stashes `zoo_last_role` on applyUser and leaves
+  // it in place on clearAuth for exactly this reason.
+  const lastRole = localStorage.getItem('zoo_last_role');
+  const fallback = lastRole === 'customer' ? '/account' : '/login';
+  return <Navigate to={fallback} replace />;
 };
 
 // Role guard: only allows specified roles, redirects others to /dashboard

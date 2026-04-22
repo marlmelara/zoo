@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../../../contexts/AuthContext';
 import api from '../../../lib/api';
 import {
@@ -9,6 +9,7 @@ import {
     restockOperationalSupply,
     getAllOperationalSupplies
 } from '../../../api/supplies';
+import { getLowStockItems } from '../../../api/inventory';
 import { queryActivity, logActivity } from '../../../api/activityLog';
 import { setHealthStatus } from '../../../api/animals';
 import AnimalMedicalPanel from '../../../components/AnimalMedicalPanel';
@@ -56,6 +57,15 @@ function HealthBadge({ status }) {
 const isAnimalDept = (deptName) => {
     const n = (deptName || '').toLowerCase();
     return n.includes('vet') || n.includes('animal') || n.includes('care');
+};
+
+// Retail-adjacent dept check — the Retail & Operations manager also owns
+// the shop-inventory bucket, so their low-stock panel needs retail rows
+// on top of their operational supplies. Substring match keeps it robust
+// against seed vs production dept naming.
+const isRetailDept = (deptName) => {
+    const n = (deptName || '').toLowerCase();
+    return n.includes('retail') || n.includes('shop');
 };
 
 export default function ManagerDashboard() {
@@ -111,8 +121,11 @@ export default function ManagerDashboard() {
     const [events, setEvents] = useState([]);
     const [eventsLoading, setEventsLoading] = useState(true);
 
-    // Supplies overview
+    // Supplies overview — operational (always) + retail low-stock (admin +
+    // retail dept only). The two lists are merged into one unified
+    // "Low Stock Supplies" panel on the Overview tab.
     const [allSupplies, setAllSupplies] = useState([]);
+    const [retailLowStock, setRetailLowStock] = useState([]);
 
     // Activity log state — paginated. Default page shows the 25 newest
     // rows; Next/Prev walks back through history. When a date range is
@@ -144,6 +157,43 @@ export default function ManagerDashboard() {
 
 
     const isAdmin = role === 'admin';
+    // Admins + retail-dept managers also own the retail shop bucket, so
+    // their Low Stock Supplies view pulls from both operational_supplies
+    // and the retail `inventory` table.
+    const canSeeRetailLowStock = isAdmin || (role === 'manager' && isRetailDept(deptName));
+
+    // Normalised combined low-stock list — operational supplies run through
+    // `.is_low_stock` locally (the /api/supplies payload includes it) and
+    // retail rows come pre-filtered from /api/inventory/low-stock. Sorted
+    // by stock ascending so the most-critical item lands at the top.
+    //
+    // /api/supplies returns every dept's ops to any manager, so we scope
+    // it client-side here: admins see everyone, managers only see their
+    // own dept. Other consumers of /api/supplies (e.g. the Supplies tab)
+    // keep their current cross-dept view.
+    const lowStockSupplies = useMemo(() => {
+        const myDeptId = resolvedDeptId ?? deptId;
+        const ops = (allSupplies || [])
+            .filter(s => s.is_low_stock)
+            .filter(s => isAdmin || (myDeptId != null && s.department_id === myDeptId))
+            .map(s => ({
+                key: `op-${s.supply_id}`,
+                name: s.item_name,
+                stock: s.stock_count,
+                threshold: s.restock_threshold,
+                source: 'operational',
+                sourceLabel: s.dept_name,
+            }));
+        const retail = (retailLowStock || []).map(i => ({
+            key: `retail-${i.item_id}`,
+            name: i.item_name,
+            stock: i.stock_count,
+            threshold: i.restock_threshold,
+            source: 'retail',
+            sourceLabel: i.shop_name || 'Retail',
+        }));
+        return [...ops, ...retail].sort((a, b) => a.stock - b.stock);
+    }, [allSupplies, retailLowStock]);
 
     // Resolve employee profile directly from DB using auth user ID
     useEffect(() => {
@@ -232,8 +282,16 @@ export default function ManagerDashboard() {
 
     async function fetchAllSupplies() {
         try {
-            const data = await getAllOperationalSupplies();
-            setAllSupplies(data);
+            // Run the ops + retail fetches in parallel. Retail only fires
+            // when the caller's scope covers the shop bucket (admin or
+            // retail-dept manager); everyone else gets an empty array,
+            // which falls through the `lowStockSupplies` merge cleanly.
+            const [ops, retail] = await Promise.all([
+                getAllOperationalSupplies(),
+                canSeeRetailLowStock ? getLowStockItems() : Promise.resolve([]),
+            ]);
+            setAllSupplies(ops || []);
+            setRetailLowStock(retail || []);
         } catch (err) {
             console.error('Error fetching all supplies:', err);
         }
@@ -679,8 +737,12 @@ export default function ManagerDashboard() {
                                 <h3 style={{ margin: 0 }}>Low Stock Items</h3>
                                 <AlertTriangle size={20} color="var(--color-accent)" />
                             </div>
-                            <p style={{ fontSize: '32px', fontWeight: 'bold', margin: 0, color: overviewStats.lowStockCount > 0 ? 'var(--color-accent)' : 'inherit' }}>
-                                {overviewLoading ? '...' : overviewStats.lowStockCount}
+                            {/* Count reads off the same merged list the panel
+                                below renders — single source of truth. The
+                                /api/dashboard/stats lowStockCount counts only
+                                inventory, which didn't match the panel's scope. */}
+                            <p style={{ fontSize: '32px', fontWeight: 'bold', margin: 0, color: lowStockSupplies.length > 0 ? 'var(--color-accent)' : 'inherit' }}>
+                                {overviewLoading ? '...' : lowStockSupplies.length}
                             </p>
                         </div>
                         <div className="glass-panel" style={{ padding: '20px' }}>
@@ -694,31 +756,49 @@ export default function ManagerDashboard() {
                         </div>
                     </div>
 
-                    {/* Low Stock Supplies */}
+                    {/* Low Stock Supplies — unified view over operational +
+                        retail stock. Retail rows only appear for admins and
+                        retail-dept managers (who own the shop bucket);
+                        everyone else sees operational only, matching the
+                        scoping baked into /api/supplies + /api/inventory/low-stock. */}
                     <h3 style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <Package size={20} /> Low Stock Operational Supplies
+                        <Package size={20} /> Low Stock Supplies
                     </h3>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                        {allSupplies.filter(s => s.is_low_stock).length === 0 ? (
+                        {lowStockSupplies.length === 0 ? (
                             <p style={{ color: 'var(--color-text-muted)' }}>All supplies are well-stocked.</p>
-                        ) : allSupplies.filter(s => s.is_low_stock).map(item => (
-                            <div key={item.supply_id} style={{
-                                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                                background: 'rgba(255, 245, 231, 0.78)', padding: '12px 15px', borderRadius: '10px',
-                                border: '1px solid rgba(239, 68, 68, 0.35)',
-                            }}>
-                                <div>
-                                    <span style={{ fontWeight: 700, color: 'var(--color-text-dark)' }}>{item.item_name}</span>
-                                    <span style={{ fontSize: '12px', color: MGR_GREEN_DARK, marginLeft: '10px', fontWeight: 600 }}>
-                                        {item.dept_name}
-                                    </span>
+                        ) : lowStockSupplies.map(item => {
+                            const isRetail = item.source === 'retail';
+                            return (
+                                <div key={item.key} style={{
+                                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                                    background: 'rgba(255, 245, 231, 0.78)', padding: '12px 15px', borderRadius: '10px',
+                                    border: '1px solid rgba(239, 68, 68, 0.35)',
+                                    gap: '10px',
+                                }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+                                        <span style={{
+                                            fontSize: '10px', fontWeight: 700,
+                                            textTransform: 'uppercase', letterSpacing: '0.05em',
+                                            padding: '2px 8px', borderRadius: '8px',
+                                            background: isRetail ? 'rgba(209, 146, 51, 0.18)' : 'rgba(121, 162, 128, 0.18)',
+                                            color: isRetail ? '#a8620b' : MGR_GREEN_DARK,
+                                            flexShrink: 0,
+                                        }}>
+                                            {isRetail ? 'Retail' : 'Operational'}
+                                        </span>
+                                        <span style={{ fontWeight: 700, color: 'var(--color-text-dark)' }}>{item.name}</span>
+                                        <span style={{ fontSize: '12px', color: MGR_GREEN_DARK, fontWeight: 600 }}>
+                                            {item.sourceLabel}
+                                        </span>
+                                    </div>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
+                                        <span style={{ fontWeight: 700, color: '#b91c1c' }}>{item.stock}</span>
+                                        <span style={{ fontSize: '12px', color: MGR_GREEN_DARK }}>/ {item.threshold} threshold</span>
+                                    </div>
                                 </div>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                    <span style={{ fontWeight: 700, color: '#b91c1c' }}>{item.stock_count}</span>
-                                    <span style={{ fontSize: '12px', color: MGR_GREEN_DARK }}>/ {item.restock_threshold} threshold</span>
-                                </div>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 </div>
             )}

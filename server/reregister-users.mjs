@@ -6,7 +6,8 @@
 // Run once against Azure after the initial data push:
 //     node reregister-users.mjs
 //
-// All users end up with the password:  DEFAULT_PASSWORD (below)
+// All users end up with the password in the SEED_PASSWORD env var
+// (set it in server/.env — never commit the actual value).
 // Re-running is safe — INSERT IGNORE + ON DUPLICATE KEY on email.
 // ================================================================
 
@@ -15,7 +16,11 @@ import bcrypt from 'bcryptjs';
 import dotenv from 'dotenv';
 dotenv.config();
 
-const DEFAULT_PASSWORD = 'zoo123456';
+const DEFAULT_PASSWORD = process.env.SEED_PASSWORD;
+if (!DEFAULT_PASSWORD) {
+    console.error('SEED_PASSWORD is not set — add it to server/.env before running.');
+    process.exit(1);
+}
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 async function main() {

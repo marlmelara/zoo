@@ -74,6 +74,7 @@ DB_PASSWORD=your-mysql-password
 DB_NAME=coog_zoo
 JWT_SECRET=change-me-in-production
 PORT=3001
+SEED_PASSWORD=pick-a-password-for-seeded-accounts
 EOF
 
 # 3a. OPTION A: load the populated dump we ship (fastest)

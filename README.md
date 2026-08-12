@@ -1,22 +1,20 @@
 # Coog Zoo — Database Management Application
 
-Full-stack zoo management system built for **COSC 3380 — Database Systems** (Spring 2026).
+Full-stack zoo management system.
 Runs on **MySQL 8 + Node.js/Express (API) + React 18 + Vite (client)**.
 
-- **Hosted URL:** _[paste the deployed URL here before submitting]_
+- **Live demo:** <https://zoo-chi.vercel.app>
 - **Team:** Marlon Melara, Ashley Truong, Connor Sivley, Pablo Velazquez-Bremont
-- **Course section / Team number:** _[fill in before emailing TAs]_
-- **Instructor:** Dr. Rakesh Verma / Prof. Ramamurthy (`uramamur@bcm.edu`)
-- **Project document:** [`docs/project-document.tex`](docs/project-document.tex) (LaTeX source — compile to PDF)
+- **Design document:** [`docs/project-document.tex`](docs/project-document.tex) (LaTeX source — compile to PDF)
 
 ---
 
-## What's in this submission
+## What's in this repo
 
 ```
 zoo/
 ├── docs/
-│   └── project-document.tex     ← the required project document
+│   └── project-document.tex     ← design document (LaTeX)
 ├── server/                      ← Node.js + Express API
 │   ├── routes/                  ← 15 route files, 109 REST endpoints
 │   ├── migrations/              ← numbered SQL migrations (triggers, schema tweaks)
@@ -36,7 +34,7 @@ zoo/
 │   ├── contexts/                ← AuthContext
 │   └── lib/api.js               ← fetch wrapper (JWT auto-attach)
 ├── public/                      ← static assets, logo, favicon
-├── coog_zoo_dump.sql            ← populated database dump (included separately)
+├── coog_zoo_dump.sql            ← populated database dump
 ├── package.json                 ← front-end deps + scripts
 ├── vite.config.js
 └── README.md                    ← you are here
@@ -106,22 +104,9 @@ node server/run-migration.mjs server/migrations/0025_supply_request_action.sql
 
 ---
 
-## Default logins for graders
+## Demo credentials
 
-Every seeded account shares the same password: **`zoo123456`**.
-Customer self-registration also works on `/signup`.
-
-| Role             | Email                          | Notes                                              |
-|------------------|--------------------------------|----------------------------------------------------|
-| Admin            | `admin@zoo.com`                | Full system access                                 |
-| Manager          | `john@zoo.com`                 | Animal Care / Vet manager — see supply approvals   |
-| Vet              | `lisa.vet@zoo.com`             | Rich medical-records form, My Animals, My Requests |
-| Caretaker        | `sam.caretaker@zoo.com`        | Daily care log, My Events, remove-stock flow       |
-| Security         | `security@zoo.com`             | Shift info + events                                |
-| Retail Associate | `retail@zoo.com`               | Can also restock shop inventory                    |
-| Customer         | `customer@zoo.com`             | Profile, purchases, tickets, donations             |
-
-Exact seeded emails depend on the dump; check `server/reregister-users.mjs` if you add or rename users.
+Demo credentials available on request. Customer self-registration also works on `/signup`.
 
 ---
 
@@ -165,7 +150,7 @@ Exact seeded emails depend on the dump; check `server/reregister-users.mjs` if y
 
 ## Triggers (semantic constraints)
 
-Ten MySQL triggers enforce cross-table invariants. See the project
+Ten MySQL triggers enforce cross-table invariants. See the design
 document (§ Semantic Constraints) for the full writeup.
 
 | Trigger                                   | Fires on                                | Rule enforced                                               |
@@ -187,7 +172,7 @@ Verify they're installed: `SHOW TRIGGERS FROM coog_zoo;`
 
 ## Reproducing the SQL dump
 
-The file `coog_zoo_dump.sql` (shipped in the submission ZIP) was produced with:
+The file `coog_zoo_dump.sql` was produced with:
 
 ```bash
 mysqldump -u root -p \
@@ -200,15 +185,6 @@ Loading it recreates the schema, triggers, and seed data in one shot.
 
 ---
 
-## Academic honesty
-
-This project is the team's own work, developed for the spring 2026 COSC 3380
-class. It complies with the [UH Code of Honor](https://www.uh.edu/nsm/students/undergraduate/code-of-honor)
-and the [UH Student Handbook](https://publications.uh.edu/content.php?catoid=49&navoid=18552).
-
-## Contacts
+## Contact
 
 - `marlonmelara96@gmail.com`
-- `ashleydtruong@gmail.com`
-- `connor.sivley@att.net`
-- `pablovelazquezbremont@gmail.com`

@@ -7,7 +7,17 @@ import { defineConfig, globalIgnores } from 'eslint/config'
 export default defineConfig([
   globalIgnores(['dist']),
   {
-    files: ['**/*.{js,jsx}'],
+    // The API half runs on Node, not in a browser: `process`, `Buffer` et al.
+    // are globals here. Without this block every server file reports no-undef.
+    files: ['server/**/*.{js,mjs}', 'api/**/*.js'],
+    languageOptions: {
+      ecmaVersion: 'latest',
+      sourceType: 'module',
+      globals: globals.node,
+    },
+  },
+  {
+    files: ['src/**/*.{js,jsx}'],
     extends: [
       js.configs.recommended,
       reactHooks.configs.flat.recommended,

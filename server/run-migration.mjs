@@ -10,6 +10,7 @@ import 'dotenv/config';
 import fs from 'fs';
 import path from 'path';
 import mysql from 'mysql2/promise';
+import { splitStatements, retargetDatabase } from './lib/sql-file.js';
 
 const file = process.argv[2];
 if (!file) {
@@ -24,40 +25,11 @@ if (!fs.existsSync(fullPath)) {
 
 const sql = fs.readFileSync(fullPath, 'utf8');
 
-// ── DELIMITER-aware statement splitter ──────────────────────
-function splitStatements(text) {
-    const out = [];
-    let delimiter = ';';
-    let current = '';
-    const lines = text.split('\n');
-    for (let rawLine of lines) {
-        const line = rawLine;
-        const trimmed = line.trim();
-        // Skip full-line comments (-- ...) / blank lines when splitting
-        if (/^DELIMITER\s+\S+/i.test(trimmed)) {
-            const flush = current.trim();
-            if (flush) out.push(flush);
-            current = '';
-            delimiter = trimmed.replace(/^DELIMITER\s+/i, '').trim();
-            continue;
-        }
-        current += line + '\n';
-        // Check if the current buffer (minus trailing whitespace) ends with
-        // the active delimiter.
-        const end = current.trimEnd();
-        if (end.endsWith(delimiter)) {
-            const stmt = end.slice(0, -delimiter.length).trim();
-            if (stmt) out.push(stmt);
-            current = '';
-        }
-    }
-    const leftover = current.trim();
-    if (leftover) out.push(leftover);
-    return out;
-}
-
-const statements = splitStatements(sql);
-console.log(`→ Parsed ${statements.length} statements from ${path.basename(fullPath)}`);
+const dbName = process.env.DB_NAME || 'coog_zoo';
+// Migrations hardcode `USE coog_zoo;`. Honour DB_NAME instead, so pointing
+// this script at a scratch database can't silently write to the real one.
+const statements = retargetDatabase(splitStatements(sql), dbName);
+console.log(`→ Parsed ${statements.length} statements from ${path.basename(fullPath)} (target: ${dbName})`);
 
 // ── Connect and run ─────────────────────────────────────────
 const isAzure = (process.env.DB_HOST || '').includes('database.azure.com');
@@ -68,7 +40,7 @@ const conn = await mysql.createConnection({
     port:     parseInt(process.env.DB_PORT || '3306'),
     user:     process.env.DB_USER     || 'root',
     password: process.env.DB_PASSWORD || '',
-    database: process.env.DB_NAME     || 'coog_zoo',
+    database: dbName,
     ssl:      useSSL ? { rejectUnauthorized: true } : undefined,
     multipleStatements: false,
 });

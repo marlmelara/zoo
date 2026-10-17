@@ -1,0 +1,78 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build-and-test:
+    name: Build + test
+    runs-on: ubuntu-latest
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: ci_root_password
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -pci_root_password"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+
+    env:
+      TEST_DB_HOST: 127.0.0.1
+      TEST_DB_PORT: 3306
+      TEST_DB_USER: zoo_test
+      TEST_DB_PASSWORD: zoo_test_password
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # 22 is the floor for `node --test` glob patterns, which npm test uses.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run build
+
+      # Two things the stock MySQL 8 container gets wrong for this suite:
+      #
+      #  1. New accounts default to caching_sha2_password, and mysql2 cannot
+      #     complete that handshake over a plain TCP socket — it dies with
+      #     ER_NET_READ_INTERRUPTED / "packets out of order". So the test
+      #     account is created with mysql_native_password explicitly.
+      #  2. Binary logging is on, so CREATE TRIGGER (migration 0010 adds four)
+      #     is refused without SUPER. Global privileges plus
+      #     log_bin_trust_function_creators cover it.
+      #
+      # Run through `docker exec` on the service container rather than a
+      # client on the runner, so this doesn't depend on the runner image
+      # happening to ship mysql-client.
+      - name: Create the test database account
+        run: |
+          docker exec ${{ job.services.mysql.id }} \
+            mysql -uroot -pci_root_password -e "
+              CREATE USER '$TEST_DB_USER'@'%'
+                IDENTIFIED WITH mysql_native_password BY '$TEST_DB_PASSWORD';
+              GRANT ALL PRIVILEGES ON *.* TO '$TEST_DB_USER'@'%' WITH GRANT OPTION;
+              SET GLOBAL log_bin_trust_function_creators = 1;
+              FLUSH PRIVILEGES;"
+
+      # Each test file builds its own `coog_zoo_<scope>_test` from
+      # server/schema.sql + every migration, runs against it, then drops it.
+      - run: npm test
+
+      # Non-blocking on purpose: src/ carries 63 eslint errors (unused vars,
+      # react-hooks/exhaustive-deps) that predate this workflow. They're
+      # reported so the number stays visible, but a red lint shouldn't be able
+      # to mask a red test.
+      - name: Lint (non-blocking)
+        continue-on-error: true
+        run: npm run lint

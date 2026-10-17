@@ -3,8 +3,9 @@
 **A zoo operations platform: a public storefront, seven role-scoped staff dashboards, and a MySQL schema that enforces its own rules.**
 
 [![Live demo](https://img.shields.io/badge/live-zoo--chi.vercel.app-2ea44f)](https://zoo-chi.vercel.app)
+[![CI](https://github.com/marlmelara/zoo/actions/workflows/ci.yml/badge.svg)](https://github.com/marlmelara/zoo/actions/workflows/ci.yml)
 [![React 19](https://img.shields.io/badge/React-19-61DAFB.svg?logo=react&logoColor=white)](package.json)
-[![Node 20+](https://img.shields.io/badge/Node-20%2B-339933.svg?logo=node.js&logoColor=white)](server/package.json)
+[![Node 22+](https://img.shields.io/badge/Node-22%2B-339933.svg?logo=node.js&logoColor=white)](server/package.json)
 [![MySQL 8](https://img.shields.io/badge/MySQL-8.0-4479A1.svg?logo=mysql&logoColor=white)](server/schema.sql)
 
 Guests browse animals, buy tickets, shop, donate and book events. Staff log in to
@@ -207,7 +208,8 @@ SHOW TRIGGERS FROM coog_zoo;   # all ten
 
 ## Running it locally
 
-**Requires** Node 20+, MySQL 8+.
+**Requires** MySQL 8+ and Node 20+ to run — Node 22+ to test, since `npm test`
+uses `node --test`'s glob patterns.
 
 ```bash
 npm install
@@ -275,6 +277,33 @@ The dump was produced with
 `mysqldump --routines --triggers --events --single-transaction`, so loading it
 recreates the triggers too.
 
+### Tests
+
+`npm test` builds its own throwaway `coog_zoo_<scope>_test` databases from
+`server/schema.sql` plus every migration, runs against them and drops them. It
+reads `TEST_DB_*`, never `server/.env`, and refuses any database whose name
+doesn't end in `_test` — so it cannot reach `coog_zoo`, let alone production.
+
+The account it connects as needs native auth (the same `caching_sha2_password`
+problem as above) and enough privilege to create the four triggers in migration
+0010, which binary logging otherwise refuses:
+
+```bash
+docker exec zoo-local mysql -uroot -pzoolocaldev -e \
+  "CREATE USER 'zoo_test'@'%' IDENTIFIED WITH mysql_native_password BY 'zootestdev';
+   GRANT ALL PRIVILEGES ON *.* TO 'zoo_test'@'%' WITH GRANT OPTION;
+   SET PERSIST log_bin_trust_function_creators = 1;"
+```
+
+```bash
+TEST_DB_HOST=127.0.0.1 TEST_DB_PORT=3307 \
+TEST_DB_USER=zoo_test TEST_DB_PASSWORD=zootestdev npm test
+```
+
+The centrepiece fires eight concurrent checkouts at one remaining unit and one
+remaining seat, twenty times over — `tests/oversell.test.js`, which also records
+what happened when it was run against the pre-fix code.
+
 ---
 
 ## What I built
@@ -315,11 +344,17 @@ fortnight of the course and after it, on top of the version we built together.
 
 Named here rather than left to be discovered:
 
-- **There is no automated test suite.** Not one test, and no CI. The oversell
-  guards were verified by hand against a local database. For a repo whose
-  central claim is about concurrent behaviour, a test that actually races two
-  checkouts is the most valuable missing piece, and its absence is the honest
-  headline of this section.
+- **Test coverage stops at the two guarantees worth proving.** CI builds the
+  front end and runs 21 tests against a MySQL 8 container, rebuilt from
+  `server/schema.sql` plus all twenty migrations on every run. The centrepiece
+  fires eight concurrent checkouts at one remaining unit and one remaining
+  seat, twenty times over, and asserts a single winner with `stock_count` and
+  `actual_attendance` inside their legal range; the rest cover all-or-nothing
+  multi-event carts and the role checks in `server/lib/roles.js`. Those tests
+  were confirmed to fail against the pre-fix code before being trusted. What
+  they do **not** cover is everything else: 13 of 15 route modules, every React
+  component, and the ten triggers. There are no component tests and no
+  end-to-end run of a real checkout through the UI.
 - **`npm run lint` reports 63 errors and 19 warnings**, all in `src/`. They are
   real: unused bindings, missing hook dependencies, state written during an
   effect. The front end grew fastest under a deadline and it shows. Nothing in

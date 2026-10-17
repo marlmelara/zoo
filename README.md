@@ -3,6 +3,7 @@
 **A zoo operations platform: a public storefront, seven role-scoped staff dashboards, and a MySQL schema that enforces its own rules.**
 
 [![Live demo](https://img.shields.io/badge/live-zoo--chi.vercel.app-2ea44f)](https://zoo-chi.vercel.app)
+[![CI](https://github.com/marlmelara/zoo/actions/workflows/ci.yml/badge.svg)](https://github.com/marlmelara/zoo/actions/workflows/ci.yml)
 [![React 19](https://img.shields.io/badge/React-19-61DAFB.svg?logo=react&logoColor=white)](package.json)
 [![Node 20+](https://img.shields.io/badge/Node-20%2B-339933.svg?logo=node.js&logoColor=white)](server/package.json)
 [![MySQL 8](https://img.shields.io/badge/MySQL-8.0-4479A1.svg?logo=mysql&logoColor=white)](server/schema.sql)
@@ -315,11 +316,17 @@ fortnight of the course and after it, on top of the version we built together.
 
 Named here rather than left to be discovered:
 
-- **There is no automated test suite.** Not one test, and no CI. The oversell
-  guards were verified by hand against a local database. For a repo whose
-  central claim is about concurrent behaviour, a test that actually races two
-  checkouts is the most valuable missing piece, and its absence is the honest
-  headline of this section.
+- **Test coverage stops at the two guarantees worth proving.** CI builds the
+  front end and runs 21 tests against a MySQL 8 container, rebuilt from
+  `server/schema.sql` plus all twenty migrations on every run. The centrepiece
+  fires eight concurrent checkouts at one remaining unit and one remaining
+  seat, twenty times over, and asserts a single winner with `stock_count` and
+  `actual_attendance` inside their legal range; the rest cover all-or-nothing
+  multi-event carts and the role checks in `server/lib/roles.js`. Those tests
+  were confirmed to fail against the pre-fix code before being trusted. What
+  they do **not** cover is everything else: 13 of 15 route modules, every React
+  component, and the ten triggers. There are no component tests and no
+  end-to-end run of a real checkout through the UI.
 - **`npm run lint` reports 63 errors and 19 warnings**, all in `src/`. They are
   real: unused bindings, missing hook dependencies, state written during an
   effect. The front end grew fastest under a deadline and it shows. Nothing in

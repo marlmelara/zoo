@@ -73,10 +73,14 @@ async function main() {
 
     for (const [email, { customer_ids, employee_ids }] of byEmail) {
         // Insert-or-fetch the user row by email
+        // The ON DUPLICATE branch must rewrite password_hash too. Without it a
+        // user row that already existed kept its old password, so re-running
+        // this script silently reset nobody — the one thing it exists to do.
         const [ins] = await conn.query(
             `INSERT INTO users (email, password_hash) VALUES (?, ?)
-             ON DUPLICATE KEY UPDATE user_id = LAST_INSERT_ID(user_id)`,
-            [email, hash]
+             ON DUPLICATE KEY UPDATE user_id = LAST_INSERT_ID(user_id),
+                                     password_hash = ?`,
+            [email, hash, hash]
         );
         // insertId is the new row's ID or (via LAST_INSERT_ID trick) the existing one
         const userId = ins.insertId;

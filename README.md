@@ -33,7 +33,17 @@ team's.
 | ![Our Animals: a grid of animal cards, each with a photograph, name and species, filterable by zone](docs/images/animals.jpg) | ![The gift shop: a grid of product cards with photographs, prices and Add to Cart buttons](docs/images/shop.jpg) |
 | **Our Animals** — the live roster, read from the database and filterable by zone. | **Gift Shop** — inventory-backed catalog; stock is checked under a row lock at checkout. |
 
-The staff dashboards are behind the login and are not pictured.
+### Behind the login
+
+Seven dashboards, each scoped to what its role may see. Captured from a local
+instance running the seed data in `coog_zoo_dump.sql`.
+
+| | |
+|---|---|
+| ![Admin Shop Performance tab: KPI cards for total retail, top category and best-seller above a dual-axis bar chart of revenue and units by category, with a date range picker, Show Data toggle and Export CSV button](docs/images/dash-admin-analytics.jpg) | ![Manager Activity Log: a searchable, date-filtered feed of audit entries, each showing the actor, an action-type chip such as "hours request denied" or "supply restocked", and a timestamp](docs/images/dash-activity-log.jpg) |
+| **Admin → Shop Performance.** The subtitle names the join it runs. Date range, CSV export and a Show Data toggle on every analytics tab. | **Manager → Activity Log.** Every lifecycle event, attributed to a person and searchable. |
+| ![Vet dashboard My Animals tab: cards for each assigned animal showing species, age, zone and a health-status dropdown, with the sidebar reduced to just the vet's own portal](docs/images/dash-vet-animals.jpg) | ![The add-medical-entry form: date, severity, status, diagnosis, injury, disease, treatment, medications, weight, temperature, heart rate and next follow-up fields](docs/images/dash-medical-form.jpg) |
+| **Vet → My Animals.** Only this vet's assignments — and the sidebar has collapsed to the one portal the role may open. | **Vet → Medical entry.** The structured record behind the health status. |
 
 ---
 
@@ -219,7 +229,27 @@ SEED_PASSWORD=pick-a-password-for-seeded-accounts
 EOF
 ```
 
-Load the database — either the populated dump, or the schema plus migrations:
+No MySQL installed? A throwaway container is the quickest route, and keeps the
+project's data off your own server:
+
+```bash
+docker run -d --name zoo-local -p 3307:3306 \
+  -e MYSQL_ROOT_PASSWORD=zoolocaldev -e MYSQL_DATABASE=coog_zoo mysql:8.0
+docker exec -i zoo-local mysql -uroot -pzoolocaldev coog_zoo < coog_zoo_dump.sql
+```
+
+Point `server/.env` at `DB_HOST=127.0.0.1`, `DB_PORT=3307`. The `mysql2` driver
+cannot complete MySQL 8's `caching_sha2_password` handshake over a plain socket,
+so give it a native-auth user:
+
+```bash
+docker exec zoo-local mysql -uroot -pzoolocaldev -e \
+  "CREATE USER 'zoo'@'%' IDENTIFIED WITH mysql_native_password BY 'zoolocaldev';
+   GRANT ALL PRIVILEGES ON coog_zoo.* TO 'zoo'@'%'; FLUSH PRIVILEGES;"
+```
+
+Otherwise, load the database into your own MySQL — either the populated dump, or
+the schema plus migrations:
 
 ```bash
 mysql -u root -p < coog_zoo_dump.sql          # fastest: schema + triggers + seed data

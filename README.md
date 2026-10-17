@@ -5,7 +5,7 @@
 [![Live demo](https://img.shields.io/badge/live-zoo--chi.vercel.app-2ea44f)](https://zoo-chi.vercel.app)
 [![CI](https://github.com/marlmelara/zoo/actions/workflows/ci.yml/badge.svg)](https://github.com/marlmelara/zoo/actions/workflows/ci.yml)
 [![React 19](https://img.shields.io/badge/React-19-61DAFB.svg?logo=react&logoColor=white)](package.json)
-[![Node 20+](https://img.shields.io/badge/Node-20%2B-339933.svg?logo=node.js&logoColor=white)](server/package.json)
+[![Node 22+](https://img.shields.io/badge/Node-22%2B-339933.svg?logo=node.js&logoColor=white)](server/package.json)
 [![MySQL 8](https://img.shields.io/badge/MySQL-8.0-4479A1.svg?logo=mysql&logoColor=white)](server/schema.sql)
 
 Guests browse animals, buy tickets, shop, donate and book events. Staff log in to
@@ -208,7 +208,8 @@ SHOW TRIGGERS FROM coog_zoo;   # all ten
 
 ## Running it locally
 
-**Requires** Node 20+, MySQL 8+.
+**Requires** MySQL 8+ and Node 20+ to run — Node 22+ to test, since `npm test`
+uses `node --test`'s glob patterns.
 
 ```bash
 npm install
@@ -275,6 +276,33 @@ database; staff accounts come from the seed data.
 The dump was produced with
 `mysqldump --routines --triggers --events --single-transaction`, so loading it
 recreates the triggers too.
+
+### Tests
+
+`npm test` builds its own throwaway `coog_zoo_<scope>_test` databases from
+`server/schema.sql` plus every migration, runs against them and drops them. It
+reads `TEST_DB_*`, never `server/.env`, and refuses any database whose name
+doesn't end in `_test` — so it cannot reach `coog_zoo`, let alone production.
+
+The account it connects as needs native auth (the same `caching_sha2_password`
+problem as above) and enough privilege to create the four triggers in migration
+0010, which binary logging otherwise refuses:
+
+```bash
+docker exec zoo-local mysql -uroot -pzoolocaldev -e \
+  "CREATE USER 'zoo_test'@'%' IDENTIFIED WITH mysql_native_password BY 'zootestdev';
+   GRANT ALL PRIVILEGES ON *.* TO 'zoo_test'@'%' WITH GRANT OPTION;
+   SET PERSIST log_bin_trust_function_creators = 1;"
+```
+
+```bash
+TEST_DB_HOST=127.0.0.1 TEST_DB_PORT=3307 \
+TEST_DB_USER=zoo_test TEST_DB_PASSWORD=zootestdev npm test
+```
+
+The centrepiece fires eight concurrent checkouts at one remaining unit and one
+remaining seat, twenty times over — `tests/oversell.test.js`, which also records
+what happened when it was run against the pre-fix code.
 
 ---
 

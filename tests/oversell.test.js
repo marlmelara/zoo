@@ -46,13 +46,16 @@
 import { before, after, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { connect } from './helpers/database.js';
+import { useDatabase } from './helpers/config.js';
+import { connect, provisionTestDatabase, dropTestDatabase } from './helpers/database.js';
 import { startTestServer } from './helpers/server.js';
 import {
     seedInventoryItem, setStock, getStock, countSaleItems,
     seedEvent, setAttendance, getEventCounters, countTickets,
     clearCheckoutData,
 } from './helpers/seed.js';
+
+useDatabase('oversell');
 
 // 8 concurrent requests, below server/db.js's connectionLimit of 10 so
 // every request is genuinely in flight rather than queued on the pool.
@@ -64,6 +67,7 @@ let server;
 let db;
 
 before(async () => {
+    await provisionTestDatabase();
     server = await startTestServer();
     db = await connect();
 });
@@ -71,6 +75,7 @@ before(async () => {
 after(async () => {
     await db?.end();
     await server?.close();
+    await dropTestDatabase();
 });
 
 function summarise(results) {

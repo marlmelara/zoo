@@ -1,45 +1,66 @@
 // ============================================================
 // Where the test suite is allowed to point, and nowhere else.
 //
-// Requires Node >= 22.13 — `npm test` passes --test-global-setup,
-// which builds the database once for the whole run.
+// `npm test` needs Node >= 22.6, where `node --test` learned to
+// take glob patterns.
 //
-// Every test runs against a throwaway database that this harness
-// creates and drops. It must never be the developer's `coog_zoo`
-// and must never be the Azure production server, so both are
-// refused here rather than discovered the hard way.
+// Every test file builds and drops its own throwaway database,
+// named `<prefix>_<scope>_test`. That keeps files independent —
+// `node --test tests/oversell.test.js` works on its own, and
+// node's default parallel file execution can't have two files
+// clobbering one schema.
+//
+// The database must never be the developer's `coog_zoo` and never
+// the Azure production server, so both are refused here rather
+// than discovered the hard way.
 //
 // Override with env vars when your MySQL isn't on the default
-// socket — e.g. the local Docker container in the README:
+// socket — e.g. the local Docker container from the README:
 //
 //   TEST_DB_HOST=127.0.0.1 TEST_DB_PORT=3307 \
 //   TEST_DB_USER=zoo_test TEST_DB_PASSWORD=zootestdev npm test
 //
-// The user needs CREATE/DROP on the test database. MySQL 8 defaults
-// new accounts to caching_sha2_password, which mysql2 cannot complete
-// over a plain TCP socket (it dies with ER_NET_READ_INTERRUPTED /
-// "packets out of order"), so create the account explicitly:
+// That account needs more than it might look like:
 //
 //   CREATE USER 'zoo_test'@'%' IDENTIFIED WITH mysql_native_password
 //     BY 'zootestdev';
-//   GRANT ALL PRIVILEGES ON `coog_zoo_test`.* TO 'zoo_test'@'%';
+//   GRANT ALL PRIVILEGES ON *.* TO 'zoo_test'@'%' WITH GRANT OPTION;
+//   SET PERSIST log_bin_trust_function_creators = 1;
+//
+//  - mysql_native_password because mysql2 cannot complete MySQL 8's
+//    default caching_sha2_password handshake over a plain TCP socket;
+//    it fails with ER_NET_READ_INTERRUPTED / "packets out of order".
+//  - Global privileges plus log_bin_trust_function_creators because
+//    binary logging is on by default, and CREATE TRIGGER (migration
+//    0010 adds four) is refused without SUPER.
 // ============================================================
 
+let scope = 'default';
+
+// Called once at the top of each test file, before any hook runs.
+export function useDatabase(name) {
+    if (!/^[a-z][a-z0-9_]*$/.test(name)) {
+        throw new Error(`Invalid test database scope: ${name}`);
+    }
+    scope = name;
+}
+
 export function testDbConfig() {
+    const prefix = process.env.TEST_DB_PREFIX || 'coog_zoo';
     const cfg = {
         host:     process.env.TEST_DB_HOST     || '127.0.0.1',
         port:     Number(process.env.TEST_DB_PORT || 3306),
         user:     process.env.TEST_DB_USER     || 'root',
         password: process.env.TEST_DB_PASSWORD ?? '',
-        database: process.env.TEST_DB_NAME     || 'coog_zoo_test',
+        database: `${prefix}_${scope}_test`,
     };
     assertDisposableTarget(cfg);
     return cfg;
 }
 
 // Two hard stops. Neither is configurable on purpose: the suite
-// truncates tables and drops its database, so "are you sure?" is
-// not a question worth asking at runtime.
+// drops its database on the way out, so "are you sure?" is not a
+// question worth asking at runtime.
 export function assertDisposableTarget(cfg) {
     if (/azure|rds\.amazonaws|planetscale/i.test(cfg.host)) {
         throw new Error(

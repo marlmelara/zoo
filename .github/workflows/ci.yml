@@ -28,11 +28,11 @@ jobs:
       TEST_DB_PORT: 3306
       TEST_DB_USER: zoo_test
       TEST_DB_PASSWORD: zoo_test_password
-      TEST_DB_NAME: coog_zoo_test
 
     steps:
       - uses: actions/checkout@v4
 
+      # 22 is the floor for `node --test` glob patterns, which npm test uses.
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -65,8 +65,8 @@ jobs:
               SET GLOBAL log_bin_trust_function_creators = 1;
               FLUSH PRIVILEGES;"
 
-      # Builds coog_zoo_test from server/schema.sql + every migration, runs
-      # the oversell race and the roles tests against it, then drops it.
+      # Each test file builds its own `coog_zoo_<scope>_test` from
+      # server/schema.sql + every migration, runs against it, then drops it.
       - run: npm test
 
       # Non-blocking on purpose: src/ carries 63 eslint errors (unused vars,

@@ -1,6 +1,11 @@
 // ============================================================
 // Build and tear down the throwaway test database.
 //
+// Called from each test file's before/after hooks rather than a
+// single global setup: `node --test --test-global-setup=...` only
+// exists on very recent Node, and a suite that needs a bleeding-edge
+// flag to run at all is a suite nobody runs.
+//
 // The schema this project ships is split in two: `server/schema.sql`
 // (tables as first created) and twenty `server/migrations/*.sql`
 // files applied on top. Tests load both, in that order, so what they

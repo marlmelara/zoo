@@ -13,8 +13,10 @@
 import { before, after, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { connect } from './helpers/database.js';
-import { applyServerEnv } from './helpers/config.js';
+import { connect, provisionTestDatabase, dropTestDatabase } from './helpers/database.js';
+import { applyServerEnv, useDatabase } from './helpers/config.js';
+
+useDatabase('roles');
 
 let db;
 let pool;
@@ -27,6 +29,7 @@ let assignedAnimalId;
 let unassignedAnimalId;
 
 before(async () => {
+    await provisionTestDatabase();
     applyServerEnv();
     roles  = await import('../server/lib/roles.js');
     pool   = (await import('../server/db.js')).default;
@@ -73,6 +76,7 @@ before(async () => {
 after(async () => {
     await db?.end();
     await pool?.end();
+    await dropTestDatabase();
 });
 
 const user = (role, { employeeId = null, deptId = null } = {}) =>
